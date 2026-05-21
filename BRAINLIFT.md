@@ -79,8 +79,9 @@ Four buttons: Buy Yes, Buy No, Sell Yes, Sell No. Each = one wallet-signed trans
 - **Automation service:** Node.js + TypeScript on **Trigger.dev** (free tier) at separate `services/automation/` workspace package — cron platform handles the 8am ET morning job + ~4:05pm ET settlement nudger
 - **Package manager:** **pnpm** always (never npm, never yarn)
 - **Monorepo:** pnpm workspaces
-- **Testing (Anchor):** mocha + chai + ts-mocha via `anchor test` (the Anchor default)
-- **Testing (TS):** Jest (frontend + service unit tests)
+- **Testing (Anchor + integration + eval):** mocha + chai + ts-mocha via `anchor test` (Anchor default; Drew's `tests/integration/` + `tests/eval/` also use this)
+- **Testing (automation service):** **Vitest** (ESM-first; clean with Trigger.dev v4 + `"type": "module"`; Jest+TS+ESM interop is friction Bram explicitly chose to avoid)
+- **Testing (frontend):** Jest (Next.js default)
 - **Primary invariant verification:** **compressed-time lifecycle simulation** at `scripts/simulate-trading-day.mjs` (60s = 1 trading day, ≥3 wallets, multi-user) — Drew-owned. Catches multi-user contention bugs that per-function tests miss (per `LESSONS.md` Lesson 10). Supplemented by parameterized mocha tests for specific edge cases.
 - **Linting:** ESLint + Prettier (TS); clippy + rustfmt (Rust)
 - **Deployment:** Solana devnet (contracts), Vercel (frontend), Trigger.dev (automation service)

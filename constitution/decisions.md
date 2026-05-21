@@ -119,6 +119,31 @@ The on-chain shape:
 
 ---
 
+### DR-004 — Anchor CLI 0.31.1 paired with `@coral-xyz/anchor` JS 0.30.1 (deliberate version mismatch)
+
+**Date:** 2026-05-22 (Day-2 morning, surfaced by Aria + Bram Day-1 handoffs)
+**Status:** Active
+**Made by:** Cory (Tate) per `LESSONS.md` Lesson 1
+
+**Context:** Aria's `Anchor.toml` pins **anchor-cli 0.31.1** (required for Solana 3.x sBPF v3 compatibility per LESSONS.md Lesson 2). Bram + Cleo + Drew pin **`@coral-xyz/anchor` 0.30.1** in their JS workspaces. These versions cannot be unified without giving up either Solana 3.x VM compat (downgrade CLI to 0.30) or ecosystem stability (bump JS to 0.31, which is recently-cut and has not propagated through wallet-adapter / TanStack peer-deps). Aria flagged the mismatch as a potential IDL-deserialization risk for complex enum types.
+
+**Decision:** Keep the mismatch. **Anchor CLI 0.31.1 (Aria) + `@coral-xyz/anchor` JS 0.30.1 (Bram / Cleo / Drew).** This is the exact combination `LESSONS.md` (Ken's same-project Meridian build) shipped to devnet with successfully.
+
+**Trade-off:** We pay the risk that complex enum types in the IDL emitted by Anchor 0.31 don't decode cleanly in the 0.30 client (one-line manual JSON patch if it happens; verified on first `anchor build`) in exchange for: Solana 3.x sBPF v3 compatibility (avoids LESSONS.md Lesson 2's "code that ran on 2.x is rejected by 3.x" trap), and ecosystem stability (every wallet-adapter / TanStack / shadcn / Anchor JS dep in our tree is tested against `@coral-xyz/anchor` 0.30.x; bumping to 0.31 client invites unrelated peer-dep breakage).
+
+**Consequences:**
+- BellMarkets' `Outcome` enum is two simple variants (`YesWins`, `NoWins`) — far simpler than the cases where IDL mismatch bites (deeply nested generics, custom serializer-tagged unions). Low probability of needing the manual patch.
+- **Day-2 verification step (Aria):** after first `anchor build` produces `target/idl/bell_markets.json`, manually deserialize a `MarketConfig` + a `StrikeMarket` + an `Outcome` value via the JS client (`@coral-xyz/anchor@0.30.1`). If any field decodes incorrectly, manually patch the IDL JSON to match the 0.30 client's expected shape (typically a one-line field-rename). Document the patch in `apps/web/src/idl/bell_markets.json` with a comment block explaining the manual edit.
+- **AVM auto-switching mitigates the host-toolchain side.** AVM reads `[toolchain] anchor_version` from `Anchor.toml` in each project's cwd, so the host's `anchor` command auto-uses 0.31.1 for BellMarkets and 0.32.1 for w3Swap. No global pin conflict.
+- If the IDL mismatch turns out to be unworkable (worst case), the fallback is to bump JS client to 0.31 across all 3 JS workspaces. This is a one-PR change but invites peer-dep churn — only triggered if the manual patch path fails for some unexpected complex type.
+
+**Alternatives considered:**
+- **Bump JS client to `@coral-xyz/anchor@0.31`:** rejected — 0.31 client is recently-cut; ecosystem (wallet-adapter, TanStack Query) hasn't pinned against it yet; introduces unrelated peer-dep risk to a 3-day build.
+- **Downgrade CLI to `anchor-cli@0.30.1`:** rejected — LESSONS.md Lesson 2 documents that Solana 3.x's sBPF v3 VM rejects code older Anchor versions produced. We'd ship a binary that compiles locally but won't run on current devnet.
+- **Both at 0.32 (matching w3Swap):** rejected — 0.32 has its own IDL format changes; LESSONS.md's tested combination is the 0.31/0.30 split, not 0.32 unified.
+
+---
+
 > Aim for 5–15 active DRs over a project's life. Fewer and you're not
 > locking enough; more and the file becomes unscannable (rotate stable
 > ones into `specs/architecture.md` if they've become "just how the
