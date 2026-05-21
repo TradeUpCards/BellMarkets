@@ -161,7 +161,29 @@
 
 ---
 
-> Aim for clarity over completeness. 7 well-documented deferrals beat 20 thin ones. If something genuinely doesn't need deferral context (e.g., "we're not building an iOS native app"), it can live in `specs/bell-markets-spec.md` §6 (Non-goals) as a one-liner instead.
+### Docker / containerization for build, deploy, or demo
+
+**Status:** Deferred indefinitely (architecturally not needed for this stack)
+**Decided in:** Day-0 presearch session
+**Decided on:** 2026-05-21
+
+**What we considered:** Adding a `Dockerfile` + `docker-compose.yml` that pins the Solana CLI 3.1.14 / Anchor 0.31.1 / Rust 1.95 / Node 24 / pnpm toolchain inside a container, so any grader could run `docker compose up` to reproduce the full lifecycle on any host machine. This is the pattern the team's prior Solana project (w3Swap) used.
+
+**Why deferred:**
+- **No service in BellMarkets' stack actually needs containerization.** The Solana program deploys via `anchor deploy` from a dev machine; the frontend deploys to Vercel which builds from git natively (and fights containerization); the automation runs on Trigger.dev's managed runtime. There is no Python / FastAPI / custom backend service (like w3Swap had) that needs packaging.
+- **Toolchain consistency across the 4 leads is already solved** via version pins in `Anchor.toml`, `BRAINLIFT.md` §3, and `package.json` engines/packageManager. Docker would be redundant infrastructure for a job already done.
+- **The grader workflow** (per ARCHITECTURE.md §1: async repo review + on-demand live devnet demo + recorded backup video) does NOT require grader-side toolchain installation. The team demos on their own pinned machines; the recorded video is the async artifact. Containerization adds no value here.
+- **Time cost is real on a 3-day window:** ~3-6 hours of Aria/Drew time to write + test + verify that `anchor deploy` works from inside a container with the Solana keypair mounted from the host. That time is better spent on the lifecycle, the simulation, and the demo recording.
+
+**Trade-off accepted:** A hostile reviewer who asks "why no Docker?" gets a project-specific defense: "Our stack has no service that benefits from containerization (Solana program deploys directly; Vercel builds natively; Trigger.dev manages its own runtime). Toolchain consistency is solved by version pins. Grader workflow is async + video + on-demand-live, none of which need grader-side reproducibility." If a future component required a custom managed-runtime service or a deterministic build environment for audit, Docker would be the right call.
+
+**Revisit threshold:** Only if (a) BellMarkets adds a custom backend service that doesn't fit a managed runtime like Trigger.dev / Vercel / Solana RPC, OR (b) mainnet stretch goal requires a deterministic, audit-friendly build environment for on-chain program verification (e.g., publishing reproducible build hashes alongside the deployed program). Until either trigger fires, indefinite skip.
+
+**Re-evaluation owner:** Aria + Tate. If a new backend service is introduced, Aria flags whether it needs containerization; Tate decides.
+
+---
+
+> Aim for clarity over completeness. 8 well-documented deferrals beat 20 thin ones. If something genuinely doesn't need deferral context (e.g., "we're not building an iOS native app"), it can live in `specs/bell-markets-spec.md` §6 (Non-goals) as a one-liner instead.
 
 ---
 
