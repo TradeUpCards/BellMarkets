@@ -1,33 +1,38 @@
 # Claude Session Handoff — BellMarkets
 
-**Date:** _(filled by /session-handoff at first run)_
-**Session phase:** Day 0 — initial setup; first substantive session not yet run
+**Date:** 2026-05-21 (Thu evening, EOD)
+**Session phase:** **Day 0 complete; Day 1 ready to dispatch all 4 leads in parallel.**
 **Next hard gate:** Mon 2026-05-25 7:00 PM ET (Final). Informal MVP target: Fri 2026-05-22 9:00 PM ET.
-**Current branch / SHA:** main @ _(filled by /session-handoff after first commit)_
+**Current branch / SHA:** main @ `709a00b` (presearch ARCHITECTURE.md + LESSONS.md recalibrations). 6 commits total on Day 0; all pushed to GitLab + GitHub.
 
 ---
 
 ## TATE — START HERE
 
-This is a freshly-initialized project from `claude-code-project-template`. Run `/tate` to get your morning report. Then your first action will likely be:
+**Day 0 is complete.** BRAINLIFT.md filled (147 lines), constitution/ + specs/ populated, ARCHITECTURE.md written via /presearch-interview, Drew promoted from generic quality-lead to a named 4th lead, all INFERRED tags resolved, LESSONS.md recalibrations applied (Anchor 0.31.1 / Solana 3.1.14 / React 18 / Next 14.2.18 / vendored Pyth parser / Phoenix UncheckedAccount pattern / compressed-time simulation as primary verification). All 4 leads have populated first-task kickoffs at `.project/bell-markets/kickoff/{aria,bram,cleo,drew}.md`.
 
-- Verify git state (initial commit done, remote(s) set up)
-- Read `.project/bell-markets/docs/prd/project_1771969779565.pdf` (the Meridian PRD — full project brief)
-- Read `BRAINLIFT.md` (skeletal — needs `/brainlift` to fill) and `constitution/` + `specs/` (skeletal — need `/sdd-init` to fill)
-- Read `.project/bell-markets/in-flight.md` for the workstream coordination map
-- Recommend the Day 0 sequence: fill BRAINLIFT.md → fill SDD scaffolding → dispatch first lead (likely Aria for the Anchor program skeleton)
+**On next session start, your first action sequence:**
 
-After your first substantive session, run `/session-handoff` to refresh THIS file with real state.
+1. Run `git fetch origin main` (sync from possible lead pushes overnight)
+2. Read `.project/bell-markets/in-flight.md` for active workstream status
+3. Read each lead's handoff at `.project/bell-markets/handoffs/{aria,bram,cleo,drew}-handoff.md` — they should exist after their first sessions
+4. Surface the 4-line morning report (days to gate, build state, lead status, recommendation for today)
+5. Run `/daily-sync` to refresh + synthesize all 4 lead states into a single coordinated status
+
+The build timeline is in `docs/TIMELINE.md` (Gantt + per-lead Day-1 deliverables + risks). Critical gate: **Sat 5/23 6pm ET — Aria's first devnet deploy** unblocks live integration for the other 3 leads.
 
 ---
 
 ## Current Objective
 
-BellMarkets is a non-custodial Solana dApp for trading binary outcome contracts on daily MAG7 stock prices, with $1 USDC payouts settled on-chain via a price oracle at 4PM ET (Gauntlet "Meridian" project).
+Ship the Gauntlet "Meridian" submission: non-custodial Solana dApp for binary outcome contracts on daily MAG7 stock prices, $1 USDC invariant payouts, on-chain Pyth settlement at 4:05 PM ET, Phoenix CLOB. Final deadline: Mon 2026-05-25 7:00 PM ET.
 
-Day 0 priority: convert the PRD into a defensible architecture (BRAINLIFT + SDD), then start the Anchor program skeleton + monorepo scaffolding.
-
-_(Update this section after each session to reflect what we're trying to ship right now.)_
+**Day-by-day plan:**
+- **Day 0 (Thu 5/21, DONE):** Brainlift + SDD + presearch + Drew roster + LESSONS.md recalibrations. 6 commits pushed.
+- **Day 1 (Fri 5/22):** All 4 leads scaffold their workstream packages in parallel — see `docs/TIMELINE.md` for per-lead deliverables. Target by 9pm ET: 4 worktree branches with passing scaffold-level work.
+- **Day 2 (Sat 5/23):** Aria deploys first devnet program (CRITICAL gate at 6pm ET); Cleo wires trade buttons to live program; Bram wires jobs to deployed program; Drew runs compressed-time simulation against real chain.
+- **Day 3 (Sun 5/24):** Bug-fix iteration; cron-failure demo path scripted; demo video recorded; defense narrative written.
+- **Day 4 (Mon 5/25):** Demo dry-runs; final commits + grader-handoff verification before 7pm ET hard final.
 
 ---
 
