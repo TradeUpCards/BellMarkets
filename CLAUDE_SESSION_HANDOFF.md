@@ -36,7 +36,7 @@ _(Update this section after each session to reflect what we're trying to ship ri
 | # | Decision | Chosen | Rationale |
 |---|---|---|---|
 | 1 | Package manager | pnpm (always — never npm/yarn) | User preference; pnpm workspaces fit the multi-package monorepo (apps/web, services/automation) |
-| 2 | Lead setup | Option C named leads (Aria/Bram/Cleo) + generic quality-lead | 3 distinct workstreams (onchain, automation, frontend) + a separate owner for cross-cutting integration tests + demo |
+| 2 | Lead setup | Option C named leads (Aria/Bram/Cleo/Drew) | 4 distinct workstreams: onchain, automation, frontend, and cross-cutting quality+integration+demo. Drew was promoted from generic quality-lead to a named 4th lead on Day 0 |
 | 3 | Worktree mode | Mode 2 (per-lead worktrees, sibling `BellMarkets-<lead>`) | Sustained multi-day parallel work between contract + service + frontend |
 | 4 | Doc weight | Both Brain Lift + SDD from day one | User explicitly chose both — not the migration path; want the constitution scaffolding live before any code |
 | 5 | License | Apache 2.0 | Explicit patent grant is helpful for crypto/DeFi |

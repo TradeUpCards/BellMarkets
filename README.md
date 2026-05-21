@@ -27,9 +27,9 @@ Two tokens per contract — **Yes** and **No** — trade against USDC on an on-c
 | **Aria** | Onchain (Solana / Anchor) — mint-pair, settle, redeem, oracle integration, order book | `programs/**`, `tests/contracts/**`, `migrations/**`, `Anchor.toml`, `Cargo.*` |
 | **Bram** | Automation Service (Node/TS) — morning create-markets, ~4:05pm settle, retry+backoff | `services/automation/**`, `services/oracle-adapter/**`, `tests/automation/**` |
 | **Cleo** | Frontend (Next.js/React/TS) — Landing/Markets/Trade/Portfolio/History, wallet, order book UI | `apps/web/**`, `packages/ui/**`, `tests/frontend/**` |
-| **quality-lead** (ad-hoc) | Cross-cutting — integration tests (full lifecycle), eval suite, demo script, README narrative | `tests/integration/**`, `tests/eval/**`, `docs/demo/**` |
+| **Drew** | Quality + Integration + Demo — full-lifecycle tests, property-based invariant evals, demo script, cron-failure path | `tests/integration/**`, `tests/eval/**`, `docs/demo/**`, `scripts/one-command-demo.sh` |
 
-Coordinated by **Tate** (Director, `/tate`). See `.project/bell-markets/in-flight.md` for the live workstream map and file-ownership rules.
+Coordinated by **Tate** (Director, `/tate`). Slash commands: `/aria`, `/bram`, `/cleo`, `/drew`. See `.project/bell-markets/in-flight.md` for the live workstream map and file-ownership rules.
 
 ---
 

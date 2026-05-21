@@ -1,188 +1,147 @@
 # BellMarkets — Brain Lift
 
-> Single source of truth for AI coding assistants working on this project.
-> Read this before writing code. If you'd contradict something here, stop and ask.
+> Single source of truth for AI coding assistants. Read this before writing code. If you'd contradict something here, stop and ask.
 >
-> **Status:** Draft. Fill in `[FILL IN: ...]` markers before the first
-> `/aria` / `/bram` / `/cleo` dispatch. Re-edit any section as the project's
-> understanding of itself changes.
+> **Status:** v1 — locked Day 0 (2026-05-21). Detailed architecture (repo layout, type signatures, domain model) lives in `specs/architecture.md`. Locked design decisions live in `constitution/decisions.md` (DR-001 Phoenix, DR-002 Permissionless settle, DR-003 Pyth).
 
 ---
 
 ## 1. Context
 
 ### What this is
-
-[FILL IN: 1–2 sentences. Concrete enough that an AI assistant can refuse
-off-scope work. Bad: "an app for users." Good: "a web app where front-desk
-staff upload scanned lab PDFs and a 2-stage extraction pipeline writes
-verified facts into OpenEMR's clinical tables with audit trails."]
+BellMarkets is the team's implementation of the Gauntlet "Meridian" PRD: a non-custodial Solana dApp where users trade Yes/No binary outcome tokens against USDC for *"Will [STOCK] close above [PRICE] today?"* on the MAG7. Settlement is an on-chain Pyth read at 4:05 PM ET; the order book is Phoenix; the daily lifecycle is orchestrated by an off-chain TypeScript service. PRD source: `.project/bell-markets/docs/prd/project_1771969779565.pdf`.
 
 ### Why it exists
-
-[FILL IN: Stakes, audience, deadline. Why does this project need to exist
-this week / this quarter? "Gauntlet Week N cohort exercise — judges
-evaluate X" / "hiring partner deliverable — partner is evaluating Y" /
-"production replacement for legacy system Z — switchover date W".]
+Gauntlet cohort project — partner-evaluated build demonstrating the full lifecycle (`create → mint → trade → settle → redeem`) end-to-end on Solana devnet, with defensible architecture and named trade-offs. Hard final: **Mon 2026-05-25 7:00 PM ET**. Effective build window: ~3 days from Day 0.
 
 ### Who uses it
-
-[FILL IN]
-- **Primary user:** [role + context]
-- **Secondary user:** [role + context]
-
-If unknown, write `[UNKNOWN — confirm in presearch-interview]`.
+- **Demo users:** retail-style traders on Solana devnet during the demo window; Phantom/Backpack wallet, no KYC.
+- **Evaluators:** Gauntlet reviewers running the lifecycle from the repo via one-command setup.
+- **Team:** validating on-chain invariants and the cron-failure recovery path during dev.
 
 ### Stage of build
-
-[FILL IN: e.g., "Day 0 — repo bootstrapped, no app code yet" /
-"Mid-MVP — auth + 2 endpoints shipped, dashboard in progress" /
-"Hardening — feature freeze, fixing eval regressions"]
+Day 0 — repo bootstrapped, constitution being written, no application code yet. Next: `/sdd-init`, then dispatch Aria.
 
 ### Deadlines
+- **MVP target:** Fri 2026-05-22 9:00 PM ET (informal team target — not a hard gate)
+- **Final:** Mon 2026-05-25 7:00 PM ET (hard cohort deliverable)
+- **Stretch:** mainnet-beta with funded automation wallet + production Pyth feeds — post-demo only.
 
-- **MVP:** Fri 2026-05-22 9:00 PM ET (informal target; not a hard gate)
-- **Final:** Mon 2026-05-25 7:00 PM ET
-- **Other:** [FILL IN: AI Interview / partner demo / cohort review window]
-
-### Out of scope (for this build, by deliberate choice)
-
-[FILL IN: bullet list. Be specific. "No mobile app" beats "no extras".
-Common: "no user accounts", "no i18n", "no multi-tenant", "no offline mode".]
-
-- ...
+### Out of scope (deliberate)
+- No mainnet, no real funds (PRD hard rule)
+- No KYC, no custody, no off-ramp
+- No mobile / no i18n / no multi-tenant
+- No persistent off-chain database — Solana RPC is the source of truth; automation service is stateless cron
+- No fallback CLOB if Phoenix has an outage (DR-001) and no fallback oracle if Pyth fails (DR-003) — admin override is the recovery
+- No non-MAG7 stocks, no margin / perps / cross-strike netting, no on-chain matching engine of our own
 
 ---
 
 ## 2. Spiky Points of View
 
-> Strong opinions baked into the architecture. Disagreeing with one means
-> redesigning the project, not patching it. Every POV has a documented
-> trade-off — own it.
+> Disagreeing with one means redesigning the project, not patching it. Each POV has a Decision Record in `constitution/decisions.md`.
 
-### POV 1 — [FILL IN: short title]
+### POV 1 — Integrate Phoenix; do not reinvent the matching engine
+We use Phoenix as the on-chain CLOB for every strike market. Aria's Anchor program creates a Phoenix market per strike during the morning job and binds Yes-token settlement to it. Matching, price-time priority, partial-fill accounting, self-trade prevention are Phoenix's problem.
 
-[FILL IN: 2–4 sentences. Stake the position. Name the trade-off it
-accepts. Reference budget / constraint / data that justifies it.]
+**Trade-off:** We pay a weaker "we built our own matching engine" interview narrative and accept a hard dependency on Phoenix (no fallback CLOB), in exchange for ~1.5 days of build budget, audited matching logic, and a permissionless-crank philosophy aligned with POV-2. See DR-001.
 
-**Trade-off:** [What this position costs. "We pay X in exchange for Y."]
+### POV 2 — On-chain owns the rules; off-chain owns the schedule. `settle_market` is permissionless.
+The Anchor program enforces all settlement rules: time gate, Pyth staleness + confidence, immutable outcome write. `settle_market` is **callable by anyone** — Bram's automation service is a convenience caller (first to crank wins), not an authority. Admin override (`admin_settle`) is on-chain time-delayed (≥1hr) and used only when Pyth fails.
 
-### POV 2 — [FILL IN]
+**Trade-off:** ~half a day of extra on-chain timing-logic work + benign race-condition wasted fees, in exchange for cheaper mainnet ops (~5–10×), better scaling (load distributes to user demand), stronger demo defense ("our cron can die and the system still works"), and alignment with Phoenix's permissionless-crank philosophy. See DR-002.
 
-[...]
+### POV 3 — Buy No / Sell No are first-class atomic operations; UI never exposes mint-and-sell
+Four buttons: Buy Yes, Buy No, Sell Yes, Sell No. Each = one wallet-signed transaction. Buy No bundles `mint_pair + sell_yes` on Phoenix atomically (user keeps the No, effective cost = `$1 - yes_sale_price`); Sell No is the inverse. Users never see a "mint pair" button, never see a Yes token they don't want.
 
-**Trade-off:** [...]
-
-### POV 3 — [FILL IN]
-
-[...]
-
-**Trade-off:** [...]
-
-> Add more POVs as the project demands. 3–6 is a healthy range. Fewer and
-> the AI assistant has too much freedom; more and you're over-engineering.
+**Trade-off:** More frontend complexity (bundled atomic transactions, position-aware button states, four-button mental model) in exchange for UX that matches user intent rather than protocol internals. We reject the faster-to-build path that exposes the steps.
 
 ---
 
 ## 3. The Knowledge Tree
 
+> Detailed architecture (repo layout tree, Rust + TS type signatures, full domain model) lives in `specs/architecture.md` (populated by `/sdd-init`). This section is the index, not the architecture.
+
 ### Tech Stack
-
-[FILL IN each line; mark `[INFERRED — CONFIRM]` if not yet decided]
-
-- **Frontend:**
-- **Backend:**
-- **Language:**
-- **State management:**
-- **Database:**
-- **Testing:**
-- **Linting:**
-- **Deployment:**
-- **CI gate:** (what specifically blocks merge? Vitest pass? Eval threshold? Type-check?)
-
-### Repo layout (target)
-
-```
-[FILL IN: tree diagram of the planned file structure. Even if speculative,
-having a target shape prevents AI assistants from spraying files everywhere.]
-```
-
-### Domain primitives (build these FIRST, before any UI / API)
-
-```
-[FILL IN: the 3–6 typed primitives that everything else composes from.
-Function signatures + types are enough — no implementations. Example:
-
-type PatientId = number;
-type Fraction = { num: number; den: number };
-function isEquivalent(a: Fraction, b: Fraction): boolean;
-]
-```
+- **Onchain:** Rust + Anchor on **Solana devnet** (stretch: mainnet-beta)
+- **CLOB:** Phoenix (DR-001) — no custom matcher
+- **Oracle:** Pyth Network (DR-003) — both off-chain HTTP and on-chain account read
+- **RPC:** Helius (devnet + WebSocket subscriptions)
+- **Frontend:** Next.js 15 (App Router) + React 19 + TypeScript strict `[INFERRED — CONFIRM with Cleo]`
+- **Wallet:** `@solana/wallet-adapter-react` (Phantom / Backpack / Solflare)
+- **Realtime:** `connection.onAccountChange` subscriptions — no polling (Hard YES #9)
+- **State / data:** TanStack Query for RPC caching; Zustand for ephemeral UI `[INFERRED]`
+- **Styling:** Tailwind CSS + shadcn/ui `[INFERRED]`
+- **Automation service:** Node.js + TypeScript; local dev for demo, deploy target TBD `[INFERRED — CONFIRM with Bram]`
+- **Package manager:** **pnpm** always (never npm, never yarn)
+- **Monorepo:** pnpm workspaces
+- **Testing:** `anchor test` + `proptest` (Rust); Vitest + `fast-check` (TS)
+- **Linting:** ESLint + Prettier (TS); clippy + rustfmt (Rust)
+- **Deployment:** Solana devnet (contracts), Vercel (frontend), TBD (automation)
+- **CI gate:** `anchor test` + `pnpm test` + `pnpm typecheck` + `pnpm lint` — all must pass
 
 ### Critical files (when they exist)
-
-[FILL IN: name the load-bearing files and what's load-bearing about them.
-"A bug in this file silently passes wrong answers as correct." If a file
-isn't critical, don't list it.]
-
-- **`path/to/file.ts`** — [what makes it load-bearing]
-
-### External references
-
-[FILL IN: links, papers, reference implementations, partner docs, PRD
-locations. Only what the AI assistant needs to make decisions — not a
-literature dump.]
-
-### Decisions log
-
-Maintain `DECISIONS.md` at repo root. Every spiky POV gets an entry with
-its trade-off. Every deferral gets an entry with a revisit threshold.
+- **`programs/bell-markets/src/instructions/settle_market.rs`** — $1 invariant load-bearing; permissionless; Pyth-validated. Highest property-test coverage.
+- **`programs/bell-markets/src/instructions/mint_pair.rs`** — vault-balance invariant load-bearing.
+- **`programs/bell-markets/src/instructions/redeem.rs`** — payout invariant load-bearing.
+- **`programs/bell-markets/src/oracle/pyth.rs`** — staleness + confidence thresholds; wrong thresholds = settlements on bad data.
+- **`services/automation/src/jobs/morning.ts`** — daily liveness; no morning markets = no demo.
+- **`apps/web/lib/solana/buy-no.ts`** (+ `sell-no.ts`) — POV-3 atomicity; review must verify the bundle.
 
 ### Where local-only coordination memory lives
+- `.project/bell-markets/in-flight.md` — workstream + file-ownership map
+- `.project/bell-markets/kickoff/`, `handoffs/`, `sessions/`, `candidates/`, `stories/`, `docs/prd/`
+- `CLAUDE_SESSION_HANDOFF.md` (repo root) — Tate session continuity
 
-- `.project/in-flight.md` — workstream rules + file ownership map
-- `.project/kickoff/` — lead boot prompts
-- `.project/handoffs/` — per-lead handoff files
-- `.project/sessions/` — per-session recaps
-- `.project/stories/` — interview-ready story repo
-- `CLAUDE_SESSION_HANDOFF.md` (repo root) — primer for fresh Tate sessions
-
-`.project/` is gitignored. Never committed. Mirrored to OneDrive for survivor copies.
+`.project/` and `.claude/` are gitignored; junctioned to OneDrive for survivor copies + cross-machine sync.
 
 ---
 
 ## 4. Guardrails
 
-### Hard NOs for AI coding assistants
+### Hard NOs
 
-[FILL IN: specific prohibitions. "Do not use Redux" beats "keep state
-simple". 5–10 items is a healthy range. The list earns its keep by
-preventing AI assistants from making the same mistake twice.]
-
-1. [FILL IN]
-2. ...
+1. **Never use mainnet or real funds** for the core submission (PRD).
+2. **Never commit secrets / private keys / mnemonics / API keys / RPC keys** to git. `.env` only; `.env.example` shows the shape.
+3. **Never use `npm install` or `yarn add`** — pnpm always. Delete any `package-lock.json` / `yarn.lock` that sneaks in.
+4. **Never write an on-chain matching engine** (DR-001). Reject PRs that add price-time-priority code inside the Anchor program.
+5. **Never give `settle_market` a special-signer requirement** (DR-002). The instruction must be safe under arbitrary callers.
+6. **Never add a fallback oracle** (DR-003). Pyth or admin override only.
+7. **Never leak the mint-and-sell mechanic to the trade UI** (POV-3). Buy No / Sell No are atomic single-tx operations from the user's perspective.
+8. **Never violate the $1 USDC invariant** — `yes_payout + no_payout = $1.00` exactly. Fees, if added later, go to a separate account.
+9. **Never commit files under `.project/` or `.claude/`** — OneDrive-mirrored, gitignored by construction.
+10. **Never `git push --force` to `main`** without explicit user request.
+11. **Never dump raw oracle / RPC / wallet logs** (>20 lines) into handoffs, session recaps, or commit messages.
+12. **Never use live stock prices in unit / integration tests** — synthetic / mocked Pyth feeds only. CI must not depend on market hours.
 
 ### Hard YESes
 
-[FILL IN: non-negotiable requirements. Same shape as the NOs.]
+1. **The $1 USDC invariant has property-based tests** — for all sequences of (mint, settle, redeem), `vault_balance == $1 × open_pairs` AND `yes_payout + no_payout == $1.00`. Property tests, not example tests.
+2. **The full lifecycle is demoable end-to-end on devnet with one command** (`scripts/one-command-demo.sh`).
+3. **pnpm always** — every script / CI / README / `package.json` references pnpm.
+4. **Every PR runs:** `anchor test` + `pnpm test` + `pnpm typecheck` + `pnpm lint`. CI fails the merge if any fail.
+5. **The demo includes the cron-failure path** — kill automation mid-settle, trigger settle from a test user wallet. Load-bearing evidence for DR-002.
+6. **`settle_market` validates Pyth staleness AND confidence**; both thresholds configurable; outcome immutable once written.
+7. **`admin_settle` has an on-chain time-delay gate** (≥1hr after settlement window). Enforced in the program.
+8. **Position-exclusivity is a frontend guardrail** — UI prevents Buy Yes while holding No (and vice versa). Benign if bypassed (user redeems pair for $1).
+9. **Order book + portfolio views update via WebSocket** (`onAccountChange`) — no polling. Reconnect-on-disconnect handled.
+10. **Frontend uses `@solana/wallet-adapter-react` for all signing** — no in-app keystore, no env-var private keys for "test flows."
+11. **Every Spiky POV has a Decision Record** in `constitution/decisions.md` with the trade-off line spelled out.
 
-1. [FILL IN]
-2. ...
+### Things to flag for human review (not auto-block)
+- Adding any new dependency beyond the locked stack (Anchor, Pyth SDK, Phoenix SDK, Next.js, wallet adapter, TanStack Query) — name a one-line "why" first.
+- Touching the `vault` PDA seeds or `StrikeMarket` account schema after the first devnet deploy.
+- Any change to `settle_market`, `mint_pair`, or `redeem` — pause for property-test coverage review.
+- Any cross-workstream PR (e.g., `programs/` + `apps/web/`) — both owning leads must sign off.
+- Any deviation from a Spiky POV — write a new DR before implementing.
 
-### Things to *flag for human review* (not auto-block)
-
-[FILL IN: actions the AI should pause and confirm before taking, but
-isn't outright banned from. "Any new dependency — post to chat with 1-line
-why before npm install." Different from a Hard NO — these are reviewable,
-not refused.]
-
-- ...
+### Sweep items — `[INFERRED — CONFIRM]` tags to resolve
+- Cleo to confirm: Next.js 15 App Router, React 19, Tailwind + shadcn, Zustand.
+- Bram to confirm: automation service runtime (local for demo vs Railway/Fly.io).
 
 ---
 
-> **Created:** {{INIT_DATE}}
-> **Template:** brainlift v1 (from `claude-code-project-template` {{TEMPLATE_VERSION}})
-> **Owner:** {{OWNER_NAME}}
-> **Update cadence:** Every Brain Lift item that changes during a session
-> gets a same-session edit. End-of-week, sweep for `[INFERRED — CONFIRM]`
-> tags that have been resolved.
+> **Created:** 2026-05-21
+> **Template:** brainlift v1 (from `claude-code-project-template` v0.3.0+)
+> **Owner:** Cory Vandenberg (Tate)
+> **Update cadence:** Same-session edit for Brain Lift items that change during work. End-of-week, sweep for resolved `[INFERRED — CONFIRM]` tags.

@@ -11,7 +11,7 @@ set -euo pipefail
 
 PROJECT_NAME="BellMarkets"
 PROJECT_DIR="$(pwd)"
-LEADS=(aria bram cleo)
+LEADS=(aria bram cleo drew)
 BRANCH_PREFIX="crt"  # claude-red-team style; rename if desired
 
 for lead in "${LEADS[@]}"; do
@@ -59,7 +59,7 @@ echo ""
 echo "Done. Each lead now has its own worktree:"
 git worktree list
 echo ""
-echo "Open Cursor in each worktree and run /aria, /bram, /cleo respectively."
+echo "Open Cursor in each worktree and run /aria, /bram, /cleo, /drew respectively."
 echo ""
 echo "REMINDER: ALWAYS remove junctions BEFORE 'git worktree remove' on Windows,"
 echo "or rm-rf on the worktree will follow the junction and nuke the main checkout."
