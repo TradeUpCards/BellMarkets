@@ -4,6 +4,8 @@
   "private": true,
   "description": "Cross-cutting tests: devnet integration lifecycle, property/edge-case evals, compressed-time simulation. Owned by Drew. NOTE: `simulate` script points at ../scripts/simulate-trading-day.mjs which Drew hasn't authored yet (Day-1 scaffold) — it will fail until Drew lands the file.",
   "scripts": {
+    "test": "ts-mocha -p tsconfig.json -t 1000000 'contracts/**/*_test.ts' 'integration/**/*.test.ts' 'eval/**/*.test.ts'",
+    "test:contracts": "ts-mocha -p tsconfig.json -t 1000000 'contracts/**/*_test.ts'",
     "test:integration": "ts-mocha -p tsconfig.json 'integration/**/*.test.ts'",
     "test:eval": "ts-mocha -p tsconfig.json 'eval/**/*.test.ts'",
     "simulate": "node ../scripts/simulate-trading-day.mjs"

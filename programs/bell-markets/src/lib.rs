@@ -1,0 +1,82 @@
+//! BellMarkets — binary outcome contracts on daily MAG7 stock prices.
+//!
+//! Read order for new contributors:
+//!   1. `.project/bell-markets/kickoff/aria.md`  (workstream rules)
+//!   2. `programs/bell-markets/src/state.rs`     (data model)
+//!   3. `programs/bell-markets/src/oracle.rs`    (Pyth parser — vendored, no SDK)
+//!   4. `programs/bell-markets/src/adapters/phoenix.rs` (Phoenix magic-prefix check)
+//!   5. `programs/bell-markets/src/instructions/*` (per-instruction Accounts shape)
+//!
+//! Hard-rule reminders (kickoff §"Hard rules"):
+//!   §4.10  Every heavy account in an Accounts struct is `Box<Account<'info,T>>`.
+//!   §4.11  Stack-offset warnings are build failures.
+//!   §4.12  Phoenix accounts are `UncheckedAccount` + 8-byte magic validation.
+//!   §4.13  Pyth: vendored parser only. No `pyth-sdk-solana` dep.
+//!   §4.2   `settle_market` requires no signer beyond the fee payer.
+
+use anchor_lang::prelude::*;
+
+pub mod state;
+pub mod errors;
+pub mod oracle;
+pub mod adapters;
+pub mod instructions;
+
+use instructions::*;
+use state::Outcome;
+
+// Placeholder. Replaced by `anchor build && anchor keys sync` once a real
+// keypair lands at target/deploy/bell_markets-keypair.json. The mainnet ID is
+// intentionally never declared (Hard NO #1).
+declare_id!("BeLLMrKtsProGramID1111111111111111111111111");
+
+#[program]
+pub mod bell_markets {
+    use super::*;
+
+    pub fn initialize_config(
+        ctx: Context<InitializeConfig>,
+        price_staleness_secs: i64,
+        price_confidence_bps: u16,
+        admin_override_delay_secs: i64,
+    ) -> Result<()> {
+        instructions::initialize_config::handler(
+            ctx,
+            price_staleness_secs,
+            price_confidence_bps,
+            admin_override_delay_secs,
+        )
+    }
+
+    pub fn create_strike_market(
+        ctx: Context<CreateStrikeMarket>,
+        strike_price: i64,
+        expiry_unix: i64,
+    ) -> Result<()> {
+        instructions::create_strike_market::handler(ctx, strike_price, expiry_unix)
+    }
+
+    pub fn add_strike(ctx: Context<AddStrike>) -> Result<()> {
+        instructions::add_strike::handler(ctx)
+    }
+
+    pub fn mint_pair(ctx: Context<MintPair>, amount: u64) -> Result<()> {
+        instructions::mint_pair::handler(ctx, amount)
+    }
+
+    pub fn settle_market(ctx: Context<SettleMarket>) -> Result<()> {
+        instructions::settle_market::handler(ctx)
+    }
+
+    pub fn admin_settle(ctx: Context<AdminSettle>, forced_outcome: Outcome) -> Result<()> {
+        instructions::admin_settle::handler(ctx, forced_outcome)
+    }
+
+    pub fn redeem(ctx: Context<Redeem>, amount: u64) -> Result<()> {
+        instructions::redeem::handler(ctx, amount)
+    }
+
+    pub fn pause(ctx: Context<Pause>, paused: bool) -> Result<()> {
+        instructions::pause::handler(ctx, paused)
+    }
+}
