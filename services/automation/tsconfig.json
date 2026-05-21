@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022"],
+    "types": ["node"],
+    "outDir": "dist",
+    "noEmit": true
+  },
+  "include": ["src/**/*.ts", "trigger.config.ts"],
+  "exclude": ["dist", "node_modules"]
+}
