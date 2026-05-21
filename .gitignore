@@ -1,0 +1,74 @@
+# Node / npm / yarn / pnpm
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.npm
+.yarn-integrity
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
+
+# Build output
+dist/
+build/
+.next/
+out/
+.nuxt/
+.cache/
+.parcel-cache/
+.svelte-kit/
+
+# Testing
+coverage/
+.nyc_output/
+*.lcov
+
+# Type checking / linting
+*.tsbuildinfo
+.eslintcache
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+secrets/
+credentials.json
+*.pem
+*.key
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+.Trashes
+desktop.ini
+Thumbs.db
+
+# Local-only team coordination memory (NOT committed; mirrored to OneDrive).
+# Contains: lead kickoff prompts, per-lead handoffs, session summaries, story
+# candidates, cross-lead coordination threads, interview-story repo, plus
+# project docs (PRD source, lesson sketches, demo plans) under .project/<slug>/docs/.
+# None of it ships to the public mirror or the partner's submission. See
+# WORKTREE_PATTERNS.md "OneDrive mirroring" section and
+# scripts/setup-onedrive-mirror.sh.
+/.project/
+
+# Claude Code agent definitions + skills + settings — local-only (OneDrive).
+# Slash commands /aria, /bram, /cleo, /tate are tied to this machine's setup;
+# other machines pick them up via OneDrive sync, not git.
+/.claude/
+
+# Project-specific
+# Uncomment / customize as needed
