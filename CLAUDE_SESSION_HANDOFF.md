@@ -1,25 +1,36 @@
 # Claude Session Handoff — BellMarkets
 
-**Date:** 2026-05-21 (Thu evening, EOD)
-**Session phase:** **Day 0 complete; Day 1 ready to dispatch all 4 leads in parallel.**
-**Next hard gate:** Mon 2026-05-25 7:00 PM ET (Final). Informal MVP target: Fri 2026-05-22 9:00 PM ET.
-**Current branch / SHA:** main @ `709a00b` (presearch ARCHITECTURE.md + LESSONS.md recalibrations). 6 commits total on Day 0; all pushed to GitLab + GitHub.
+**Date:** 2026-05-21 (Thu late evening — Day-1 wrap)
+**Session phase:** **Day 1 complete; Day 2 ready to dispatch.** All 4 lead branches merged to `main`. Toolchain upgraded in WSL2 Ubuntu-24.04 (Solana 3.1.14 / Anchor 0.31.1). DR-004 locks Anchor 0.31 CLI + 0.30 JS mismatch with Day-2 verification step.
+**Next hard gate:** **Sat 2026-05-23 6:00 PM ET — Aria's first devnet deploy** (critical path; unblocks Bram + Cleo + Drew live integration). Then Mon 2026-05-25 7:00 PM ET (final hard deadline). Informal MVP target: Fri 2026-05-22 9:00 PM ET.
+**Current branch / SHA:** main @ `1973336` (test-runner spec drift fix + DR-004 Anchor mismatch). 16 commits total since Day-0 init; all pushed to GitLab + GitHub.
 
 ---
 
 ## TATE — START HERE
 
-**Day 0 is complete.** BRAINLIFT.md filled (147 lines), constitution/ + specs/ populated, ARCHITECTURE.md written via /presearch-interview, Drew promoted from generic quality-lead to a named 4th lead, all INFERRED tags resolved, LESSONS.md recalibrations applied (Anchor 0.31.1 / Solana 3.1.14 / React 18 / Next 14.2.18 / vendored Pyth parser / Phoenix UncheckedAccount pattern / compressed-time simulation as primary verification). All 4 leads have populated first-task kickoffs at `.project/bell-markets/kickoff/{aria,bram,cleo,drew}.md`.
+**Day 1 is complete.** All 4 leads shipped their Day-1 scaffolds — Aria (Anchor program skeleton, 8 instructions, vendored Pyth parser, Phoenix UncheckedAccount stub), Bram (`services/automation` with 29 passing Vitest tests + Trigger.dev v4 config + strike-calc matching PRD), Cleo (Next.js 14.2.18 + React 18 + wallet adapter + 5 route shells + Tailwind/shadcn), Drew (compressed-time simulation runs in 11ms with 5 invariants verified + edge-case mocha stubs).
+
+**Day-2 corrections shipped by Tate:**
+- All 4 lead branches merged into `main` (Cleo → Bram → Aria → Drew sequence; conflicts resolved on root `package.json` + `pnpm-workspace.yaml`)
+- Spec drift fix: `specs/architecture.md` §2.4 + `BRAINLIFT.md` §3 now reflect actual test-runner split (Vitest for service, Jest for frontend, mocha for Anchor + integration/eval)
+- DR-004 added: Anchor CLI 0.31 + JS 0.30 mismatch locked, with Day-2 verification step + one-line IDL patch fallback documented
+- Step-0 (`git fetch + merge origin/main`) added to all 4 lead kickoffs to prevent the stale-branch trap Aria fell into on Day 1
+
+**Operator state:**
+- WSL2 Ubuntu-24.04 has Solana 3.1.14 + Anchor 0.31.1 via AVM (LESSONS.md-pinned versions)
+- AVM auto-switch works for BellMarkets (0.31.1 active); shows 0.31.1 for w3Swap too — `avm install 0.32.1` if you want w3Swap host-CLI back (Docker unaffected either way)
+- Cursor Remote-WSL extension recommended for Aria's worktree (best Anchor build speed)
 
 **On next session start, your first action sequence:**
 
-1. Run `git fetch origin main` (sync from possible lead pushes overnight)
-2. Read `.project/bell-markets/in-flight.md` for active workstream status
-3. Read each lead's handoff at `.project/bell-markets/handoffs/{aria,bram,cleo,drew}-handoff.md` — they should exist after their first sessions
+1. Run `git fetch origin main` (sync any pushes from lead sessions)
+2. Read `.project/bell-markets/in-flight.md` In-Flight table for active status
+3. Read fresh lead handoffs at `.project/bell-markets/handoffs/{aria,bram,cleo,drew}-handoff.md`
 4. Surface the 4-line morning report (days to gate, build state, lead status, recommendation for today)
 5. Run `/daily-sync` to refresh + synthesize all 4 lead states into a single coordinated status
 
-The build timeline is in `docs/TIMELINE.md` (Gantt + per-lead Day-1 deliverables + risks). Critical gate: **Sat 5/23 6pm ET — Aria's first devnet deploy** unblocks live integration for the other 3 leads.
+The build timeline is in `docs/TIMELINE.md`. **Critical gate: Sat 5/23 6pm ET — Aria's first devnet deploy** unblocks live integration for Bram + Cleo + Drew.
 
 ---
 
