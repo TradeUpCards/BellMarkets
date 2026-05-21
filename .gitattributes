@@ -1,0 +1,31 @@
+# Normalize line endings across Windows + WSL + macOS + Linux to prevent
+# phantom "modified" status from cross-platform LF/CRLF differences.
+#
+# Background: Git for Windows defaults to core.autocrlf=true, which converts
+# LF -> CRLF on checkout and CRLF -> LF on commit. WSL git typically uses
+# core.autocrlf=input or false, so the same checked-out files appear "modified"
+# in WSL because WSL sees CRLF but the index has LF. This file forces all
+# text files to LF in the repo regardless of platform; each platform's git
+# can still adjust the working-tree representation, but normalization wins.
+
+* text=auto eol=lf
+
+# Specific overrides — keep these binary even if name suggests text
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.docx binary
+*.zip binary
+*.tar.gz binary
+*.tar.bz2 binary
+
+# Shell scripts should always be LF (will fail with CRLF on Linux)
+*.sh text eol=lf
+
+# Windows-specific batch files keep CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
