@@ -72,3 +72,9 @@ Thumbs.db
 
 # Project-specific
 # Uncomment / customize as needed
+
+# Derived doc exports (PDFs/HTML from markdown sources) — markdown is the
+# source of truth; exports go stale fast. Keep PDFs in OneDrive if you want
+# snapshots, not in git.
+*.pdf
+*.docx
