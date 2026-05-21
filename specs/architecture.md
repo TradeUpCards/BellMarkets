@@ -72,7 +72,7 @@ Three runtime surfaces: frontend (Cleo), automation service (Bram), on-chain pro
 
 **Crucially:** the settlement nudger has no special signing authority over `settle_market` (per DR-002). It's a convenience caller. If it dies, any user can call `settle_market` themselves; the system still works.
 
-**Tech:** Node.js + TypeScript. Solana web3.js client via Helius RPC. Stateless (no persistent DB per `constitution/hard-rules.md` §3.3). pnpm workspaces.
+**Tech:** Node.js + TypeScript. Solana web3.js + Anchor client via Helius RPC. **Trigger.dev (free tier)** as the cron platform — handles the morning + settlement-nudger schedules natively. No long-running process required; jobs run on Trigger.dev's infra. Stateless (no persistent DB per `constitution/hard-rules.md` §3.3). pnpm workspaces.
 
 **Talks to:** Pyth HTTP API (off-chain price reads), Helius RPC (transaction signing + submission), the BellMarkets program (via Anchor client).
 
@@ -90,13 +90,13 @@ Three runtime surfaces: frontend (Cleo), automation service (Bram), on-chain pro
 - `/history` — trade execution log
 
 **Tech:**
-- Next.js 15 (App Router) `[INFERRED — CONFIRM with Cleo]`
-- React 19 + TypeScript (strict mode)
+- Next.js 15 (App Router)
+- **React 18** + TypeScript (strict mode) — React 18 for peer-dep compat with `@solana/wallet-adapter-react`; none of React 19's new features (Server Actions, `use()`, form actions) are load-bearing for this app
 - `@solana/wallet-adapter-react` for wallet integration (Phantom, Backpack, Solflare). Per Hard YES #10: no in-app keystore, no env-var private keys.
 - `connection.onAccountChange` (Helius WebSocket) for real-time book + portfolio updates. **No polling** (Hard YES #9 / `hard-rules.md` §4.8).
-- TanStack Query for RPC caching `[INFERRED]`
-- Zustand for ephemeral UI state `[INFERRED]`
-- Tailwind CSS + shadcn/ui components `[INFERRED]`
+- TanStack Query for RPC caching, dedup, and the WebSocket → cache bridge (`queryClient.setQueryData` from inside the subscription handler)
+- Zustand for ephemeral UI state (open modals, selected strike, panel filters)
+- Tailwind CSS + shadcn/ui components (Radix-based, copy-paste)
 
 **Buy No / Sell No atomicity (POV-3):** Each user click → ONE wallet-signed transaction that bundles all required instructions. Buy No = `[mint_pair, place_sell_yes_on_phoenix]` in one tx. Sell No = `[buy_yes_on_phoenix, redeem_pair_for_usdc]` (or similar). The user never sees a "mint pair" button, never sees intermediate Yes balances. Per `hard-rules.md` §4.7.
 
@@ -290,8 +290,8 @@ export async function settleMarketsForDay(markets: PublicKey[]): Promise<Settlem
 | Env | Purpose | Cluster | Where the frontend runs | Automation runs |
 |---|---|---|---|---|
 | Local dev | Per-lead work | Solana localnet OR devnet | `pnpm --filter web dev` on `localhost:3000` | `pnpm --filter automation dev` locally |
-| Devnet demo | **Submission target** | Solana devnet | Vercel preview deploy | Local (operator's laptop) for demo |
-| Mainnet-beta (stretch) | Post-demo only | Solana mainnet-beta | Vercel production | Railway or Fly.io `[INFERRED — CONFIRM with Bram]` |
+| Devnet demo | **Submission target** | Solana devnet | Vercel preview deploy | Trigger.dev (free tier) |
+| Mainnet-beta (stretch) | Post-demo only | Solana mainnet-beta | Vercel production | Trigger.dev (paid tier if cron volume grows) |
 
 ### Build + deploy pipeline
 
@@ -347,6 +347,7 @@ Before the final demo, Tate runs the full demo dry-run including the cron-failur
 | **Phoenix CLOB** | On-chain order book | Phoenix program outage → no trading possible | **No fallback CLOB** by design (`hard-rules.md` §4.1). Acceptable for a devnet demo — flagged in `specs/deferred.md` as a known operational risk for the mainnet stretch. |
 | **Pyth Network** | Stock prices (HTTP for morning strikes, on-chain accounts for settlement) | Pyth outage at settlement → markets can't settle until Pyth recovers | Admin override path (`admin_settle`, time-delayed per Hard YES #7). **No fallback oracle** (`hard-rules.md` §4.3). |
 | **Helius RPC** | Solana RPC + WebSocket for frontend + automation | Helius outage → frontend can't fetch state; automation can't submit txs | Fallback: any public Solana RPC endpoint (configurable via `NEXT_PUBLIC_RPC_URL` env var). Documented in `docs/SETUP.md` (when created). |
+| **Trigger.dev** | Cron platform — runs the morning create-markets job (~8am ET) and the settlement nudger (~4:05pm ET) | Trigger.dev outage → automation doesn't fire; markets either don't get created (morning) or don't settle automatically (afternoon) | For the afternoon path: permissionless settle (DR-002) means any user can crank `settle_market` themselves — automation is convenience, not authority. For the morning path: operator (Tate) runs the create-markets script manually as recovery. Trigger.dev's free-tier SLA is best-effort; this is acceptable for a devnet demo. |
 | **GitHub + GitLab** | Code hosting + dual-push | One down → push to the other still works; both down → local work only | Dual-push by design (`scripts/setup-worktrees.sh` and `git remote -v`). |
 
 ---

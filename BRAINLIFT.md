@@ -67,12 +67,12 @@ Four buttons: Buy Yes, Buy No, Sell Yes, Sell No. Each = one wallet-signed trans
 - **CLOB:** Phoenix (DR-001) — no custom matcher
 - **Oracle:** Pyth Network (DR-003) — both off-chain HTTP and on-chain account read
 - **RPC:** Helius (devnet + WebSocket subscriptions)
-- **Frontend:** Next.js 15 (App Router) + React 19 + TypeScript strict `[INFERRED — CONFIRM with Cleo]`
+- **Frontend:** Next.js 15 (App Router) + **React 18** (peer-dep compat with wallet-adapter) + TypeScript strict
 - **Wallet:** `@solana/wallet-adapter-react` (Phantom / Backpack / Solflare)
 - **Realtime:** `connection.onAccountChange` subscriptions — no polling (Hard YES #9)
-- **State / data:** TanStack Query for RPC caching; Zustand for ephemeral UI `[INFERRED]`
-- **Styling:** Tailwind CSS + shadcn/ui `[INFERRED]`
-- **Automation service:** Node.js + TypeScript; local dev for demo, deploy target TBD `[INFERRED — CONFIRM with Bram]`
+- **State / data:** TanStack Query for RPC caching + dedup + WebSocket cache bridge; Zustand for ephemeral UI state
+- **Styling:** Tailwind CSS + shadcn/ui (copy-paste Radix-based components)
+- **Automation service:** Node.js + TypeScript on **Trigger.dev** (free tier) — cron platform handles the 8am ET morning job + ~4:05pm ET settlement nudger
 - **Package manager:** **pnpm** always (never npm, never yarn)
 - **Monorepo:** pnpm workspaces
 - **Testing:** `anchor test` + `proptest` (Rust); Vitest + `fast-check` (TS)
@@ -135,9 +135,8 @@ Four buttons: Buy Yes, Buy No, Sell Yes, Sell No. Each = one wallet-signed trans
 - Any cross-workstream PR (e.g., `programs/` + `apps/web/`) — both owning leads must sign off.
 - Any deviation from a Spiky POV — write a new DR before implementing.
 
-### Sweep items — `[INFERRED — CONFIRM]` tags to resolve
-- Cleo to confirm: Next.js 15 App Router, React 19, Tailwind + shadcn, Zustand.
-- Bram to confirm: automation service runtime (local for demo vs Railway/Fly.io).
+### Sweep items
+(All `[INFERRED — CONFIRM]` tags resolved on Day 0 — see Tech Stack section above. Cleo's stack locked at Next 15 App Router + React 18 + TS strict + TanStack Query + Zustand + Tailwind + shadcn. Bram's automation locked at Trigger.dev free tier.)
 
 ---
 
