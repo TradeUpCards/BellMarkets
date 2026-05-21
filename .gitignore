@@ -70,5 +70,15 @@ Thumbs.db
 # other machines pick them up via OneDrive sync, not git.
 /.claude/
 
+# Rust / Anchor / Solana
+target/
+.anchor/
+test-ledger/
+**/*.rs.bk
+Cargo.lock.bak
+
+# Anchor build artifacts that should NOT be committed
+# (note: Cargo.lock IS committed for deployable program — see Aria's kickoff)
+
 # Project-specific
 # Uncomment / customize as needed

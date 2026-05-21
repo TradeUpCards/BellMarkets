@@ -1,0 +1,24 @@
+[package]
+name = "bell-markets"
+version = "0.1.0"
+description = "BellMarkets — binary outcome contracts on daily MAG7 stock prices, settled on-chain via Pyth at 4PM ET."
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "bell_markets"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+
+[dependencies]
+anchor-lang = { version = "0.31.1", features = ["init-if-needed"] }
+anchor-spl = "0.31.1"
+# DELIBERATELY ABSENT: pyth-sdk-solana. See aria kickoff §"Hard rules" + oracle.rs
+# header. We vendor a ~30-line account parser instead to keep deps lean and
+# avoid the SDK's transitive bloat in BPF builds.
