@@ -21,66 +21,44 @@
 
 ```mermaid
 gantt
-    title BellMarkets — Build Timeline (Thu 5/21 evening → Mon 5/25 final 7pm ET)
-    dateFormat YYYY-MM-DD HH:mm
-    axisFormat %a %H:%M
+    title BellMarkets Build Timeline
+    dateFormat YYYY-MM-DD
+    axisFormat %a %m-%d
 
-    section Tate (Director)
-    Day-0 setup (DONE)                    :done, t0, 2026-05-21 09:00, 8h
-    Dispatch all 4 leads tonight          :crit, t1, 2026-05-21 21:00, 1h
-    /daily-sync each morning              :t2, 2026-05-22 08:00, 4d
-    Demo dry-runs + cron-failure rehearsal:t3, 2026-05-24 18:00, 18h
-    Final submission                      :crit, t4, 2026-05-25 15:00, 4h
+    section Tate
+    Day 0 setup done             :done, t0, 2026-05-21, 1d
+    Dispatch 4 leads             :crit, t1, 2026-05-21, 1d
+    Daily syncs                  :t2, 2026-05-22, 3d
+    Demo dry runs                :t3, 2026-05-24, 1d
+    Final submission             :crit, t4, 2026-05-25, 1d
 
-    section Aria (Onchain)
-    Anchor.toml + Cargo.toml + lib.rs     :a0, 2026-05-21 21:00, 3h
-    state.rs (MarketConfig, StrikeMarket) :a1, 2026-05-22 08:00, 4h
-    8 instruction skeletons + errors.rs   :a2, 2026-05-22 12:00, 6h
-    Vendored Pyth parser (oracle.rs)      :a3, 2026-05-22 18:00, 3h
-    Phoenix adapter stub (adapters/)      :a4, 2026-05-22 21:00, 3h
-    Instruction bodies (mint_pair, settle):a5, 2026-05-23 08:00, 6h
-    Instruction bodies (redeem, admin)    :a6, 2026-05-23 14:00, 4h
-    First devnet deploy + Drew sim run    :crit, a7, 2026-05-23 18:00, 4h
-    Bug fixes from Drew findings          :a8, 2026-05-24 08:00, 8h
-    Final devnet redeploy + verify        :a9, 2026-05-24 16:00, 4h
+    section Aria
+    Program scaffold day 1       :a1, 2026-05-22, 1d
+    Instruction bodies day 2     :a2, 2026-05-23, 1d
+    First devnet deploy          :crit, a3, 2026-05-23, 1d
+    Bug fixes from Drew          :a4, 2026-05-24, 1d
+    Final redeploy               :a5, 2026-05-25, 1d
 
-    section Bram (Automation)
-    services/automation + pnpm setup      :b0, 2026-05-21 21:00, 2h
-    trigger.config.ts + job stubs         :b1, 2026-05-22 08:00, 3h
-    Strike calc (deterministic, mocked)   :b2, 2026-05-22 11:00, 4h
-    Pyth HTTP + Helius RPC clients        :b3, 2026-05-22 15:00, 4h
-    Unit tests on strike logic            :b4, 2026-05-22 19:00, 3h
-    Wire morning job to real program      :b5, 2026-05-23 14:00, 4h
-    Wire settlement nudger + retry        :b6, 2026-05-23 18:00, 4h
-    Trigger.dev deploy + dashboard verify :b7, 2026-05-24 12:00, 4h
-    Mainnet-readiness doc (stretch defer) :b8, 2026-05-24 16:00, 2h
+    section Bram
+    Service scaffold day 1       :b1, 2026-05-22, 1d
+    Strike calc + clients        :b2, 2026-05-22, 1d
+    Wire jobs to program         :b3, 2026-05-23, 1d
+    Trigger dev deploy           :b4, 2026-05-24, 1d
 
-    section Cleo (Frontend)
-    Next.js 14.2.18 + React 18 setup      :c0, 2026-05-21 21:00, 2h
-    Wallet adapter + Phantom connect      :c1, 2026-05-22 08:00, 3h
-    Tailwind + shadcn baseline + layout   :c2, 2026-05-22 11:00, 3h
-    Route shells (5 pages, no data)       :c3, 2026-05-22 14:00, 3h
-    TanStack Query + Anchor client setup  :c4, 2026-05-22 17:00, 3h
-    Markets + Trade pages (read-only)     :c5, 2026-05-23 08:00, 5h
-    Trade panel UI (4 buttons, disabled)  :c6, 2026-05-23 13:00, 4h
-    Atomic Buy/Sell No tx bundling        :c7, 2026-05-23 17:00, 4h
-    Connect to deployed program (live)    :crit, c8, 2026-05-23 21:00, 2h
-    Position-exclusivity + portfolio P&L  :c9, 2026-05-24 08:00, 4h
-    Settlement countdown + redeem flow    :c10, 2026-05-24 12:00, 4h
-    docs/USER-GUIDE.md (composite-tx FAQ) :c11, 2026-05-24 16:00, 2h
-    Polish + Vercel deploy                :c12, 2026-05-24 18:00, 4h
+    section Cleo
+    Frontend scaffold day 1      :c1, 2026-05-22, 1d
+    Trade panel + atomic tx      :c2, 2026-05-23, 1d
+    Connect to live program      :crit, c3, 2026-05-23, 1d
+    Portfolio + redeem flow      :c4, 2026-05-24, 1d
+    Polish + Vercel deploy       :c5, 2026-05-24, 1d
 
-    section Drew (Quality+Demo)
-    tests/integration + tests/eval setup  :d0, 2026-05-21 21:00, 2h
-    Mocked Aria interface for simulation  :d1, 2026-05-22 08:00, 4h
-    simulate-trading-day.mjs skeleton     :d2, 2026-05-22 12:00, 6h
-    Parameterized mocha edge cases stubs  :d3, 2026-05-22 18:00, 4h
-    Live sim against deployed program     :crit, d4, 2026-05-23 18:00, 4h
-    Surface bugs to Aria; iterate         :d5, 2026-05-24 08:00, 4h
-    one-command-demo.sh                   :d6, 2026-05-24 12:00, 4h
-    Cron-failure demo step + script       :d7, 2026-05-24 16:00, 3h
-    Record demo video                     :d8, 2026-05-24 19:00, 4h
-    Defense narrative + Q&A prep          :d9, 2026-05-25 08:00, 4h
+    section Drew
+    Test infra day 1             :d1, 2026-05-22, 1d
+    Simulation skeleton          :d2, 2026-05-22, 1d
+    Live sim on devnet           :crit, d3, 2026-05-23, 1d
+    Cron failure demo            :d4, 2026-05-24, 1d
+    Record demo video            :d5, 2026-05-24, 1d
+    Defense narrative            :d6, 2026-05-25, 1d
 ```
 
 ## Per-lead Day 1 deliverables (target: Fri 5/22 9pm ET)
