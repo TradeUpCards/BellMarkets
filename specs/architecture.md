@@ -47,7 +47,7 @@ Three runtime surfaces: frontend (Cleo), automation service (Bram), on-chain pro
 
 **Responsibility:** authoritative state + the load-bearing invariants. Holds USDC vaults, mints Yes/No SPL tokens, enforces the $1 invariant, validates Pyth for settlement, immutably writes outcomes, pays out on redeem. **Does NOT** match trades (Phoenix does that — DR-001), schedule the lifecycle (off-chain — DR-002), or enforce position-exclusivity (frontend — Hard YES #8).
 
-**Tech:** Rust + Anchor framework. SPL Token program for Yes/No mints + USDC vault. Pyth Solana Receiver SDK for on-chain price reads. Phoenix SDK for market creation + binding.
+**Tech:** Rust + Anchor framework (Anchor 0.31.1 / Solana 3.1.14 / Rust 1.95 per LESSONS.md-validated toolchain triple). SPL Token program for Yes/No mints + USDC vault. **Vendored 30-line Pyth price-account parser** at `programs/bell-markets/src/oracle.rs` for on-chain price reads — `pyth-sdk-solana` NOT used (Borsh cascade per `hard-rules.md` §4.13). Phoenix integration via `UncheckedAccount<'info>` + manual byte layout (`hard-rules.md` §4.12); reference: Phoenix's own `phoenix-v1/src/state/markets/fifo_market.rs`. All `Account<T>` fields in instruction `Accounts` structs are `Box<Account<'info, T>>` (`hard-rules.md` §4.10).
 
 **Instructions exposed:**
 - `initialize_config` — admin sets up global config (supported tickers, Pyth feed map, admin authority, override delay)
@@ -90,13 +90,15 @@ Three runtime surfaces: frontend (Cleo), automation service (Bram), on-chain pro
 - `/history` — trade execution log
 
 **Tech:**
-- Next.js 15 (App Router)
-- **React 18** + TypeScript (strict mode) — React 18 for peer-dep compat with `@solana/wallet-adapter-react`; none of React 19's new features (Server Actions, `use()`, form actions) are load-bearing for this app
+- **Next.js 14.2.18** (App Router) — pinned per LESSONS.md as "stable with `@solana/wallet-adapter`"
+- **React 18** + TypeScript (strict mode) — pinned per LESSONS.md; React 19 deferred until wallet-adapter ecosystem catches up
+- `@coral-xyz/anchor` JS client **0.30.1**
 - `@solana/wallet-adapter-react` for wallet integration (Phantom, Backpack, Solflare). Per Hard YES #10: no in-app keystore, no env-var private keys.
 - `connection.onAccountChange` (Helius WebSocket) for real-time book + portfolio updates. **No polling** (Hard YES #9 / `hard-rules.md` §4.8).
 - TanStack Query for RPC caching, dedup, and the WebSocket → cache bridge (`queryClient.setQueryData` from inside the subscription handler)
 - Zustand for ephemeral UI state (open modals, selected strike, panel filters)
 - Tailwind CSS + shadcn/ui components (Radix-based, copy-paste)
+- **No confirmation modal** on trade actions — we deliberately rejected this. The wallet's tx simulation already shows state changes; an extra modal duplicates information without adding any, slows the trade (latency-sensitive UX), and degen traders dislike friction. User education for composite-tx flows (Buy No / Sell No bundling mint_pair + Phoenix order) lives in `docs/USER-GUIDE.md` instead.
 
 **Buy No / Sell No atomicity (POV-3):** Each user click → ONE wallet-signed transaction that bundles all required instructions. Buy No = `[mint_pair, place_sell_yes_on_phoenix]` in one tx. Sell No = `[buy_yes_on_phoenix, redeem_pair_for_usdc]` (or similar). The user never sees a "mint pair" button, never sees intermediate Yes balances. Per `hard-rules.md` §4.7.
 
@@ -108,7 +110,7 @@ Three runtime surfaces: frontend (Cleo), automation service (Bram), on-chain pro
 
 **Responsibility:** prove the system works end-to-end. Property-based tests for the $1 USDC invariant. Integration tests that exercise the full lifecycle on devnet. The "one-command demo" script. The cron-failure-path demo step (Hard YES #5).
 
-**Tech:** Anchor test framework, `proptest` (Rust) for property-based invariants. Vitest + `fast-check` (TypeScript) for service + integration property tests. Mocked Pyth feeds for deterministic CI (Hard NO #12).
+**Tech:** Anchor test framework via mocha + chai + ts-mocha (Anchor default). Jest for frontend + service unit tests. **Primary invariant verification: compressed-time lifecycle simulation** at `scripts/simulate-trading-day.mjs` (60s = 1 trading day, ≥3 wallets, multi-user contention — per LESSONS.md Lesson 10). Supplemented by parameterized mocha tests for specific edge cases (at-strike, double-redeem, stale Pyth, settle-before-window, admin-settle-without-delay). Mocked Pyth feeds for deterministic CI (Hard NO #12); live Pyth reads only behind `LIVE_ORACLE=1` env flag for devnet integration runs. Note: `proptest` (Rust) and `fast-check` (TypeScript) were considered and dropped — the compressed-time simulation catches multi-user contention bugs that property-based per-function tests miss, and adding a new property-testing framework on a 3-day window has too high a learning-curve tax.
 
 **Owned by:** Drew. See `constitution/file-ownership.md`.
 

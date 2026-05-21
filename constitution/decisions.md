@@ -103,7 +103,7 @@ The on-chain shape:
 
 **Context:** PRD requires an oracle with staleness + confidence checks, providing both previous-day close (for morning strike calc) and current-day close (for ~4:05pm settlement). Pyth and Switchboard are the two production-grade options on Solana. Pyth has direct US equities feeds (MAG7 included) with a native confidence-interval model; Switchboard is permissionless-feed-first and equity coverage is thinner.
 
-**Decision:** **Pyth Network** for both pre-market reads (off-chain HTTP API) and on-chain settlement reads (program reads Pyth price account during `settle_market`).
+**Decision:** **Pyth Network** for both pre-market reads (off-chain HTTP API) and on-chain settlement reads. **Implementation note:** the on-chain read is implemented via a vendored 30-line price-account parser at `programs/bell-markets/src/oracle.rs` — we **do NOT** import `pyth-sdk-solana`. A same-project veteran (LESSONS.md Lesson 1) documented a Borsh-version cascade that breaks when `pyth-sdk-solana` is in the dependency tree alongside Anchor 0.31. Vendoring is acceptable because Pyth's account binary layout is stable + documented (magic-number check catches any future layout bump). We extract: price, confidence, exponent, publish slot, and status — then validate `status == Trading`, `current_slot - publish_slot < staleness_threshold`, and `confidence / |price| < confidence_threshold_bps`.
 
 **Trade-off:** We pay coupling to Pyth's feed availability and pricing model in exchange for: native equity coverage, native staleness + confidence semantics that map 1:1 to PRD requirements, mature Anchor SDK integration, and lower integration risk on the 3-day timeline.
 

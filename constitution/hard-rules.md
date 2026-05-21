@@ -100,6 +100,22 @@ Each rule has:
 **Rationale:** Bias diversification — a model that wrote code has the writer's perspective and is more likely to defend it than challenge it. A different-model audit catches independent classes of issues.
 **Enforcement:** Drew's operating discipline (`.project/bell-markets/kickoff/drew.md`). Audit reports name the model used. Default: Opus-written → Sonnet audit. Generic `quality-lead` agent type defaults to Sonnet exactly for this reason. Deterministic test execution (e.g., `anchor test`) needs no model and is exempt.
 
+### §4.10 `Box<Account<'info, T>>` on every heavy Anchor-managed account
+**Rationale:** The BPF stack is 4 KB per frame. Anchor's `try_accounts` deserializes `Account<T>` fields onto the stack during validation. Three or more unboxed heavy accounts (Mint, TokenAccount, MarketConfig, StrikeMarket, UserPosition) overflow the stack silently — the program compiles, deploys, and fails at runtime with cryptic errors. Box-by-default moves them to the heap; CU cost is trivial compared to a broken program. Source: LESSONS.md Lesson 9.
+**Enforcement:** Aria's instruction `Accounts` structs use `Box<Account<'info, T>>` on every non-Pubkey field by default. Drew flags PRs that unbox a previously-boxed account during review.
+
+### §4.11 "Stack offset exceeded" warnings from `anchor build` are build failures
+**Rationale:** Per LESSONS.md Lesson 7, these warnings ARE the actual runtime failures — just disguised as warnings during build. Dismissing them led to deploy-but-doesn't-execute programs.
+**Enforcement:** CI build step greps for "Stack offset exceeded" in the `anchor build` output and fails the pipeline if found. Aria does not deploy a binary that emitted these warnings.
+
+### §4.12 Phoenix order-book accounts use `UncheckedAccount<'info>` with manual byte layout
+**Rationale:** Per LESSONS.md Lesson 3 + Pattern 1, Anchor's `Account<T>` and `zero_copy(unsafe)` both fail at runtime for accounts > 1 KB. The only pattern that works is the one Phoenix, Serum, and OpenBook v2 themselves use: `UncheckedAccount` + a 8-byte magic prefix + manual byte offset reads via a `SlabRef<'a> { data: &'a mut [u8] }` wrapper.
+**Enforcement:** Aria's `programs/bell-markets/src/adapters/phoenix.rs` uses this pattern. Drew flags PRs that try to wrap Phoenix accounts in `Account<T>` during review. Reference: `phoenix-v1/src/state/markets/fifo_market.rs` (https://github.com/Ellipsis-Labs/phoenix-v1).
+
+### §4.13 Pyth on-chain reads use a vendored 30-line parser; do NOT import `pyth-sdk-solana`
+**Rationale:** Per LESSONS.md Lesson 1, `pyth-sdk-solana` causes a Borsh-version cascade against Anchor 0.31. Vendoring a tiny parser at `programs/bell-markets/src/oracle.rs` (validates magic number, reads price/confidence/exponent/publish_slot at known byte offsets, returns a typed `PriceData` struct) avoids the dep conflict entirely. Pyth's binary layout is documented and stable. Cross-references DR-003 implementation note.
+**Enforcement:** Aria does not add `pyth-sdk-solana` to `Cargo.toml`. Drew flags PRs that introduce it.
+
 ---
 
 ## 5. Deploy & Operations

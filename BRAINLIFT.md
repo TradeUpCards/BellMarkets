@@ -63,22 +63,28 @@ Four buttons: Buy Yes, Buy No, Sell Yes, Sell No. Each = one wallet-signed trans
 > Detailed architecture (repo layout tree, Rust + TS type signatures, full domain model) lives in `specs/architecture.md` (populated by `/sdd-init`). This section is the index, not the architecture.
 
 ### Tech Stack
-- **Onchain:** Rust + Anchor on **Solana devnet** (stretch: mainnet-beta)
-- **CLOB:** Phoenix (DR-001) — no custom matcher
-- **Oracle:** Pyth Network (DR-003) — both off-chain HTTP and on-chain account read
+- **Solana CLI:** **3.1.14** (Anza/agave; bundles platform-tools v1.52 with Cargo 1.85 / edition2024)
+- **Anchor CLI:** **0.31.1** (compatible with Solana 3.x sBPF v3 VM)
+- **Rust (host):** 1.95 stable
+- **Onchain language:** Rust + Anchor on **Solana devnet** (stretch: mainnet-beta)
+- **CLOB:** Phoenix (DR-001) — no custom matcher. Integrate via `UncheckedAccount<'info>` + manual byte layout (only pattern that works for > 1 KB Solana accounts; same approach Phoenix/Serum/OpenBook use internally per `LESSONS.md` Lesson 3).
+- **Oracle:** Pyth Network (DR-003) — implemented via vendored 30-line price-account parser at `programs/bell-markets/src/oracle.rs`. **Do NOT use `pyth-sdk-solana`** — Borsh-version cascade documented in `LESSONS.md` Lesson 1.
 - **RPC:** Helius (devnet + WebSocket subscriptions)
-- **Frontend:** Next.js 15 (App Router) + **React 18** (peer-dep compat with wallet-adapter) + TypeScript strict
+- **Frontend:** **Next.js 14.2.18** (App Router) + **React 18** + TypeScript strict — version pinned to the combination `LESSONS.md` validated as "stable with `@solana/wallet-adapter`"
+- **Anchor JS client:** `@coral-xyz/anchor` **0.30.1**
 - **Wallet:** `@solana/wallet-adapter-react` (Phantom / Backpack / Solflare)
 - **Realtime:** `connection.onAccountChange` subscriptions — no polling (Hard YES #9)
 - **State / data:** TanStack Query for RPC caching + dedup + WebSocket cache bridge; Zustand for ephemeral UI state
 - **Styling:** Tailwind CSS + shadcn/ui (copy-paste Radix-based components)
-- **Automation service:** Node.js + TypeScript on **Trigger.dev** (free tier) — cron platform handles the 8am ET morning job + ~4:05pm ET settlement nudger
+- **Automation service:** Node.js + TypeScript on **Trigger.dev** (free tier) at separate `services/automation/` workspace package — cron platform handles the 8am ET morning job + ~4:05pm ET settlement nudger
 - **Package manager:** **pnpm** always (never npm, never yarn)
 - **Monorepo:** pnpm workspaces
-- **Testing:** `anchor test` + `proptest` (Rust); Vitest + `fast-check` (TS)
+- **Testing (Anchor):** mocha + chai + ts-mocha via `anchor test` (the Anchor default)
+- **Testing (TS):** Jest (frontend + service unit tests)
+- **Primary invariant verification:** **compressed-time lifecycle simulation** at `scripts/simulate-trading-day.mjs` (60s = 1 trading day, ≥3 wallets, multi-user) — Drew-owned. Catches multi-user contention bugs that per-function tests miss (per `LESSONS.md` Lesson 10). Supplemented by parameterized mocha tests for specific edge cases.
 - **Linting:** ESLint + Prettier (TS); clippy + rustfmt (Rust)
-- **Deployment:** Solana devnet (contracts), Vercel (frontend), TBD (automation)
-- **CI gate:** `anchor test` + `pnpm test` + `pnpm typecheck` + `pnpm lint` — all must pass
+- **Deployment:** Solana devnet (contracts), Vercel (frontend), Trigger.dev (automation service)
+- **CI gate:** `anchor test` + `pnpm test` + `pnpm typecheck` + `pnpm lint` + compressed-time simulation run. All must pass to merge.
 
 ### Critical files (when they exist)
 - **`programs/bell-markets/src/instructions/settle_market.rs`** — $1 invariant load-bearing; permissionless; Pyth-validated. Highest property-test coverage.
@@ -116,7 +122,7 @@ Four buttons: Buy Yes, Buy No, Sell Yes, Sell No. Each = one wallet-signed trans
 
 ### Hard YESes
 
-1. **The $1 USDC invariant has property-based tests** — for all sequences of (mint, settle, redeem), `vault_balance == $1 × open_pairs` AND `yes_payout + no_payout == $1.00`. Property tests, not example tests.
+1. **The $1 USDC invariant is verified by the compressed-time lifecycle simulation** (`scripts/simulate-trading-day.mjs`) on every CI build. The simulation covers create → mint → ≥3 trade paths → settle → redeem with ≥3 distinct test wallets and asserts `vault_balance == $1 × open_pairs` AND `yes_payout + no_payout == $1.00` from logged events. Supplemented by parameterized mocha edge cases (at-strike, double-redeem, stale Pyth, settle-before-window).
 2. **The full lifecycle is demoable end-to-end on devnet with one command** (`scripts/one-command-demo.sh`).
 3. **pnpm always** — every script / CI / README / `package.json` references pnpm.
 4. **Every PR runs:** `anchor test` + `pnpm test` + `pnpm typecheck` + `pnpm lint`. CI fails the merge if any fail.
@@ -136,7 +142,7 @@ Four buttons: Buy Yes, Buy No, Sell Yes, Sell No. Each = one wallet-signed trans
 - Any deviation from a Spiky POV — write a new DR before implementing.
 
 ### Sweep items
-(All `[INFERRED — CONFIRM]` tags resolved on Day 0 — see Tech Stack section above. Cleo's stack locked at Next 15 App Router + React 18 + TS strict + TanStack Query + Zustand + Tailwind + shadcn. Bram's automation locked at Trigger.dev free tier.)
+(All `[INFERRED — CONFIRM]` tags resolved on Day 0 — see Tech Stack section above. Cleo's stack locked at Next 14.2.18 App Router + React 18 + TS strict + TanStack Query + Zustand + Tailwind + shadcn. Bram's automation locked at Trigger.dev free tier in separate `services/automation/`. Toolchain triple pinned to Solana 3.1.14 / Anchor 0.31.1 / Rust 1.95 per `LESSONS.md` evidence. Verification approach reset to compressed-time simulation + parameterized mocha — fast-check and proptest dropped from plan.)
 
 ---
 
