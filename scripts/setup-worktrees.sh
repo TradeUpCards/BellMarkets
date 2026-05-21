@@ -23,6 +23,14 @@ for lead in "${LEADS[@]}"; do
   else
     echo "Creating worktree at ${WORKTREE_PATH} on branch ${BRANCH}"
     git worktree add "${WORKTREE_PATH}" -b "${BRANCH}"
+
+    # Convert absolute gitdir pointers to relative paths so git works from
+    # both Windows-side (Git Bash / PowerShell) AND WSL inside the same
+    # filesystem location. git worktree add writes absolute Windows paths
+    # by default, which WSL cannot resolve (it expects /mnt/c/... not C:/).
+    echo "gitdir: ../${PROJECT_NAME}/.git/worktrees/${PROJECT_NAME}-${lead}" > "${WORKTREE_PATH}/.git"
+    echo "../../../../${PROJECT_NAME}-${lead}/.git" > "${PROJECT_DIR}/.git/worktrees/${PROJECT_NAME}-${lead}/gitdir"
+    echo "  + worktree pointers converted to portable relative paths"
   fi
 
   cd "${WORKTREE_PATH}"
