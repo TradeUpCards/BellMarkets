@@ -30,11 +30,129 @@
   }
   .nav-link.primary { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
 
-  .grid {
-    display: grid; grid-template-columns: repeat(7, 1fr);
-    gap: 10px; padding: 16px;
-    min-width: 3000px;
+  /* Controls bar */
+  .controls {
+    background: #ffffff; border-bottom: 1px solid #e0e0dd;
+    padding: 10px 24px;
+    display: flex; justify-content: space-between; align-items: center;
+    position: sticky; top: 53px; z-index: 99;
+    gap: 16px;
   }
+  .filter-tabs {
+    display: flex; gap: 4px; background: #f0f0ed; padding: 4px;
+    border-radius: 8px; border: 1px solid #e0e0dd;
+  }
+  .filter-tab {
+    padding: 7px 16px; background: transparent; border: none;
+    color: #6a6a6a; font-size: 12px; font-weight: 600;
+    border-radius: 5px; transition: all 150ms;
+    font-family: 'Inter', sans-serif;
+    cursor: pointer;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .filter-tab:hover { color: #1a1a1a; background: #fff; }
+  .filter-tab.active {
+    background: #1a1a1a; color: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+  }
+  .filter-tab .count {
+    background: rgba(0,0,0,0.12); padding: 1px 6px;
+    border-radius: 999px; font-size: 10px; font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .filter-tab.active .count { background: rgba(255,255,255,0.2); }
+  .filter-tab.round-2.active { background: #fb923c; color: #fff; }
+
+  .scroll-controls {
+    display: flex; gap: 6px; align-items: center;
+  }
+  .scroll-btn {
+    width: 36px; height: 36px;
+    background: #ffffff; border: 1px solid #c0c0bd;
+    color: #1a1a1a; border-radius: 8px;
+    font-size: 18px; transition: all 150ms;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+  .scroll-btn:hover {
+    border-color: #1a1a1a;
+    background: #f5f5f2;
+    transform: scale(1.05);
+  }
+  .scroll-btn:disabled {
+    opacity: 0.35; cursor: not-allowed;
+    transform: none;
+  }
+  .view-mode-toggle {
+    display: flex; background: #f0f0ed; padding: 3px;
+    border-radius: 6px; border: 1px solid #e0e0dd;
+  }
+  .view-mode-btn {
+    padding: 6px 12px; background: transparent; border: none;
+    color: #6a6a6a; font-size: 12px; font-weight: 600;
+    border-radius: 4px; cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    transition: all 150ms;
+  }
+  .view-mode-btn:hover { color: #1a1a1a; }
+  .view-mode-btn.active { background: #1a1a1a; color: #fff; }
+
+  .scroll-position {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    color: #6a6a6a; min-width: 60px; text-align: center;
+    background: #f0f0ed; padding: 6px 12px; border-radius: 6px;
+    border: 1px solid #e0e0dd;
+  }
+
+  /* Grid container */
+  .grid-wrap {
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-behavior: smooth;
+    position: relative;
+  }
+  .grid-wrap::-webkit-scrollbar { height: 10px; }
+  .grid-wrap::-webkit-scrollbar-track { background: #f0f0ed; }
+  .grid-wrap::-webkit-scrollbar-thumb { background: #c0c0bd; border-radius: 5px; }
+  .grid-wrap::-webkit-scrollbar-thumb:hover { background: #1a1a1a; }
+
+  .grid {
+    display: grid; grid-template-columns: repeat(7, 420px);
+    gap: 10px; padding: 16px;
+    width: max-content;
+    transition: grid-template-columns 250ms ease;
+  }
+
+  /* Filter modes */
+  body[data-filter="all"] .col { display: flex; }
+  body[data-filter="r1"] .col[data-round="2"] { display: none; }
+  body[data-filter="r2"] .col[data-round="1"] { display: none; }
+
+  /* Single-view mode */
+  body[data-view="single"] .grid {
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+  body[data-view="single"] .grid-wrap {
+    overflow: hidden;
+  }
+  body[data-view="single"] .col {
+    display: none !important;
+  }
+  body[data-view="single"] .col.single-active {
+    display: flex !important;
+    max-width: 100%;
+  }
+  body[data-view="single"] .frame-wrap.scale iframe {
+    width: 100%;
+    height: 100%;
+    transform: none;
+  }
+  body[data-view="single"] .scroll-controls .scroll-btn[data-action="prev"],
+  body[data-view="single"] .scroll-controls .scroll-btn[data-action="next"] {
+    /* Repurpose for single-view navigation */
+  }
+
   .col.new-iter .col-header {
     border-color: #fb923c;
     background: linear-gradient(135deg, rgba(251, 146, 60, 0.10), #ffffff);
@@ -48,6 +166,10 @@
     margin-left: 6px;
   }
   .col-header { position: relative; }
+  body[data-view="single"] .col.single-active .col-header {
+    border-color: #1a1a1a;
+    box-shadow: 0 0 0 1px #1a1a1a;
+  }
   .col { display: flex; flex-direction: column; }
   .col-header {
     background: #ffffff; border: 1px solid #e0e0dd;
@@ -90,16 +212,35 @@
 <body>
 
 <div class="topbar">
-  <h1>BellMarkets · Compare Landings <span class="meta">— 7 candidates · scroll horizontally · v6 + v7 are feedback-driven</span></h1>
+  <h1>BellMarkets · Compare Landings <span class="meta">— 7 candidates</span></h1>
   <div class="nav-links">
     <a href="index.html" class="nav-link">← All candidates</a>
     <a href="compare-trade.html" class="nav-link primary">Compare trade pages →</a>
   </div>
 </div>
 
+<div class="controls">
+  <div class="filter-tabs">
+    <button class="filter-tab active" data-filter="all">All <span class="count">7</span></button>
+    <button class="filter-tab" data-filter="r1">Round 1 <span class="count">5</span></button>
+    <button class="filter-tab round-2" data-filter="r2">Round 2 <span class="count">2</span></button>
+  </div>
+
+  <div class="scroll-controls">
+    <div class="view-mode-toggle">
+      <button class="view-mode-btn active" data-view="grid">Grid</button>
+      <button class="view-mode-btn" data-view="single">Single</button>
+    </div>
+    <button class="scroll-btn" data-action="prev" title="Previous (← arrow key)">◀</button>
+    <span class="scroll-position" id="scrollPos">1 / 7</span>
+    <button class="scroll-btn" data-action="next" title="Next (→ arrow key)">▶</button>
+  </div>
+</div>
+
+<div class="grid-wrap" id="gridWrap">
 <div class="grid">
 
-  <div class="col">
+  <div class="col" data-round="1">
     <div class="col-header">
       <div class="col-name"><span class="num">v1</span> Hyperliquid</div>
       <div class="col-actions">
@@ -111,7 +252,7 @@
     </div>
   </div>
 
-  <div class="col">
+  <div class="col" data-round="1">
     <div class="col-header">
       <div class="col-name"><span class="num">v2</span> Polymarket</div>
       <div class="col-actions">
@@ -123,7 +264,7 @@
     </div>
   </div>
 
-  <div class="col">
+  <div class="col" data-round="1">
     <div class="col-header">
       <div class="col-name"><span class="num">v3</span> Drift</div>
       <div class="col-actions">
@@ -135,7 +276,7 @@
     </div>
   </div>
 
-  <div class="col">
+  <div class="col" data-round="1">
     <div class="col-header">
       <div class="col-name"><span class="num">v4</span> Bloomberg</div>
       <div class="col-actions">
@@ -147,7 +288,7 @@
     </div>
   </div>
 
-  <div class="col">
+  <div class="col" data-round="1">
     <div class="col-header">
       <div class="col-name"><span class="num">v5</span> Linear</div>
       <div class="col-actions">
@@ -159,7 +300,7 @@
     </div>
   </div>
 
-  <div class="col new-iter">
+  <div class="col new-iter" data-round="2">
     <div class="col-header">
       <div class="col-name"><span class="num">v6</span> Pulse</div>
       <div class="col-actions">
@@ -171,7 +312,7 @@
     </div>
   </div>
 
-  <div class="col new-iter">
+  <div class="col new-iter" data-round="2">
     <div class="col-header">
       <div class="col-name"><span class="num">v7</span> Terminal</div>
       <div class="col-actions">
@@ -184,6 +325,125 @@
   </div>
 
 </div>
+</div>
+
+<script>
+  (function() {
+    const body = document.body;
+    const gridWrap = document.getElementById('gridWrap');
+    const filterTabs = document.querySelectorAll('.filter-tab');
+    const viewBtns = document.querySelectorAll('.view-mode-btn');
+    const scrollBtns = document.querySelectorAll('.scroll-btn');
+    const scrollPos = document.getElementById('scrollPos');
+    const cols = Array.from(document.querySelectorAll('.col'));
+
+    let currentSingleIndex = 0;
+
+    function visibleCols() {
+      return cols.filter(c => getComputedStyle(c).display !== 'none');
+    }
+
+    function updateScrollPos() {
+      const vis = visibleCols();
+      if (body.dataset.view === 'single') {
+        scrollPos.textContent = `${currentSingleIndex + 1} / ${vis.length}`;
+        return;
+      }
+      // Grid mode — estimate which col is centered
+      const wrap = gridWrap;
+      if (!vis.length) { scrollPos.textContent = '0 / 0'; return; }
+      const wrapRect = wrap.getBoundingClientRect();
+      const center = wrapRect.left + wrapRect.width / 2;
+      let active = 0;
+      vis.forEach((c, i) => {
+        const r = c.getBoundingClientRect();
+        if (r.left <= center && r.right >= center) active = i;
+      });
+      scrollPos.textContent = `${active + 1} / ${vis.length}`;
+    }
+
+    function applySingleView() {
+      const vis = visibleCols();
+      cols.forEach(c => c.classList.remove('single-active'));
+      if (vis[currentSingleIndex]) vis[currentSingleIndex].classList.add('single-active');
+      updateScrollPos();
+    }
+
+    // Filter tabs
+    filterTabs.forEach(btn => {
+      btn.addEventListener('click', () => {
+        filterTabs.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        body.dataset.filter = btn.dataset.filter;
+        currentSingleIndex = 0;
+        if (body.dataset.view === 'single') applySingleView();
+        else { gridWrap.scrollLeft = 0; updateScrollPos(); }
+      });
+    });
+
+    // View mode toggle
+    viewBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        viewBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        body.dataset.view = btn.dataset.view;
+        if (btn.dataset.view === 'single') {
+          currentSingleIndex = 0;
+          applySingleView();
+        } else {
+          cols.forEach(c => c.classList.remove('single-active'));
+          updateScrollPos();
+        }
+      });
+    });
+
+    // Scroll buttons
+    scrollBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const dir = btn.dataset.action === 'next' ? 1 : -1;
+        if (body.dataset.view === 'single') {
+          const vis = visibleCols();
+          currentSingleIndex = Math.max(0, Math.min(vis.length - 1, currentSingleIndex + dir));
+          applySingleView();
+        } else {
+          gridWrap.scrollBy({ left: dir * 430, behavior: 'smooth' });
+        }
+      });
+    });
+
+    // Track grid scroll
+    gridWrap.addEventListener('scroll', () => {
+      if (body.dataset.view !== 'single') updateScrollPos();
+    });
+
+    // Keyboard
+    document.addEventListener('keydown', (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        document.querySelector('.scroll-btn[data-action="prev"]').click();
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        document.querySelector('.scroll-btn[data-action="next"]').click();
+      } else if (e.key === '1') {
+        document.querySelector('.filter-tab[data-filter="all"]').click();
+      } else if (e.key === '2') {
+        document.querySelector('.filter-tab[data-filter="r1"]').click();
+      } else if (e.key === '3') {
+        document.querySelector('.filter-tab[data-filter="r2"]').click();
+      } else if (e.key === 'g') {
+        document.querySelector('.view-mode-btn[data-view="grid"]').click();
+      } else if (e.key === 's') {
+        document.querySelector('.view-mode-btn[data-view="single"]').click();
+      }
+    });
+
+    // Initialize
+    body.dataset.filter = 'all';
+    body.dataset.view = 'grid';
+    updateScrollPos();
+  })();
+</script>
 
 </body>
 </html>
