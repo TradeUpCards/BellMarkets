@@ -40,4 +40,19 @@ export type {
   SendCreateStrikeMarketTxFn,
   TickerOutcome,
 } from "./jobs/morning.js";
-export { settlementNudgerJob } from "./jobs/settlement.js";
+export {
+  settlementNudgerJob,
+  runSettlementNudger,
+  defaultShouldRetry,
+  SETTLE_RETRY_INTERVAL_MS,
+  SETTLE_RETRY_DEADLINE_MS,
+} from "./jobs/settlement.js";
+export type {
+  SettlementJobDeps,
+  SettlementJobOutcome,
+  SettlementOutcome,
+  OpenMarketRef,
+  SettleMarketTxFn,
+} from "./jobs/settlement.js";
+export { retryUntilDeadline } from "./lib/retry.js";
+export type { RetryOptions, RetryResult, RetryDeps } from "./lib/retry.js";

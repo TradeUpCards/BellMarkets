@@ -7,7 +7,7 @@ Two scheduled jobs (Trigger.dev free tier):
 | Job | Schedule (EDT) | Schedule (UTC cron) | Purpose |
 |---|---|---|---|
 | `morning-create-markets` | 8:00 AM ET, Mon–Fri | `0 13 * * 1-5` | Read previous close per MAG7 stock, compute strikes (±3/6/9 %, $10-rounded, deduped, plus rounded prev close), call `create_strike_market` per unique strike. |
-| `settlement-nudger` | 4:05 PM ET, Mon–Fri | `5 21 * * 1-5` | Permissionless caller of `settle_market` (DR-002). Retries every 30s for up to 15 min if Pyth confidence is wide; otherwise alerts admin for `admin_settle` fallback. **Day-3 — currently still a stub.** |
+| `settlement-nudger` | 4:05 PM ET, Mon–Fri | `5 21 * * 1-5` | Permissionless caller of `settle_market` (DR-002). Retries every 30s for up to 15 min on `PythConfidenceTooWide` / `PythStale` / RPC blips per the PRD; non-retriable errors abort immediately. After 15min the market stays Unsettled and `admin_settle` becomes eligible at expiry + `admin_override_delay_secs`. |
 
 > **DST:** the cron expressions above are correct for EDT (mid-March through early November). When the US shifts back to EST in November, both crons must move one hour later in UTC (`0 14 …` / `5 22 …`). Tracked as a known issue in `.project/bell-markets/handoffs/bram-handoff.md`.
 
@@ -31,13 +31,15 @@ services/automation/
     ├── idl/
     │   ├── bell_markets.json   placeholder `{}` until Aria's anchor build artifact lands
     │   └── README.md           drop-zone instructions
+    ├── lib/
+    │   └── retry.ts      deadline-bounded retry helper (injectable clock + sleep, PRD-mandated 30s × 15min cadence)
     ├── clients/
     │   ├── pyth.ts       Hermes HTTP client (mockable fetch) — returns price + expo + publishTime
     │   ├── helius.ts     web3.js Connection wrapper (mockable factory, deferred imports)
     │   └── anchor.ts     BellMarketsAnchorClient — loads IDL + keypair, builds `Program<Idl>` (deferred imports)
     └── jobs/
         ├── morning.ts    Trigger.dev schedules.task — calls create_strike_market per unique strike
-        └── settlement.ts Trigger.dev schedules.task — Day-2 stub (Day-3 settle wiring)
+        └── settlement.ts Trigger.dev schedules.task — scans open StrikeMarket accounts, settles each with retry harness
 ```
 
 Tests live at `tests/automation/**` (kept out of the workspace package so Drew's cross-cutting test runner can pick them up uniformly).
@@ -81,5 +83,5 @@ The orchestration is extracted to `runMorningCreateMarkets({ deps })` so it's un
 - **Pyth on-chain price-account pubkeys** (per-ticker `PYTH_PRICE_ACCOUNT_*` env vars) are blank. Look up devnet pubkeys from pyth.network's published feed list and populate `.env`.
 - **Phoenix v1 FIFO market pubkeys** (per-ticker `PHOENIX_MARKET_*` env vars) are blank. Aria's `verify_phoenix_market` is live and rejects anything without the 8-byte magic prefix — Day-3 work to find or clone real devnet markets.
 - **`USDC_DEVNET_MINT`** must match `MarketConfig.usdc_mint` set at `initialize_config` time. Populate from Aria's deploy record.
-- **Settlement nudger** is still a stub — Day-3 scope (real `settle_market` loop + 30s × 15min retry harness).
+- **Settlement nudger** wired Day-3 with the PRD retry harness — scans `program.account.strikeMarket.all()`, filters Unsettled + expired, settles each with `retryUntilDeadline` (30s × 15min). Won't actually run end-to-end until the IDL + initialize_config blockers above land.
 - **DST cron flip** (see table above).
