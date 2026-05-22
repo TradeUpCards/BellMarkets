@@ -30,9 +30,14 @@ impl Default for Outcome {
 
 // ─── MarketConfig ───────────────────────────────────────────────────────────
 // Global config singleton. PDA seed = b"config".
+//
+// NOTE: no `#[derive(Default)]`. Rust's stdlib only impls Default for arrays
+// up to [T; 32], so the [u8; 64] _reserved field would need a manual impl.
+// We don't need Default — `#[account(init, ...)]` allocates zeroed space and
+// the handler writes the real values. If a future code path needs
+// MarketConfig::default(), add a manual impl then.
 
 #[account]
-#[derive(Default)]
 pub struct MarketConfig {
     pub admin: Pubkey,
     pub usdc_mint: Pubkey,
@@ -53,8 +58,9 @@ impl MarketConfig {
 // One per (underlying, expiry, strike). PDA seed = b"strike",
 // underlying_pyth_feed, expiry_unix_le, strike_price_le.
 
+// Same Default-derive caveat as MarketConfig — see note above.
+
 #[account]
-#[derive(Default)]
 pub struct StrikeMarket {
     pub config: Pubkey,
     pub underlying_pyth_feed: Pubkey,

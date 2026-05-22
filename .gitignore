@@ -77,6 +77,17 @@ test-ledger/
 **/*.rs.bk
 Cargo.lock.bak
 
+# Security — never commit private keys / wallet keypairs.
+# Pattern borrowed from w3swap solana_token_migration/.gitignore.
+keys/
+wallets/
+keypairs/
+*.keypair
+*-keypair.json
+wallet.json
+id.json
+*.wallet
+
 # Anchor build artifacts that should NOT be committed
 # (note: Cargo.lock IS committed for deployable program — see Aria's kickoff)
 

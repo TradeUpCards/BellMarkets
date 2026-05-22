@@ -7,10 +7,10 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-bell_markets = "BeLLMrKtsProGramID1111111111111111111111111"
+bell_markets = "599h7VznYR4CxyrG5nQbhR13qtRuwPcbnNr5QqbkS7uV"
 
 [programs.devnet]
-bell_markets = "BeLLMrKtsProGramID1111111111111111111111111"
+bell_markets = "599h7VznYR4CxyrG5nQbhR13qtRuwPcbnNr5QqbkS7uV"
 
 # Mainnet intentionally omitted — Hard NO #1 (no mainnet, no real funds).
 # See .project/bell-markets/kickoff/aria.md and CLAUDE_SESSION_HANDOFF.md "Hard Rules".
@@ -19,8 +19,11 @@ bell_markets = "BeLLMrKtsProGramID1111111111111111111111111"
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "Localnet"
-wallet = "~/.config/solana/id.json"
+cluster = "Devnet"
+# Per w3swap solana_token_migration pattern: the upgrade authority keypair
+# (gitignored under keys/) signs `anchor deploy` and program upgrades. Devnet
+# only — mainnet keypair never created (Hard NO #1).
+wallet = "keys/devnet-upgrade-authority.json"
 
 [scripts]
 test = "pnpm exec ts-mocha -p ./tsconfig.json -t 1000000 'tests/contracts/**/*.ts'"
