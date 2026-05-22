@@ -31,10 +31,23 @@
   .nav-link.primary { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
 
   .grid {
-    display: grid; grid-template-columns: repeat(5, 1fr);
-    gap: 12px; padding: 16px;
-    min-width: 2000px;
+    display: grid; grid-template-columns: repeat(7, 1fr);
+    gap: 10px; padding: 16px;
+    min-width: 3000px;
   }
+  .col.new-iter .col-header {
+    border-color: #fb923c;
+    background: linear-gradient(135deg, rgba(251, 146, 60, 0.10), #ffffff);
+  }
+  .col.new-iter .col-name .num { color: #ea580c; font-weight: 800; }
+  .col.new-iter .col-header::after {
+    content: "NEW"; background: #fb923c; color: #fff;
+    font-size: 9px; font-weight: 800; padding: 1px 6px;
+    border-radius: 3px; letter-spacing: 0.5px;
+    font-family: 'JetBrains Mono', monospace;
+    margin-left: 6px;
+  }
+  .col-header { position: relative; }
   .col { display: flex; flex-direction: column; }
   .col-header {
     background: #ffffff; border: 1px solid #e0e0dd;
@@ -77,7 +90,7 @@
 <body>
 
 <div class="topbar">
-  <h1>BellMarkets · Compare Landings <span class="meta">— scroll horizontally · zoom out for full view</span></h1>
+  <h1>BellMarkets · Compare Landings <span class="meta">— 7 candidates · scroll horizontally · v6 + v7 are feedback-driven</span></h1>
   <div class="nav-links">
     <a href="index.html" class="nav-link">← All candidates</a>
     <a href="compare-trade.html" class="nav-link primary">Compare trade pages →</a>
@@ -143,6 +156,30 @@
     </div>
     <div class="frame-wrap scale">
       <iframe src="v5-landing.html"></iframe>
+    </div>
+  </div>
+
+  <div class="col new-iter">
+    <div class="col-header">
+      <div class="col-name"><span class="num">v6</span> Pulse</div>
+      <div class="col-actions">
+        <a href="v6-landing.html" target="_blank" class="full">↗ open</a>
+      </div>
+    </div>
+    <div class="frame-wrap scale">
+      <iframe src="v6-landing.html"></iframe>
+    </div>
+  </div>
+
+  <div class="col new-iter">
+    <div class="col-header">
+      <div class="col-name"><span class="num">v7</span> Terminal</div>
+      <div class="col-actions">
+        <a href="v7-landing.html" target="_blank" class="full">↗ open</a>
+      </div>
+    </div>
+    <div class="frame-wrap scale">
+      <iframe src="v7-landing.html"></iframe>
     </div>
   </div>
 
