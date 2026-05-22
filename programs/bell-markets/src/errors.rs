@@ -76,4 +76,7 @@ pub enum BellMarketsError {
 
     #[msg("admin_settle forced_outcome must be Yes / No / Invalid (not Unsettled).")]
     ForcedOutcomeUnsettled,
+
+    #[msg("strike_market.config does not match the supplied config account.")]
+    ConfigMismatch,
 }

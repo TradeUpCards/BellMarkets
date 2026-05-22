@@ -1,3 +1,14 @@
+//! `initialize_config` — one-shot setup of the global `MarketConfig` PDA.
+//!
+//! Bounds on the three tunables (staleness, confidence, override delay) are
+//! defensive — they prevent obviously-broken values from being stored even by
+//! a trusted admin (e.g., fat-fingered "staleness = 0" which would reject
+//! every Pyth price, locking every market into the admin-override path).
+//! See the const block below for each bound's rationale.
+//!
+//! Idempotency: `#[account(init, ...)]` ensures this can only succeed once
+//! per `[b"config"]` PDA. A second call fails at account allocation.
+
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token};
 use crate::state::*;

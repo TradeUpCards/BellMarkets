@@ -1,3 +1,14 @@
+//! `admin_settle` — escape hatch when the oracle is unrecoverable past the
+//! human-intervention delay window.
+//!
+//! Two discriminators distinguish admin-pathed settles from oracle-pathed
+//! settles in the StrikeMarket record:
+//!   - `settle_price == 0` => admin-pathed (this instruction)
+//!   - `settle_price != 0` => oracle-pathed (settle_market)
+//!
+//! Downstream consumers (frontend display, analytics) use this to badge the
+//! settlement source without needing a separate "source" field.
+
 use anchor_lang::prelude::*;
 use crate::state::*;
 use crate::errors::BellMarketsError;

@@ -1,3 +1,17 @@
+//! `mint_pair` — the `$1 USDC → 1 YES + 1 NO` operation that establishes the
+//! Hard YES #1 invariant.
+//!
+//! Per-call conservation (enforced by code structure, not arithmetic): every
+//! `amount` flows symmetrically through three SPL CPIs:
+//!   1. transfer `amount` USDC user → vault   (user signs)
+//!   2. mint `amount` YES → user              (strike_market PDA signs)
+//!   3. mint `amount` NO  → user              (strike_market PDA signs)
+//!
+//! There is no rounding, no fee, no scaling. The aggregate invariant
+//! (vault_balance == yes_supply == no_supply at any point in the market's
+//! lifetime, modulo redemptions) follows from this per-call symmetry plus
+//! the equivalent symmetry in `redeem` and `redeem_invalid`.
+
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Mint, MintTo, Token, TokenAccount, Transfer};
 use crate::state::*;

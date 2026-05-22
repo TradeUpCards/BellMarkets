@@ -2,11 +2,12 @@ use anchor_lang::prelude::*;
 use crate::state::*;
 use crate::errors::BellMarketsError;
 
-/// Convenience wrapper for adding a strike to an existing (underlying,
-/// expiry) series. The series is implicit — we just spawn a new
-/// `StrikeMarket` PDA via `create_strike_market` with a different strike.
-/// Day-2 may evolve this into a separate batch creator if the cost/UX of
-/// repeated CPIs justifies it.
+/// Convenience hook for adding a strike to an existing (underlying, expiry)
+/// series. The series is implicit — each strike is its own `StrikeMarket`
+/// PDA created via `create_strike_market` with the same underlying + expiry
+/// and a different strike_price. This instruction is a no-op surface
+/// reserved for a possible future batch creator; live in the IDL today only
+/// so clients can target it without an upgrade later.
 #[derive(Accounts)]
 pub struct AddStrike<'info> {
     #[account(mut)]

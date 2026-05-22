@@ -1,3 +1,18 @@
+//! `redeem` — winning-side payout. User burns `amount` of the winning mint
+//! and receives `amount` USDC from the vault.
+//!
+//! Why Yes/No only (not Invalid): this Accounts struct has a single
+//! `winning_mint` + `user_winning_token` pair, which fits the binary-payout
+//! shape (one winner, one loser) but cannot represent the symmetric
+//! "burn both sides" shape that Invalid markets need. The dedicated
+//! `redeem_invalid` instruction handles that.
+//!
+//! Why no fee on the redeem path: the $1 USDC invariant is load-bearing
+//! (Hard YES #1). Any fee here would break the property that aggregate
+//! redemptions == aggregate deposits for the winning side. Platform fees, if
+//! ever added, should live on `mint_pair` instead (charge on entry, exit
+//! is pure).
+
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Burn, Mint, Token, TokenAccount, Transfer};
 use crate::state::*;
@@ -22,9 +37,9 @@ pub struct Redeem<'info> {
     )]
     pub strike_market: Box<Account<'info, StrikeMarket>>,
 
-    /// The mint corresponding to the user's winning side. Day-2 handler
-    /// enforces winning_mint == strike_market.yes_mint OR no_mint based on
-    /// strike_market.outcome.
+    /// The mint corresponding to the user's winning side. The handler
+    /// enforces `winning_mint == strike_market.yes_mint` (if outcome == Yes)
+    /// or `== strike_market.no_mint` (if outcome == No).
     #[account(mut)]
     pub winning_mint: Box<Account<'info, Mint>>,
 
@@ -50,10 +65,9 @@ pub struct Redeem<'info> {
 pub fn handler(ctx: Context<Redeem>, amount: u64) -> Result<()> {
     require!(amount > 0, BellMarketsError::ZeroAmount);
 
-    // Day-2 scope: Yes/No only. Invalid (oracle-down + admin-override path)
-    // refunds 1 USDC per (YES+NO) pair burned, so it needs a different
-    // Accounts struct (both mints + both user token accounts). That goes in
-    // a follow-up `redeem_invalid` instruction; for now reject the path here.
+    // Yes/No only — Invalid markets refund the original pair deposit and
+    // require both mints + both user token accounts; that path lives in the
+    // dedicated `redeem_invalid` instruction (see ../redeem_invalid.rs).
     let outcome = ctx.accounts.strike_market.outcome;
     require!(outcome != Outcome::Invalid, BellMarketsError::InvalidOutcomeForRedeem);
     let expected_winning_mint = match outcome {

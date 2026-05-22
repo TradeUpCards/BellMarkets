@@ -78,6 +78,10 @@ pub mod bell_markets {
         instructions::redeem::handler(ctx, amount)
     }
 
+    pub fn redeem_invalid(ctx: Context<RedeemInvalid>, amount: u64) -> Result<()> {
+        instructions::redeem_invalid::handler(ctx, amount)
+    }
+
     pub fn pause(ctx: Context<Pause>, paused: bool) -> Result<()> {
         instructions::pause::handler(ctx, paused)
     }
