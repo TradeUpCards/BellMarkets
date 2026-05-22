@@ -1,0 +1,212 @@
+// ============================================================
+// BellMarkets — Deployment Topology
+//
+// Where does each piece physically run? This view answers the
+// "ops" question separately from the structural / dynamic views.
+//
+// Companion to bell-markets.c4 (structural) and dynamics.c4 (temporal).
+// ============================================================
+
+specification {
+  element deployNode {
+    style {
+      shape browser
+      color secondary
+    }
+  }
+
+  tag prod-devnet
+  tag prod-saas
+  tag prod-edge
+  tag dev-local
+}
+
+model {
+
+  // ============================================================
+  // DEPLOYMENT NODES — physical hosts
+  // ============================================================
+
+  solanaDevnet = deployNode 'Solana Devnet Cluster' {
+    description '
+      Public Solana devnet (https://api.devnet.solana.com). The Anchor
+      program lives here. Validators run on Solana Foundation
+      infrastructure; we have no operational responsibility.
+      Slot: 312,847,193+ at deploy time.
+    '
+    technology 'Solana validators (public)'
+    #prod-devnet
+  }
+
+  triggerDevCloud = deployNode 'Trigger.dev Cloud (Free Tier)' {
+    description '
+      Hosted cron + workflow runtime. Free tier: 1k task runs/month,
+      30-second execution limit per task. Our two scheduled tasks fit
+      easily within budget. Failure mode: cron stops firing →
+      permissionless settle takes over (DR-002).
+    '
+    technology 'Trigger.dev v4 (managed)'
+    #prod-saas
+  }
+
+  heliusCloud = deployNode 'Helius RPC (Free Tier)' {
+    description '
+      Solana RPC + WebSocket API. Auth via HELIUS_API_KEY env var.
+      Free tier rate limits are healthy for MVP traffic. Production
+      mainnet would bump to paid tier.
+    '
+    technology 'Helius (managed)'
+    #prod-saas
+  }
+
+  vercelEdge = deployNode 'Vercel Edge (planned)' {
+    description '
+      Where the Next.js app deploys for the demo. Currently the app
+      runs only on local dev (port 3001). Cleo to deploy when visual
+      layer lands (post-mockup-decision).
+    '
+    technology 'Vercel Edge / Next.js'
+    #prod-edge
+  }
+
+  pythHermesEdge = deployNode 'Pyth Hermes (managed)' {
+    description '
+      Pyth Network s public HTTP price feed API. Used off-chain by
+      Bram s morning cron for strike calculation and by Cleo s
+      frontend for spot price display.
+    '
+    technology 'Pyth Hermes (managed CDN)'
+    #prod-saas
+  }
+
+  devMachine = deployNode 'Developer Machine (DESKTOP-N4A35D6)' {
+    description '
+      Where everything is built and Drew s simulation runs. Windows 11
+      host + WSL2 Ubuntu-24.04 for Solana toolchain. Cursor IDE in 4
+      worktrees (one per lead). Keypairs at keys/ (gitignored).
+      Backup at OneDrive: keys-backup/.
+
+      Mode-2 worktrees: BellMarkets, BellMarkets-aria, -bram, -cleo, -drew.
+      Shared .project/ + .claude/ via OneDrive junction.
+    '
+    technology 'Windows 11 + WSL2 Ubuntu-24.04'
+    #dev-local
+  }
+
+  traderBrowser = deployNode 'Trader Browser' {
+    description '
+      Where the dApp runs in the trader s session. Browser holds the
+      WalletAdapter context; Phantom / Solflare extension holds the
+      private key. Non-custodial trust boundary.
+    '
+    technology 'Browser + Phantom/Solflare extension'
+    #prod-edge
+  }
+
+  // ============================================================
+  // RELATIONSHIPS — what runs where, what talks to what
+  // ============================================================
+
+  // What runs on Solana devnet
+  bellMarkets.program -> solanaDevnet 'Anchor program deployed here'
+  bellMarkets.marketConfig -> solanaDevnet 'PDA lives here'
+  bellMarkets.strikeMarkets -> solanaDevnet 'PDAs live here'
+  bellMarkets.yesNoMints -> solanaDevnet 'Mints live here'
+  bellMarkets.usdcVault -> solanaDevnet 'Token accounts live here'
+
+  // What runs on Trigger.dev
+  bellMarkets.automation.morningJob -> triggerDevCloud 'Scheduled at 0 13 * * 1-5'
+  bellMarkets.automation.settlementJob -> triggerDevCloud 'Scheduled at 5 21 * * 1-5'
+
+  // What runs on Vercel (planned)
+  bellMarkets.frontend.pages -> vercelEdge 'Deploys here for demo'
+
+  // What runs locally
+  bellMarkets.quality.simulation -> devMachine 'Eval suite runs here'
+  bellMarkets.quality.edgeCases -> devMachine 'mocha tests run here'
+
+  // What runs in trader s browser
+  bellMarkets.frontend.walletConnect -> traderBrowser 'Browser context'
+  walletAdapter -> traderBrowser 'Bridges to wallet extension'
+
+  // Network calls between deployment nodes
+  triggerDevCloud -> solanaDevnet 'Submits signed tx via Helius'
+  triggerDevCloud -> heliusCloud 'RPC connection'
+  triggerDevCloud -> pythHermesEdge 'HTTP fetch for strike calc'
+  vercelEdge -> heliusCloud 'WebSocket subscriptions'
+  vercelEdge -> pythHermesEdge 'Spot price display'
+  vercelEdge -> solanaDevnet 'Reads on-chain state (via Helius)'
+  traderBrowser -> vercelEdge 'HTTPS to app'
+  devMachine -> solanaDevnet 'anchor deploy, simulation runs'
+  devMachine -> heliusCloud 'RPC for testing'
+}
+
+views {
+
+  // -------- 14. DEPLOYMENT TOPOLOGY --------
+
+  view deployment {
+    title 'Deployment Topology — Where Each Piece Runs'
+    description '
+      Physical hosting layout. 5 prod surfaces (Solana devnet,
+      Trigger.dev, Helius, Pyth Hermes, Vercel-planned) + 2 edges
+      (trader browser, developer machine).
+
+      Note the asymmetry: program + data live on PUBLIC infrastructure
+      (Solana devnet). Cron + frontend live on MANAGED SaaS. The
+      "we built it" surface is small — most of the system is leverage
+      on existing infrastructure.
+    '
+
+    include
+      solanaDevnet,
+      triggerDevCloud,
+      heliusCloud,
+      vercelEdge,
+      pythHermesEdge,
+      devMachine,
+      traderBrowser,
+      bellMarkets.program,
+      bellMarkets.marketConfig,
+      bellMarkets.strikeMarkets,
+      bellMarkets.yesNoMints,
+      bellMarkets.usdcVault,
+      bellMarkets.automation.morningJob,
+      bellMarkets.automation.settlementJob,
+      bellMarkets.frontend.pages,
+      bellMarkets.frontend.walletConnect,
+      bellMarkets.quality.simulation,
+      bellMarkets.quality.edgeCases,
+      walletAdapter
+  }
+
+  // -------- 15. TRUST BOUNDARIES --------
+
+  view trustBoundaries {
+    title 'Trust Boundaries — What Touches Whose Keys'
+    description '
+      The non-custodial enforcement story in one view. Trader s
+      private key NEVER leaves their browser extension. Platform-admin
+      keypair NEVER leaves Aria s worktree (and is backed up to
+      OneDrive). Frontend handles wallet interaction via the adapter
+      ONLY — no signing primitives, no keypair files.
+
+      Three keypair stewards: Aria (platform admin + program upgrade),
+      Bram (loads platform admin in cron env for signing), Drew
+      (drew-admin for test scenarios).
+    '
+
+    include
+      trader,
+      admin,
+      cranker,
+      walletAdapter,
+      traderBrowser,
+      devMachine,
+      triggerDevCloud,
+      bellMarkets.frontend.walletConnect,
+      bellMarkets.frontend.buildBuyNo,
+      bellMarkets.automation.anchorClient,
+      bellMarkets.program
+  }
+}
