@@ -1,47 +1,324 @@
-// Settlement nudger (~4:05 PM ET): for each open contract, call
-// `settle_market` (permissionless — DR-002). Best-effort. If Pyth
-// confidence is too wide, retries every 30s for up to 15min. If still
-// failing after the window, alerts the admin for manual `admin_settle`
-// (which has its own ≥1hr on-chain delay gate — Hard YES #7).
+// Settlement nudger (~4:05 PM ET): for each open StrikeMarket account that
+// has reached its expiry, call `settle_market`. Permissionless (DR-002) —
+// any signer can crank settlement; we sign with the platform-admin keypair
+// only because we already have it loaded for the morning job.
 //
-// Day-1 status: stub — no on-chain calls yet. The job logs that it
-// *would* settle the day's open markets and exits successfully.
+// Retry policy (per PRD "Settlement" section):
+//   - 30s between attempts, total 15min deadline per market.
+//   - Retry on PythConfidenceTooWide (transient — confidence narrows as more
+//     publishers report) and PythStale (transient — fresh price will land).
+//   - Non-retriable: AlreadySettled (success state — someone else cranked
+//     it), NotExpired (premature), PhoenixBadMagic / config errors, etc.
+//   - After 15min exhaustion, the market stays Unsettled; admin can call
+//     `admin_settle` after the on-chain ≥1hr override window opens.
 //
 // Cron: `5 21 * * 1-5` = 4:05 PM ET on US weekdays during EDT (UTC-4).
-// DST: the EST half of the year needs `5 22 * * 1-5` instead. Same
-// known-issue tracking as morning.ts. Out of scope for Day 1.
-//
-// DR-002 hard rule: settle_market is permissionless. This nudger is a
-// convenience caller, not an authority. Removing the nudger entirely
-// must not break the system — any user can call settle_market with
-// the same instruction shape.
+// DST flip same known issue as morning.ts.
 
 import { schedules } from "@trigger.dev/sdk/v3";
 
-import { loadConfig, requireConfig } from "../config.js";
+import { loadConfig, type AutomationConfig } from "../config.js";
+import { BellMarketsAnchorClient } from "../clients/anchor.js";
+import { retryUntilDeadline } from "../lib/retry.js";
+
+/** 30 seconds — PRD-mandated retry cadence. */
+export const SETTLE_RETRY_INTERVAL_MS = 30_000;
+/** 15 minutes — PRD-mandated retry-deadline window. */
+export const SETTLE_RETRY_DEADLINE_MS = 15 * 60 * 1000;
 
 export const settlementNudgerJob = schedules.task({
   id: "settlement-nudger",
   cron: "5 21 * * 1-5",
   maxDuration: 900, // 15min — matches the PRD-mandated retry window
-  run: async (payload, { ctx }) => {
-    const config = loadConfig();
-    const logBase = { jobId: "settlement-nudger", runAt: payload.timestamp.toISOString(), ctxRunId: ctx.run.id };
-
-    if (!config.programId) {
-      console.info(
-        JSON.stringify({
-          ...logBase,
-          stub: true,
-          reason: "PROGRAM_ID not yet configured — Aria's program is not deployed. Would iterate open StrikeMarket accounts and call settle_market on each.",
-        }),
-      );
-      return { ok: true, stub: true } as const;
-    }
-
-    requireConfig(config, ["heliusRpcUrl", "programId", "adminKeypairPath"]);
-    throw new Error(
-      "settlement-nudger: config is complete but on-chain wiring is not implemented yet. Unset PROGRAM_ID until Aria's program is deployed.",
-    );
-  },
+  run: async (payload, { ctx }) =>
+    runSettlementNudger({
+      runAt: payload.timestamp,
+      ctxRunId: ctx.run.id,
+    }),
 });
+
+export type OpenMarketRef = {
+  pubkey: string;
+  ticker?: string;
+  expiryUnix: number;
+  underlyingPythFeed: string;
+};
+
+export type SettleMarketTxFn = (
+  client: BellMarketsAnchorClient,
+  market: OpenMarketRef,
+) => Promise<string>;
+
+export type SettlementJobDeps = {
+  runAt: Date;
+  ctxRunId?: string;
+  config?: AutomationConfig;
+  anchorClientFactory?: (cfg: AutomationConfig) => BellMarketsAnchorClient;
+  /** Enumerate open markets that need settling. Default scans on-chain via Anchor. */
+  listOpenMarkets?: (client: BellMarketsAnchorClient, now: Date) => Promise<OpenMarketRef[]>;
+  /** Send a single settle_market tx. Default uses Anchor `.methods.settleMarket(...).rpc()`. */
+  settleMarketTx?: SettleMarketTxFn;
+  /** Decide if a settle error is retriable. Default checks for Pyth-transient + RPC blips. */
+  shouldRetry?: (err: unknown, attempt: number) => boolean;
+  /** Override retry timing (used by tests). */
+  retryIntervalMs?: number;
+  retryDeadlineMs?: number;
+  /** Inject clock + sleep so tests don't actually wait. */
+  now?: () => number;
+  sleep?: (ms: number) => Promise<void>;
+  log?: (entry: Record<string, unknown>) => void;
+};
+
+export type SettlementOutcome = {
+  marketPubkey: string;
+  ticker?: string;
+  status: "settled" | "exhausted" | "non-retriable-error";
+  txSig?: string;
+  attempts: number;
+  elapsedMs: number;
+  lastError?: string;
+};
+
+export type SettlementJobOutcome = {
+  ok: true;
+  runAt: string;
+  perMarket: SettlementOutcome[];
+  stub?: boolean;
+};
+
+export async function runSettlementNudger(deps: SettlementJobDeps): Promise<SettlementJobOutcome> {
+  const config = deps.config ?? loadConfig();
+  const log = deps.log ?? ((e: Record<string, unknown>) => console.info(JSON.stringify(e)));
+  const runAtIso = deps.runAt.toISOString();
+  const logBase = { jobId: "settlement-nudger", runAt: runAtIso, ctxRunId: deps.ctxRunId };
+
+  if (!config.bellMarketsProgramId) {
+    log({ ...logBase, stub: true, reason: "BELL_MARKETS_PROGRAM_ID unset — log-only stub" });
+    return { ok: true, runAt: runAtIso, perMarket: [], stub: true };
+  }
+
+  let anchorClient: BellMarketsAnchorClient;
+  try {
+    anchorClient = deps.anchorClientFactory?.(config) ?? defaultAnchorClientFactory(config);
+    await anchorClient.getProgram();
+  } catch (err) {
+    log({ ...logBase, level: "error", stage: "anchor-program-init", error: serializeError(err) });
+    throw err;
+  }
+
+  const listOpen = deps.listOpenMarkets ?? defaultListOpenMarkets;
+  const settleTx = deps.settleMarketTx ?? defaultSettleMarketTx;
+  const shouldRetry = deps.shouldRetry ?? defaultShouldRetry;
+  const retryIntervalMs = deps.retryIntervalMs ?? SETTLE_RETRY_INTERVAL_MS;
+  const retryDeadlineMs = deps.retryDeadlineMs ?? SETTLE_RETRY_DEADLINE_MS;
+
+  const open = await listOpen(anchorClient, deps.runAt);
+  log({ ...logBase, openMarketCount: open.length });
+
+  const perMarket: SettlementOutcome[] = [];
+  for (const market of open) {
+    const result = await retryUntilDeadline(() => settleTx(anchorClient, market), {
+      intervalMs: retryIntervalMs,
+      deadlineMs: retryDeadlineMs,
+      shouldRetry,
+      now: deps.now,
+      sleep: deps.sleep,
+    });
+
+    if (result.ok) {
+      perMarket.push({
+        marketPubkey: market.pubkey,
+        ticker: market.ticker,
+        status: "settled",
+        txSig: result.value,
+        attempts: result.attempts,
+        elapsedMs: result.elapsedMs,
+      });
+      log({
+        ...logBase,
+        marketPubkey: market.pubkey,
+        ticker: market.ticker,
+        status: "settled",
+        attempts: result.attempts,
+        elapsedMs: result.elapsedMs,
+        txSig: result.value,
+      });
+    } else if (result.reason === "exhausted") {
+      perMarket.push({
+        marketPubkey: market.pubkey,
+        ticker: market.ticker,
+        status: "exhausted",
+        attempts: result.attempts,
+        elapsedMs: result.elapsedMs,
+        lastError: serializeError(result.error),
+      });
+      log({
+        ...logBase,
+        level: "warn",
+        marketPubkey: market.pubkey,
+        ticker: market.ticker,
+        status: "exhausted",
+        reason: "retry exhausted; admin_settle window opens at expiry + admin_override_delay_secs",
+        attempts: result.attempts,
+        elapsedMs: result.elapsedMs,
+        lastError: serializeError(result.error),
+      });
+    } else {
+      perMarket.push({
+        marketPubkey: market.pubkey,
+        ticker: market.ticker,
+        status: "non-retriable-error",
+        attempts: result.attempts,
+        elapsedMs: result.elapsedMs,
+        lastError: serializeError(result.error),
+      });
+      log({
+        ...logBase,
+        level: "error",
+        marketPubkey: market.pubkey,
+        ticker: market.ticker,
+        status: "non-retriable-error",
+        attempts: result.attempts,
+        lastError: serializeError(result.error),
+      });
+    }
+  }
+
+  return { ok: true, runAt: runAtIso, perMarket };
+}
+
+/**
+ * Default retry policy: retry on Pyth-transient errors (`PythConfidenceTooWide`,
+ * `PythStale`) per PRD, plus generic RPC blips (503 / timeout / network).
+ * Everything else is non-retriable.
+ *
+ * Exported so callers (and tests) can compose with their own policy.
+ */
+export function defaultShouldRetry(err: unknown): boolean {
+  if (typeof err === "object" && err !== null) {
+    const anchorErr = err as { error?: { errorCode?: { code?: string } } };
+    const code = anchorErr.error?.errorCode?.code;
+    if (code === "PythConfidenceTooWide" || code === "PythStale") return true;
+  }
+  if (err instanceof Error) {
+    const msg = err.message.toLowerCase();
+    if (msg.includes("503") || msg.includes("timeout") || msg.includes("network")) return true;
+  }
+  return false;
+}
+
+/**
+ * Default on-chain enumeration: scan all StrikeMarket PDAs and filter to
+ * `outcome === Unsettled` + `expiry_unix <= now`.
+ *
+ * Anchor's `program.account.strikeMarket.all()` is a `getProgramAccounts`
+ * RPC call under the hood — one round trip, no per-market reads. Returns
+ * up to a few KB per account, which scales fine for the MVP's ~49 markets
+ * per trading day.
+ */
+async function defaultListOpenMarkets(
+  client: BellMarketsAnchorClient,
+  now: Date,
+): Promise<OpenMarketRef[]> {
+  const program = await client.getProgram();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const accounts = program.account as any;
+  if (!accounts.strikeMarket || typeof accounts.strikeMarket.all !== "function") {
+    throw new Error(
+      "Anchor program is missing `account.strikeMarket.all()` — IDL likely incomplete or wrong shape",
+    );
+  }
+  const all: Array<{ publicKey: { toBase58(): string }; account: StrikeMarketRaw }> =
+    await accounts.strikeMarket.all();
+  const nowSec = Math.floor(now.getTime() / 1000);
+  return all
+    .filter((row) => isUnsettled(row.account.outcome))
+    .filter((row) => toNumber(row.account.expiryUnix) <= nowSec)
+    .map((row) => ({
+      pubkey: row.publicKey.toBase58(),
+      expiryUnix: toNumber(row.account.expiryUnix),
+      underlyingPythFeed: row.account.underlyingPythFeed.toBase58(),
+    }));
+}
+
+type StrikeMarketRaw = {
+  outcome: Record<string, unknown>;
+  expiryUnix: number | bigint | { toNumber: () => number };
+  underlyingPythFeed: { toBase58: () => string };
+};
+
+function isUnsettled(outcome: Record<string, unknown>): boolean {
+  return Object.prototype.hasOwnProperty.call(outcome, "unsettled");
+}
+
+function toNumber(x: number | bigint | { toNumber: () => number }): number {
+  if (typeof x === "number") return x;
+  if (typeof x === "bigint") return Number(x);
+  return x.toNumber();
+}
+
+/**
+ * Default on-chain settle: builds + sends `settle_market` against a single
+ * market. Deferred imports keep this path off web3.js until live runtime.
+ */
+async function defaultSettleMarketTx(
+  client: BellMarketsAnchorClient,
+  market: OpenMarketRef,
+): Promise<string> {
+  const program = await client.getProgram();
+  const web3 = await import("@solana/web3.js");
+
+  const programIdPk = new web3.PublicKey(client.opts.programId);
+  const marketPk = new web3.PublicKey(market.pubkey);
+  const pythFeedPk = new web3.PublicKey(market.underlyingPythFeed);
+  const [configPda] = web3.PublicKey.findProgramAddressSync([Buffer.from("config")], programIdPk);
+
+  const provider = program.provider as unknown as {
+    wallet: { publicKey: import("@solana/web3.js").PublicKey };
+  };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const methods = program.methods as any;
+  return methods
+    .settleMarket()
+    .accounts({
+      settler: provider.wallet.publicKey,
+      config: configPda,
+      strikeMarket: marketPk,
+      underlyingPythFeed: pythFeedPk,
+      clock: web3.SYSVAR_CLOCK_PUBKEY,
+    })
+    .rpc();
+}
+
+function defaultAnchorClientFactory(config: AutomationConfig): BellMarketsAnchorClient {
+  if (!config.heliusRpcUrl) {
+    throw new Error("HELIUS_DEVNET_RPC_URL required when BELL_MARKETS_PROGRAM_ID is set");
+  }
+  if (!config.platformAdminKeypairPath) {
+    throw new Error("PLATFORM_ADMIN_KEYPAIR_PATH required when BELL_MARKETS_PROGRAM_ID is set");
+  }
+  if (!config.bellMarketsIdlPath) throw new Error("BELL_MARKETS_IDL_PATH required");
+  if (!config.bellMarketsProgramId) throw new Error("BELL_MARKETS_PROGRAM_ID required");
+  return new BellMarketsAnchorClient({
+    rpcUrl: config.heliusRpcUrl,
+    programId: config.bellMarketsProgramId,
+    keypairPath: config.platformAdminKeypairPath,
+    idlPath: config.bellMarketsIdlPath,
+  });
+}
+
+function serializeError(err: unknown): string {
+  if (err instanceof Error) return `${err.name}: ${err.message}`;
+  if (typeof err === "object" && err !== null) {
+    const anchorErr = err as {
+      error?: { errorCode?: { code?: string; number?: number }; errorMessage?: string };
+    };
+    const code = anchorErr.error?.errorCode?.code;
+    if (code) {
+      const num = anchorErr.error?.errorCode?.number;
+      const msg = anchorErr.error?.errorMessage ? `: ${anchorErr.error.errorMessage}` : "";
+      return `AnchorError(${code}${num !== undefined ? ` #${num}` : ""})${msg}`;
+    }
+  }
+  return String(err);
+}
