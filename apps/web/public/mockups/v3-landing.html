@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BellMarkets — v3 Drift · Landing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root[data-theme="dark"] {
+    --bg: #0a0a14; --panel: #11111d; --panel-2: #161628; --panel-3: #1d1d2e;
+    --border: #1f1f33; --border-strong: #2a2a44;
+    --text: #e4e4ef; --text-muted: #8a8aa3; --text-subtle: #5a5a73;
+    --accent: #8b5cf6; --accent-2: #a78bfa; --accent-fg: #ffffff;
+    --accent-bg: rgba(139, 92, 246, 0.12); --accent-glow: rgba(139, 92, 246, 0.25);
+    --yes: #14d195; --yes-bg: rgba(20, 209, 149, 0.10); --yes-strong: #10b981;
+    --no: #ff5c7c; --no-bg: rgba(255, 92, 124, 0.10); --no-strong: #ef4444;
+    --amber: #fbbf24; --row-hover: #1a1a28;
+  }
+  :root[data-theme="light"] {
+    --bg: #f8f8fc; --panel: #ffffff; --panel-2: #f3f3fa; --panel-3: #ebebf5;
+    --border: #e4e4f0; --border-strong: #d4d4e8;
+    --text: #0a0a14; --text-muted: #6b6b88; --text-subtle: #a3a3bd;
+    --accent: #7c3aed; --accent-2: #6d28d9; --accent-fg: #ffffff;
+    --accent-bg: rgba(124, 58, 237, 0.10); --accent-glow: rgba(124, 58, 237, 0.20);
+    --yes: #10b981; --yes-bg: rgba(16, 185, 129, 0.10); --yes-strong: #059669;
+    --no: #ef4444; --no-bg: rgba(239, 68, 68, 0.10); --no-strong: #dc2626;
+    --amber: #d97706; --row-hover: #f0f0f8;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Geist', system-ui, sans-serif; font-size: 14px; line-height: 1.5;
+    -webkit-font-smoothing: antialiased; transition: background 120ms, color 120ms;
+  }
+  .mono { font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; }
+  a { color: inherit; text-decoration: none; }
+  button { font-family: inherit; cursor: pointer; }
+
+  header.top {
+    position: sticky; top: 0; z-index: 50;
+    background: var(--bg); border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(12px);
+  }
+  .header-inner {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 28px; max-width: 1500px; margin: 0 auto;
+  }
+  .brand { display: flex; align-items: center; gap: 32px; }
+  .logo {
+    font-weight: 700; font-size: 18px; letter-spacing: -0.5px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .logo-mark {
+    width: 24px; height: 24px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    border-radius: 6px;
+  }
+  .nav { display: flex; gap: 24px; font-size: 14px; font-weight: 500; }
+  .nav a { color: var(--text-muted); transition: color 120ms; }
+  .nav a.active, .nav a:hover { color: var(--text); }
+  .header-right { display: flex; align-items: center; gap: 10px; }
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 10px; background: var(--panel); border: 1px solid var(--border);
+    border-radius: 6px; font-size: 11px;
+    font-family: 'JetBrains Mono', monospace; color: var(--text-muted);
+  }
+  .status-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--yes); }
+  .theme-toggle {
+    background: var(--panel); border: 1px solid var(--border); color: var(--text-muted);
+    padding: 6px 10px; border-radius: 6px; font-size: 12px;
+  }
+  .btn-connect {
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color: var(--accent-fg); border: none;
+    padding: 9px 18px; border-radius: 8px;
+    font-weight: 600; font-size: 13px;
+    box-shadow: 0 0 20px var(--accent-glow);
+    transition: filter 120ms;
+  }
+  .btn-connect:hover { filter: brightness(1.1); }
+
+  main { max-width: 1500px; margin: 0 auto; padding: 48px 28px 100px; }
+
+  /* HERO */
+  .hero {
+    display: grid; grid-template-columns: 1.2fr 1fr; gap: 48px;
+    margin-bottom: 56px; align-items: center;
+  }
+  .hero-text h1 {
+    font-size: 56px; font-weight: 700; letter-spacing: -1.5px; line-height: 1.05;
+    margin-bottom: 20px;
+  }
+  .hero-text h1 .accent {
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .hero-text p {
+    font-size: 16px; color: var(--text-muted); max-width: 520px;
+    margin-bottom: 28px; line-height: 1.65;
+  }
+  .hero-ctas { display: flex; gap: 12px; }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color: var(--accent-fg); border: none;
+    padding: 12px 24px; border-radius: 8px;
+    font-weight: 600; font-size: 14px;
+    box-shadow: 0 0 24px var(--accent-glow);
+  }
+  .btn-secondary {
+    background: var(--panel); color: var(--text);
+    border: 1px solid var(--border-strong);
+    padding: 12px 24px; border-radius: 8px;
+    font-weight: 500; font-size: 14px;
+  }
+  .btn-secondary:hover { background: var(--panel-2); }
+
+  .hero-card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 16px; padding: 24px;
+    background-image: radial-gradient(circle at top right, var(--accent-glow), transparent 60%);
+  }
+  .hero-card-title {
+    font-size: 11px; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 1.5px;
+    margin-bottom: 16px; font-weight: 600;
+  }
+  .hero-card-pct {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 56px; font-weight: 700; line-height: 1;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .hero-card-q {
+    font-size: 17px; font-weight: 600; margin: 8px 0 16px;
+  }
+  .hero-card-meta {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+    padding-top: 16px; border-top: 1px solid var(--border);
+  }
+  .hero-meta-item .lbl { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
+  .hero-meta-item .val { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 14px; margin-top: 4px; }
+
+  /* STATS BAR */
+  .stats-bar {
+    display: grid; grid-template-columns: repeat(5, 1fr);
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 12px; padding: 0;
+    margin-bottom: 48px;
+  }
+  .stat-cell {
+    padding: 20px 24px; border-right: 1px solid var(--border);
+  }
+  .stat-cell:last-child { border-right: none; }
+  .stat-cell .lbl {
+    font-size: 11px; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 1px;
+    margin-bottom: 6px; font-weight: 600;
+  }
+  .stat-cell .val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 22px; font-weight: 700;
+  }
+  .stat-cell .val.accent { color: var(--accent); }
+  .stat-cell .val.up { color: var(--yes); }
+  .stat-cell .sub { font-size: 11px; color: var(--text-subtle); margin-top: 4px; font-family: 'JetBrains Mono', monospace; }
+
+  /* SECTION HEADER */
+  .section-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 20px;
+  }
+  .section-header h2 {
+    font-size: 24px; font-weight: 700; letter-spacing: -0.5px;
+  }
+  .section-tabs { display: flex; gap: 4px; background: var(--panel); padding: 3px; border-radius: 8px; border: 1px solid var(--border); }
+  .section-tab {
+    padding: 6px 14px; background: transparent; border: none;
+    color: var(--text-muted); font-size: 12px; font-weight: 600;
+    border-radius: 5px; transition: all 120ms;
+  }
+  .section-tab.active { background: var(--accent); color: var(--accent-fg); }
+
+  /* MARKETS TABLE */
+  .markets-table {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 12px; overflow: hidden;
+    margin-bottom: 48px;
+  }
+  .markets-thead, .markets-row {
+    display: grid;
+    grid-template-columns: 80px 110px 100px 1fr 100px 80px 80px;
+    gap: 16px; padding: 12px 20px;
+    align-items: center;
+  }
+  .markets-thead {
+    background: var(--panel-2);
+    font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px;
+    font-weight: 600;
+    border-bottom: 1px solid var(--border);
+  }
+  .markets-thead > div:nth-child(3),
+  .markets-thead > div:nth-child(5),
+  .markets-thead > div:nth-child(6),
+  .markets-thead > div:nth-child(7) { text-align: right; }
+  .markets-row {
+    font-family: 'JetBrains Mono', monospace; font-size: 13px;
+    border-bottom: 1px solid var(--border);
+    transition: background 120ms; cursor: pointer;
+  }
+  .markets-row:last-child { border-bottom: none; }
+  .markets-row:hover { background: var(--row-hover); }
+  .row-ticker { font-weight: 700; font-size: 14px; }
+  .row-spot { color: var(--text-muted); }
+  .row-change { font-weight: 600; text-align: right; }
+  .row-change.up { color: var(--yes); }
+  .row-change.down { color: var(--no); }
+  .row-strikes { display: flex; gap: 6px; flex-wrap: wrap; }
+  .row-strike-chip {
+    background: var(--panel-2); border: 1px solid var(--border);
+    padding: 3px 9px; border-radius: 999px;
+    font-size: 11px; font-weight: 600;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .row-strike-chip .strike-num { color: var(--text-muted); }
+  .row-strike-chip .strike-pct {
+    font-weight: 700; color: var(--accent);
+  }
+  .row-vol { text-align: right; color: var(--text-muted); }
+  .row-oi { text-align: right; color: var(--text-muted); }
+  .row-countdown { text-align: right; color: var(--amber); font-weight: 600; }
+
+  /* RECENT ACTIVITY */
+  .activity-row {
+    display: grid; grid-template-columns: 100px 1fr 80px 90px 90px 90px;
+    gap: 16px; padding: 10px 20px;
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  }
+  .activity-row:last-child { border-bottom: none; }
+  .activity-row.head {
+    background: var(--panel-2); font-size: 10px;
+    color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px;
+  }
+  .activity-row .time { color: var(--text-subtle); }
+  .activity-row .market { color: var(--text); font-weight: 600; }
+  .activity-row .side.yes { color: var(--yes); font-weight: 700; }
+  .activity-row .side.no { color: var(--no); font-weight: 700; }
+  .activity-row .price, .activity-row .size { color: var(--text-muted); text-align: right; }
+  .activity-row .wallet { text-align: right; color: var(--text-subtle); }
+
+  /* HOW IT WORKS */
+  .how-strip {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px;
+    background: var(--border); border: 1px solid var(--border);
+    border-radius: 12px; overflow: hidden;
+    margin-bottom: 48px;
+  }
+  .how-step {
+    background: var(--panel); padding: 24px;
+  }
+  .how-step-num {
+    color: var(--accent); font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; font-weight: 700; margin-bottom: 12px;
+  }
+  .how-step h4 { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+  .how-step p { font-size: 13px; color: var(--text-muted); line-height: 1.55; }
+
+  footer {
+    border-top: 1px solid var(--border); padding: 32px 28px;
+  }
+  .footer-inner {
+    max-width: 1500px; margin: 0 auto;
+    display: flex; justify-content: space-between; align-items: center;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    color: var(--text-subtle);
+  }
+  .footer-links { display: flex; gap: 24px; }
+  .footer-links a { color: var(--text-muted); }
+
+  .mockup-badge {
+    position: fixed; bottom: 16px; left: 16px; z-index: 100;
+    background: var(--panel); border: 1px solid var(--accent); color: var(--accent);
+    padding: 6px 12px; border-radius: 20px;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    font-weight: 600; letter-spacing: 1px; text-transform: uppercase;
+    box-shadow: 0 0 20px var(--accent-glow);
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="header-inner">
+    <div class="brand">
+      <a href="v3-landing.html" class="logo"><span class="logo-mark"></span>BellMarkets</a>
+      <nav class="nav">
+        <a href="v3-landing.html" class="active">Markets</a>
+        <a href="v3-trade.html">Trade</a>
+        <a href="#">Portfolio</a>
+        <a href="#">Activity</a>
+        <a href="#">Docs</a>
+      </nav>
+    </div>
+    <div class="header-right">
+      <span class="status-pill"><span class="dot"></span>devnet · 42ms</span>
+      <span class="status-pill"><span class="dot"></span>pyth fresh</span>
+      <button class="theme-toggle" onclick="toggleTheme()">◐</button>
+      <button class="btn-connect">Connect</button>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-text">
+      <h1>Binary stock options.<br><span class="accent">Permissionless.</span> Same-day.</h1>
+      <p>Trade Yes/No on daily MAG7 closes. $1 USDC payouts. Settled on-chain by Pyth at 4 PM ET. Non-custodial smart contracts on Solana.</p>
+      <div class="hero-ctas">
+        <button class="btn-primary">Launch app →</button>
+        <button class="btn-secondary">View on Solscan</button>
+      </div>
+    </div>
+    <div class="hero-card">
+      <div class="hero-card-title">trending · most active</div>
+      <div class="hero-card-pct">52%</div>
+      <div class="hero-card-q">META &gt; $680 today?</div>
+      <div class="hero-card-meta">
+        <div class="hero-meta-item">
+          <div class="lbl">vol 24h</div>
+          <div class="val">$42K</div>
+        </div>
+        <div class="hero-meta-item">
+          <div class="lbl">open int.</div>
+          <div class="val">8,420</div>
+        </div>
+        <div class="hero-meta-item">
+          <div class="lbl">expires</div>
+          <div class="val">2h 13m</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STATS BAR -->
+  <div class="stats-bar">
+    <div class="stat-cell">
+      <div class="lbl">markets open</div>
+      <div class="val accent">35</div>
+      <div class="sub">7 stocks × ~5 strikes</div>
+    </div>
+    <div class="stat-cell">
+      <div class="lbl">24h volume</div>
+      <div class="val">$184,723</div>
+      <div class="sub up" style="color: var(--yes);">+18.2%</div>
+    </div>
+    <div class="stat-cell">
+      <div class="lbl">24h trades</div>
+      <div class="val">2,847</div>
+      <div class="sub up" style="color: var(--yes);">+12.4%</div>
+    </div>
+    <div class="stat-cell">
+      <div class="lbl">active traders</div>
+      <div class="val">127</div>
+      <div class="sub">37 new today</div>
+    </div>
+    <div class="stat-cell">
+      <div class="lbl">settles in</div>
+      <div class="val" style="color: var(--amber);">02:13:47</div>
+      <div class="sub">4:00 PM ET</div>
+    </div>
+  </div>
+
+  <!-- MARKETS TABLE -->
+  <div class="section-header">
+    <h2>Markets</h2>
+    <div class="section-tabs">
+      <button class="section-tab active">All</button>
+      <button class="section-tab">Trending</button>
+      <button class="section-tab">High Vol</button>
+      <button class="section-tab">Near Strike</button>
+    </div>
+  </div>
+  <div class="markets-table">
+    <div class="markets-thead">
+      <div>ticker</div>
+      <div>spot</div>
+      <div>chg</div>
+      <div>strikes (yes probability)</div>
+      <div>vol 24h</div>
+      <div>open int.</div>
+      <div>expires</div>
+    </div>
+    <a href="v3-trade.html" class="markets-row">
+      <div class="row-ticker">META</div>
+      <div class="row-spot">$679.84</div>
+      <div class="row-change up">+0.32%</div>
+      <div class="row-strikes">
+        <span class="row-strike-chip"><span class="strike-num">$620</span><span class="strike-pct">92%</span></span>
+        <span class="row-strike-chip"><span class="strike-num">$660</span><span class="strike-pct">71%</span></span>
+        <span class="row-strike-chip"><span class="strike-num">$680</span><span class="strike-pct">50%</span></span>
+        <span class="row-strike-chip"><span class="strike-num">$700</span><span class="strike-pct">28%</span></span>
+        <span class="row-strike-chip"><span class="strike-num">$720</span><span class="strike-pct">14%</span></span>
+      </div>
+      <div class="row-vol">$42.2K</div>
+      <div class="row-oi">8,420</div>
+      <div class="row-countdown">2h 13m</div>
+    </a>
+    <a href="v3-trade.html" class="markets-row">
+      <div class="row-ticker">NVDA</div>
+      <div class="row-spot">$1,342.71</div>
+      <div class="row-change up">+1.39%</div>
+      <div class="row-strikes">
+        <span class="row-strike-chip"><span class="strike-num">$1,260</span><span class="strike-pct">88%</span></span>
+        <span class="row-strike-chip"><span class="strike-num">$1,300</span><span class="strike-pct">74%</span></span>
+        <span class="row-strike-chip"><span class="strike-num">$1,340</span><span class="strike-pct">52%</span></span>
+        <span class="row-strike-chip"><span class="strike-num">$1,380</span><span class="strike-pct">31%</span></span>
+        <span class="row-strike-chip"><span class="strike-num">$1,420</span><span class="strike-pct">16%</span></span>
+      </div>
+      <div class="row-vol">$61.9K</div>
+      <div class="row-oi">12,148</div>
+      <div class="row-countdown">2h 13m</div>
+    </a>
+    <a href="v3-trade.html" class="markets-row">
+      <div class="row-ticker">AAPL</div>
+      <div class="row-spot">$229.84</div>
+      <div class="row-change up">+0.54%</div>
+      <div class="row-strikes">
+        <span class="row-strike-chip"><span class="strike-num">$210</span><span class="strike-pct">94%</span></span>
+        <span class="row-strike-chip"><span class="strike-num">$220</span><span class="strike-pct">78%</span></span>
+        <span class="row-strike-chip"><span class="strike-num">$230</span><span class="strike-pct">51%</span></span>
+        <span class="row-strike-chip"><span class="strike-num">$240</span><span class="strike-pct">24%</span></span>
+        <span class="row-strike-chip"><span class="strike-num">$250</span><span class="strike-pct">9%</span></span>
+      </div>
+      <div class="row-vol">$28.7K</div>
+      <div class="row-oi">5,729</div>
+      <div class="row-countdown">2h 13m</div>
+    </a>
+    <a href="v3-trade.html" class="markets-row">
+      <div class="row-ticker">MSFT</div>
+      <div class="row-spot">$441.62</div>
+      <div class="row-change up">+0.73%</div>
+      <div class="row-strikes">
+        <span class="row-strike-chip"><span class="strike-num">$420</span><span class="strike-pct">81%</span></span>
+        <span class="row-strike-chip"><span class="strike-num">$440</span><span class="strike-pct">54%</span></span>
+        <span class="row-strike-chip"><span class="strike-num">$460</span><span class="strike-pct">27%</span></span>
+        <span class="row-strike-chip"><span class="strike-num">$480</span><span class="strike-pct">11%</span></span>
+      </div>
+      <div class="row-vol">$19.6K</div>
+      <div class="row-oi">3,920</div>
+      <div class="row-countdown">2h 13m</div>
+    </a>
+    <a href="v3-trade.html" class="markets-row">
+      <div class="row-ticker">GOOGL</div>
+      <div class="row-spot">$184.27</div>
+      <div class="row-change down">-0.50%</div>
+      <div class="row-strikes">
+        <span class="row-strike-chip"><span class="strike-num">$170</span><span class="strike-pct">91%</span></span>
+        <span class="row-strike-chip"><span class="strike-num">$180</span><span class="strike-pct">68%</span></span>
+        <span class="row-strike-chip"><span class="strike-num">$190</span><span class="strike-pct">36%</span></span>
+        <span class="row-strike-chip"><span class="strike-num">$200</span><span class="strike-pct">13%</span></span>
+      </div>
+      <div class="row-vol">$12.4K</div>
+      <div class="row-oi">2,481</div>
+      <div class="row-countdown">2h 13m</div>
+    </a>
+    <a href="v3-trade.html" class="markets-row">
+      <div class="row-ticker">AMZN</div>
+      <div class="row-spot">$201.13</div>
+      <div class="row-change up">+0.20%</div>
+      <div class="row-strikes">
+        <span class="row-strike-chip"><span class="strike-num">$180</span><span class="strike-pct">93%</span></span>
+        <span class="row-strike-chip"><span class="strike-num">$190</span><span class="strike-pct">76%</span></span>
+        <span class="row-strike-chip"><span class="strike-num">$200</span><span class="strike-pct">53%</span></span>
+        <span class="row-strike-chip"><span class="strike-num">$210</span><span class="strike-pct">29%</span></span>
+        <span class="row-strike-chip"><span class="strike-num">$220</span><span class="strike-pct">12%</span></span>
+      </div>
+      <div class="row-vol">$16.2K</div>
+      <div class="row-oi">3,247</div>
+      <div class="row-countdown">2h 13m</div>
+    </a>
+    <a href="v3-trade.html" class="markets-row">
+      <div class="row-ticker">TSLA</div>
+      <div class="row-spot">$261.04</div>
+      <div class="row-change down">-0.70%</div>
+      <div class="row-strikes">
+        <span class="row-strike-chip"><span class="strike-num">$240</span><span class="strike-pct">85%</span></span>
+        <span class="row-strike-chip"><span class="strike-num">$250</span><span class="strike-pct">69%</span></span>
+        <span class="row-strike-chip"><span class="strike-num">$260</span><span class="strike-pct">48%</span></span>
+        <span class="row-strike-chip"><span class="strike-num">$270</span><span class="strike-pct">26%</span></span>
+        <span class="row-strike-chip"><span class="strike-num">$280</span><span class="strike-pct">13%</span></span>
+      </div>
+      <div class="row-vol">$23.7K</div>
+      <div class="row-oi">4,756</div>
+      <div class="row-countdown">2h 13m</div>
+    </a>
+  </div>
+
+  <!-- HOW -->
+  <div class="how-strip">
+    <div class="how-step">
+      <div class="how-step-num">01 / pick</div>
+      <h4>Choose market</h4>
+      <p>Pick one of 7 MAG7 stocks. Pick a strike. Each market asks one question.</p>
+    </div>
+    <div class="how-step">
+      <div class="how-step-num">02 / trade</div>
+      <h4>Buy or sell</h4>
+      <p>Buy Yes (bullish), Buy No (bearish). One signature per action. Sell anytime.</p>
+    </div>
+    <div class="how-step">
+      <div class="how-step-num">03 / settle</div>
+      <h4>Pyth oracle</h4>
+      <p>4 PM ET close from Pyth on-chain. Permissionless — anyone can crank settle.</p>
+    </div>
+    <div class="how-step">
+      <div class="how-step-num">04 / redeem</div>
+      <h4>Claim USDC</h4>
+      <p>Winners get $1. Losers get $0. Tokens redeemable indefinitely after settle.</p>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  <div class="footer-inner">
+    <div>© 2026 BellMarkets · solana devnet · 599h7V…kS7uV</div>
+    <div class="footer-links">
+      <a href="#">docs</a>
+      <a href="#">github</a>
+      <a href="#">discord</a>
+      <a href="#">audit</a>
+    </div>
+  </div>
+</footer>
+
+<div class="mockup-badge">v3 · drift</div>
+
+<script>
+  function toggleTheme() {
+    const root = document.documentElement;
+    const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('bm-theme', next); } catch (e) {}
+  }
+  (function() {
+    try { const s = localStorage.getItem('bm-theme'); if (s === 'light') document.documentElement.setAttribute('data-theme', 'light'); } catch (e) {}
+  })();
+</script>
+
+</body>
+</html>

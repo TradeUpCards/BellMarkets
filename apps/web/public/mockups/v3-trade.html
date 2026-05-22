@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BellMarkets — v3 Drift · Trade · META &gt; $680</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root[data-theme="dark"] {
+    --bg: #0a0a14; --panel: #11111d; --panel-2: #161628; --panel-3: #1d1d2e;
+    --border: #1f1f33; --border-strong: #2a2a44;
+    --text: #e4e4ef; --text-muted: #8a8aa3; --text-subtle: #5a5a73;
+    --accent: #8b5cf6; --accent-2: #a78bfa; --accent-fg: #ffffff;
+    --accent-bg: rgba(139, 92, 246, 0.12); --accent-glow: rgba(139, 92, 246, 0.25);
+    --yes: #14d195; --yes-bg: rgba(20, 209, 149, 0.10); --yes-strong: #10b981;
+    --no: #ff5c7c; --no-bg: rgba(255, 92, 124, 0.10); --no-strong: #ef4444;
+    --amber: #fbbf24; --row-hover: #1a1a28;
+  }
+  :root[data-theme="light"] {
+    --bg: #f8f8fc; --panel: #ffffff; --panel-2: #f3f3fa; --panel-3: #ebebf5;
+    --border: #e4e4f0; --border-strong: #d4d4e8;
+    --text: #0a0a14; --text-muted: #6b6b88; --text-subtle: #a3a3bd;
+    --accent: #7c3aed; --accent-2: #6d28d9; --accent-fg: #ffffff;
+    --accent-bg: rgba(124, 58, 237, 0.10); --accent-glow: rgba(124, 58, 237, 0.20);
+    --yes: #10b981; --yes-bg: rgba(16, 185, 129, 0.10); --yes-strong: #059669;
+    --no: #ef4444; --no-bg: rgba(239, 68, 68, 0.10); --no-strong: #dc2626;
+    --amber: #d97706; --row-hover: #f0f0f8;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Geist', system-ui, sans-serif; font-size: 13px; line-height: 1.5;
+    -webkit-font-smoothing: antialiased; transition: background 120ms, color 120ms;
+  }
+  .mono { font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; }
+  a { color: inherit; text-decoration: none; }
+  button { font-family: inherit; cursor: pointer; }
+
+  header.top {
+    position: sticky; top: 0; z-index: 50;
+    background: var(--bg); border-bottom: 1px solid var(--border);
+  }
+  .header-inner {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 24px; max-width: 1800px; margin: 0 auto;
+  }
+  .brand { display: flex; align-items: center; gap: 28px; }
+  .logo { font-weight: 700; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+  .logo-mark { width: 22px; height: 22px; background: linear-gradient(135deg, var(--accent), var(--accent-2)); border-radius: 5px; }
+  .nav { display: flex; gap: 22px; font-size: 13px; font-weight: 500; }
+  .nav a { color: var(--text-muted); }
+  .nav a.active, .nav a:hover { color: var(--text); }
+  .header-right { display: flex; align-items: center; gap: 10px; }
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 10px; background: var(--panel); border: 1px solid var(--border);
+    border-radius: 6px; font-size: 11px;
+    font-family: 'JetBrains Mono', monospace; color: var(--text-muted);
+  }
+  .status-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--yes); }
+  .theme-toggle {
+    background: var(--panel); border: 1px solid var(--border); color: var(--text-muted);
+    padding: 6px 10px; border-radius: 6px; font-size: 12px;
+  }
+  .wallet {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--panel); border: 1px solid var(--border);
+    padding: 6px 12px; border-radius: 6px;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  }
+  .wallet .balance { color: var(--accent); font-weight: 700; }
+  .wallet .addr { color: var(--text-muted); }
+
+  /* Market header bar */
+  .market-bar {
+    background: var(--panel); border-bottom: 1px solid var(--border);
+    padding: 16px 24px;
+    display: flex; justify-content: space-between; align-items: center;
+    max-width: 1800px; margin: 0 auto;
+  }
+  .market-title {
+    display: flex; align-items: center; gap: 16px;
+  }
+  .market-title h1 {
+    font-size: 20px; font-weight: 700;
+    font-family: 'JetBrains Mono', monospace; letter-spacing: -0.3px;
+  }
+  .market-title h1 .accent { color: var(--accent); }
+  .strike-switch {
+    display: flex; gap: 4px; background: var(--panel-2); padding: 3px; border-radius: 6px;
+  }
+  .strike-pill {
+    padding: 6px 12px; background: transparent; border: none;
+    color: var(--text-muted); font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; font-weight: 600; border-radius: 4px;
+  }
+  .strike-pill.active { background: var(--accent); color: var(--accent-fg); }
+  .market-meta {
+    display: flex; gap: 28px;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  }
+  .meta-item { display: flex; flex-direction: column; gap: 2px; }
+  .meta-label { color: var(--text-subtle); font-size: 10px; text-transform: uppercase; letter-spacing: 1px; }
+  .meta-value { font-weight: 600; }
+  .meta-value.countdown { color: var(--amber); }
+  .meta-value.up { color: var(--yes); }
+
+  /* TRADE GRID */
+  .trade-grid {
+    max-width: 1800px; margin: 0 auto; padding: 16px 24px 120px;
+    display: grid; grid-template-columns: 1fr 360px 320px; gap: 16px;
+    min-height: calc(100vh - 200px);
+  }
+  .panel {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    overflow: hidden;
+  }
+  .panel-h {
+    padding: 12px 16px; border-bottom: 1px solid var(--border);
+    font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px;
+    color: var(--text-muted); font-weight: 600;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .panel-h .badge {
+    background: var(--accent-bg); color: var(--accent);
+    padding: 2px 8px; border-radius: 4px; font-size: 9px;
+  }
+
+  /* LEFT: chart */
+  .chart-wrap { padding: 16px; }
+  .chart-stats {
+    display: flex; align-items: end; gap: 16px;
+    margin-bottom: 16px;
+  }
+  .chart-price {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 36px; font-weight: 700; line-height: 1;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .chart-change { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; }
+  .chart-change.up { color: var(--yes); }
+  .chart-spread { color: var(--text-muted); font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-left: auto; }
+  .chart-viz {
+    height: 340px;
+    background: linear-gradient(to top, var(--accent-bg) 0%, transparent 60%);
+    border-radius: 8px; position: relative;
+    border: 1px solid var(--border);
+  }
+  .chart-svg { position: absolute; inset: 0; }
+  .chart-grid {
+    position: absolute; inset: 16px;
+    display: flex; flex-direction: column; justify-content: space-between;
+    pointer-events: none;
+  }
+  .chart-grid hr {
+    border: none; border-top: 1px dashed var(--border);
+  }
+  .chart-y-axis {
+    position: absolute; right: 8px; top: 16px; bottom: 16px;
+    display: flex; flex-direction: column; justify-content: space-between;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-subtle);
+    pointer-events: none;
+  }
+  .chart-time-tabs {
+    display: flex; gap: 4px; margin-top: 12px;
+    padding: 4px; background: var(--panel-2); border-radius: 6px; width: fit-content;
+  }
+  .chart-time-tab {
+    padding: 4px 10px; background: transparent; border: none;
+    color: var(--text-muted); font-size: 11px; font-weight: 600; border-radius: 4px;
+  }
+  .chart-time-tab.active { background: var(--panel); color: var(--text); }
+
+  /* Order book — compact under chart */
+  .ob-and-trades {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+    margin-top: 16px;
+  }
+  .ob-rows {
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    padding: 6px 16px;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    color: var(--text-subtle); text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .ob-rows > div:nth-child(2), .ob-rows > div:nth-child(3) { text-align: right; }
+  .ob-row {
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    padding: 4px 16px;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    position: relative; cursor: pointer; transition: background 120ms;
+  }
+  .ob-row:hover { background: var(--row-hover); }
+  .ob-row .depth-bar { position: absolute; right: 0; top: 0; bottom: 0; pointer-events: none; }
+  .ob-row.ask .price { color: var(--no); font-weight: 600; }
+  .ob-row.ask .depth-bar { background: var(--no-bg); }
+  .ob-row.bid .price { color: var(--yes); font-weight: 600; }
+  .ob-row.bid .depth-bar { background: var(--yes-bg); }
+  .ob-row .size, .ob-row .total { text-align: right; color: var(--text-muted); }
+  .ob-spread {
+    padding: 6px 16px; background: var(--panel-2);
+    border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    display: flex; justify-content: space-between;
+  }
+  .ob-spread .last { color: var(--text); font-weight: 700; }
+  .ob-spread .spread { color: var(--text-muted); }
+
+  .trades-row-h, .trades-row {
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    padding: 4px 16px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  }
+  .trades-row-h {
+    color: var(--text-subtle); text-transform: uppercase; letter-spacing: 0.5px; font-size: 10px;
+    padding: 6px 16px;
+  }
+  .trades-row .time { color: var(--text-subtle); }
+  .trades-row .price.up { color: var(--yes); }
+  .trades-row .price.down { color: var(--no); }
+  .trades-row .size { text-align: right; color: var(--text-muted); }
+  .trades-row .price { text-align: center; font-weight: 600; }
+
+  /* CENTER: Trade panel */
+  .trade-panel { display: flex; flex-direction: column; gap: 0; }
+  .trade-tabs {
+    display: grid; grid-template-columns: 1fr 1fr;
+    border-bottom: 1px solid var(--border);
+  }
+  .trade-tab {
+    padding: 14px; background: transparent; border: none;
+    color: var(--text-muted); font-size: 14px; font-weight: 700;
+    border-bottom: 2px solid transparent; transition: all 120ms;
+  }
+  .trade-tab.active { color: var(--text); }
+  .trade-tab.buy.active { border-bottom-color: var(--yes); color: var(--yes); }
+  .trade-tab.sell.active { border-bottom-color: var(--no); color: var(--no); }
+
+  .side-tabs {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
+    padding: 12px 16px 0;
+  }
+  .side-tab {
+    padding: 10px; background: var(--panel-2); border: 1px solid var(--border);
+    color: var(--text-muted); font-weight: 700; font-size: 13px;
+    border-radius: 6px; transition: all 120ms;
+  }
+  .side-tab.yes.active { background: var(--yes-bg); border-color: var(--yes); color: var(--yes); }
+  .side-tab.no.active { background: var(--no-bg); border-color: var(--no); color: var(--no); }
+
+  .form { padding: 16px; }
+  .order-type {
+    display: flex; gap: 4px; background: var(--panel-2);
+    padding: 3px; border-radius: 6px; margin-bottom: 14px;
+  }
+  .order-type-btn {
+    flex: 1; padding: 7px; background: transparent; border: none;
+    color: var(--text-muted); font-size: 12px; font-weight: 600; border-radius: 4px;
+  }
+  .order-type-btn.active { background: var(--panel); color: var(--text); }
+
+  .field { margin-bottom: 12px; }
+  .field-label {
+    display: flex; justify-content: space-between;
+    font-size: 11px; color: var(--text-muted); margin-bottom: 6px;
+    text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;
+  }
+  .field-label .available {
+    font-family: 'JetBrains Mono', monospace; color: var(--text-subtle);
+    text-transform: none; letter-spacing: 0;
+  }
+  .input-wrap {
+    display: flex; align-items: center;
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 6px; padding: 0 14px;
+  }
+  .input-wrap:focus-within { border-color: var(--accent); }
+  .input-wrap input {
+    flex: 1; background: transparent; border: none; outline: none;
+    color: var(--text); padding: 12px 0;
+    font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 700;
+  }
+  .input-wrap .suffix { color: var(--text-muted); font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; }
+
+  .quick {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 6px;
+  }
+  .quick button {
+    padding: 6px; background: var(--panel-2); border: 1px solid var(--border);
+    color: var(--text-muted); font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; font-weight: 600; border-radius: 4px;
+  }
+  .quick button:hover { color: var(--text); border-color: var(--accent); }
+
+  .payoff {
+    margin-top: 14px; padding: 12px;
+    background: var(--panel-2); border-radius: 8px;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+  }
+  .payoff-item .lbl { font-size: 10px; color: var(--text-subtle); text-transform: uppercase; letter-spacing: 0.5px; }
+  .payoff-item .val { font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 700; margin-top: 2px; }
+  .payoff-item .val.win { color: var(--yes); }
+  .payoff-item .val.loss { color: var(--no); }
+
+  .submit-btn {
+    width: 100%; padding: 14px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color: var(--accent-fg); border: none; border-radius: 8px;
+    font-weight: 700; font-size: 14px; letter-spacing: 0.5px;
+    margin-top: 14px;
+    box-shadow: 0 0 24px var(--accent-glow);
+    transition: filter 120ms;
+  }
+  .submit-btn:hover { filter: brightness(1.1); }
+  .submit-btn.yes { background: var(--yes); box-shadow: 0 0 24px rgba(20, 209, 149, 0.3); }
+  .submit-btn.no { background: var(--no); box-shadow: 0 0 24px rgba(255, 92, 124, 0.3); }
+
+  .summary {
+    margin-top: 10px; padding: 10px 12px;
+    background: var(--panel-2); border-radius: 6px;
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  }
+  .summary > div { display: flex; justify-content: space-between; }
+  .summary .lbl { color: var(--text-subtle); }
+  .summary .val { color: var(--text); font-weight: 600; }
+
+  /* RIGHT: info cards */
+  .info-stack { display: flex; flex-direction: column; gap: 12px; }
+  .info-rows { padding: 6px 16px 12px; }
+  .info-row {
+    display: flex; justify-content: space-between;
+    padding: 8px 0; border-bottom: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  }
+  .info-row:last-child { border-bottom: none; }
+  .info-row .lbl { color: var(--text-muted); }
+  .info-row .val { font-weight: 600; }
+  .info-row .val.accent { color: var(--accent); }
+  .info-row .val.countdown { color: var(--amber); }
+  .info-row .val.up { color: var(--yes); }
+
+  .pos-card { padding: 14px 16px; border-bottom: 1px solid var(--border); }
+  .pos-card:last-child { border-bottom: none; }
+  .pos-head {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 10px;
+  }
+  .pos-side {
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    font-weight: 700; padding: 3px 8px; border-radius: 4px;
+  }
+  .pos-side.yes { background: var(--yes-bg); color: var(--yes); }
+  .pos-side.no { background: var(--no-bg); color: var(--no); }
+  .pos-pnl { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700; }
+  .pos-pnl.up { color: var(--yes); }
+  .pos-stats {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  }
+  .pos-stat { display: flex; flex-direction: column; gap: 2px; }
+  .pos-stat .lbl { color: var(--text-subtle); font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .pos-stat .val { font-weight: 600; }
+
+  /* STICKY BOTTOM — Drift signature */
+  .bottom-bar {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 40;
+    background: var(--panel); border-top: 1px solid var(--border-strong);
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.2);
+  }
+  .bottom-inner {
+    max-width: 1800px; margin: 0 auto; padding: 12px 24px;
+    display: grid; grid-template-columns: auto 1fr auto; gap: 16px; align-items: center;
+  }
+  .portfolio-summary {
+    display: flex; gap: 24px;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  }
+  .portfolio-summary .item .lbl { color: var(--text-subtle); font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .portfolio-summary .item .val { font-weight: 700; font-size: 14px; }
+  .portfolio-summary .item .val.up { color: var(--yes); }
+  .open-positions-strip {
+    display: flex; gap: 8px; overflow-x: auto;
+  }
+  .pos-chip {
+    background: var(--panel-2); border: 1px solid var(--border);
+    padding: 6px 12px; border-radius: 6px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    display: flex; gap: 8px; align-items: center; cursor: pointer; white-space: nowrap;
+  }
+  .pos-chip .market { color: var(--text-muted); }
+  .pos-chip .side.yes { color: var(--yes); font-weight: 700; }
+  .pos-chip .side.no { color: var(--no); font-weight: 700; }
+  .pos-chip .pnl.up { color: var(--yes); font-weight: 700; }
+  .pos-chip .pnl.down { color: var(--no); font-weight: 700; }
+  .portfolio-toggle {
+    background: var(--panel-2); border: 1px solid var(--border);
+    color: var(--text-muted); padding: 8px 16px; border-radius: 6px;
+    font-size: 12px;
+  }
+
+  .mockup-badge {
+    position: fixed; top: 80px; right: 16px; z-index: 100;
+    background: var(--panel); border: 1px solid var(--accent); color: var(--accent);
+    padding: 6px 12px; border-radius: 20px;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    font-weight: 600; letter-spacing: 1px; text-transform: uppercase;
+    box-shadow: 0 0 20px var(--accent-glow);
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="header-inner">
+    <div class="brand">
+      <a href="v3-landing.html" class="logo"><span class="logo-mark"></span>BellMarkets</a>
+      <nav class="nav">
+        <a href="v3-landing.html">Markets</a>
+        <a href="v3-trade.html" class="active">Trade</a>
+        <a href="#">Portfolio</a>
+        <a href="#">Activity</a>
+      </nav>
+    </div>
+    <div class="header-right">
+      <span class="status-pill"><span class="dot"></span>devnet · 42ms</span>
+      <span class="status-pill"><span class="dot"></span>pyth fresh</span>
+      <button class="theme-toggle" onclick="toggleTheme()">◐</button>
+      <div class="wallet">
+        <span class="balance">123.45 USDC</span>
+        <span class="addr">4aPZ…G2iy</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- Market bar -->
+<div class="market-bar">
+  <div class="market-title">
+    <h1>META <span class="accent">&gt;</span> $680</h1>
+    <div class="strike-switch">
+      <button class="strike-pill">$620</button>
+      <button class="strike-pill">$640</button>
+      <button class="strike-pill">$660</button>
+      <button class="strike-pill active">$680</button>
+      <button class="strike-pill">$700</button>
+      <button class="strike-pill">$720</button>
+      <button class="strike-pill">$740</button>
+    </div>
+  </div>
+  <div class="market-meta">
+    <div class="meta-item"><span class="meta-label">spot</span><span class="meta-value">$679.84</span></div>
+    <div class="meta-item"><span class="meta-label">24h chg</span><span class="meta-value up">+0.32%</span></div>
+    <div class="meta-item"><span class="meta-label">24h vol</span><span class="meta-value">$42,184</span></div>
+    <div class="meta-item"><span class="meta-label">open int.</span><span class="meta-value">8,420</span></div>
+    <div class="meta-item"><span class="meta-label">settles in</span><span class="meta-value countdown">02h 13m</span></div>
+  </div>
+</div>
+
+<!-- Trade grid -->
+<div class="trade-grid">
+
+  <!-- LEFT: chart + ob/trades -->
+  <main>
+    <div class="panel">
+      <div class="panel-h">Yes Price · today<span class="badge">live</span></div>
+      <div class="chart-wrap">
+        <div class="chart-stats">
+          <div class="chart-price">$0.520</div>
+          <div class="chart-change up">+$0.04 · +8.3%</div>
+          <div class="chart-spread">bid 0.50 · ask 0.54 · spread 0.04</div>
+        </div>
+        <div class="chart-viz">
+          <div class="chart-grid">
+            <hr><hr><hr><hr>
+          </div>
+          <svg class="chart-svg" viewBox="0 0 800 340" preserveAspectRatio="none" style="padding: 16px;">
+            <defs>
+              <linearGradient id="g3" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#8b5cf6" stop-opacity="0.4"/>
+                <stop offset="100%" stop-color="#8b5cf6" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <path d="M 10,260 L 60,250 L 110,240 L 160,235 L 210,220 L 260,210 L 310,200 L 360,185 L 410,175 L 460,165 L 510,150 L 560,140 L 610,135 L 660,120 L 710,115 L 760,110 L 790,100 L 790,308 L 10,308 Z" fill="url(#g3)"/>
+            <polyline points="10,260 60,250 110,240 160,235 210,220 260,210 310,200 360,185 410,175 460,165 510,150 560,140 610,135 660,120 710,115 760,110 790,100" fill="none" stroke="#8b5cf6" stroke-width="1.5"/>
+            <circle cx="790" cy="100" r="4" fill="#8b5cf6"/>
+          </svg>
+          <div class="chart-y-axis">
+            <span>0.65</span><span>0.60</span><span>0.55</span><span>0.50</span><span>0.45</span>
+          </div>
+        </div>
+        <div class="chart-time-tabs">
+          <button class="chart-time-tab">15m</button>
+          <button class="chart-time-tab active">1h</button>
+          <button class="chart-time-tab">4h</button>
+          <button class="chart-time-tab">1d</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="ob-and-trades">
+      <div class="panel">
+        <div class="panel-h">Order Book<span class="badge">live</span></div>
+        <div class="ob-rows"><div>price</div><div>size</div><div>total</div></div>
+        <div class="ob-row ask"><div class="depth-bar" style="width: 12%"></div><span class="price">0.55</span><span class="size">375</span><span class="total">1,474</span></div>
+        <div class="ob-row ask"><div class="depth-bar" style="width: 22%"></div><span class="price">0.545</span><span class="size">722</span><span class="total">1,099</span></div>
+        <div class="ob-row ask"><div class="depth-bar" style="width: 14%"></div><span class="price">0.54</span><span class="size">377</span><span class="total">377</span></div>
+        <div class="ob-spread"><span class="last">$0.520 ↑</span><span class="spread">spread 0.04</span></div>
+        <div class="ob-row bid"><div class="depth-bar" style="width: 18%"></div><span class="price">0.50</span><span class="size">560</span><span class="total">560</span></div>
+        <div class="ob-row bid"><div class="depth-bar" style="width: 14%"></div><span class="price">0.495</span><span class="size">440</span><span class="total">1,000</span></div>
+        <div class="ob-row bid"><div class="depth-bar" style="width: 26%"></div><span class="price">0.49</span><span class="size">830</span><span class="total">1,830</span></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-h">Recent Trades</div>
+        <div class="trades-row-h"><span>time</span><span>price</span><span>size</span></div>
+        <div class="trades-row"><span class="time">14:42</span><span class="price up">$0.51</span><span class="size">200</span></div>
+        <div class="trades-row"><span class="time">14:42</span><span class="price down">$0.48</span><span class="size">500</span></div>
+        <div class="trades-row"><span class="time">14:41</span><span class="price up">$0.52</span><span class="size">100</span></div>
+        <div class="trades-row"><span class="time">14:41</span><span class="price up">$0.51</span><span class="size">75</span></div>
+        <div class="trades-row"><span class="time">14:41</span><span class="price down">$0.50</span><span class="size">320</span></div>
+        <div class="trades-row"><span class="time">14:40</span><span class="price up">$0.51</span><span class="size">180</span></div>
+        <div class="trades-row"><span class="time">14:40</span><span class="price down">$0.49</span><span class="size">450</span></div>
+      </div>
+    </div>
+  </main>
+
+  <!-- CENTER: trade panel -->
+  <aside class="panel trade-panel">
+    <div class="trade-tabs">
+      <button class="trade-tab buy active">Buy</button>
+      <button class="trade-tab sell">Sell</button>
+    </div>
+    <div class="side-tabs">
+      <button class="side-tab yes active">YES · $0.52</button>
+      <button class="side-tab no">NO · $0.48</button>
+    </div>
+    <div class="form">
+      <div class="order-type">
+        <button class="order-type-btn active">Market</button>
+        <button class="order-type-btn">Limit</button>
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Size</span><span class="available">$123.45 available</span></div>
+        <div class="input-wrap"><input value="200" placeholder="0"><span class="suffix">USDC</span></div>
+        <div class="quick">
+          <button>25%</button><button>50%</button><button>75%</button><button>MAX</button>
+        </div>
+      </div>
+      <div class="payoff">
+        <div class="payoff-item"><div class="lbl">Pay</div><div class="val">$104</div></div>
+        <div class="payoff-item"><div class="lbl">Max win</div><div class="val win">+$96</div></div>
+        <div class="payoff-item"><div class="lbl">Max loss</div><div class="val loss">-$104</div></div>
+      </div>
+      <button class="submit-btn yes">BUY YES @ $0.52</button>
+      <div class="summary">
+        <div><span class="lbl">implied prob</span><span class="val">52%</span></div>
+        <div><span class="lbl">contracts</span><span class="val">200 YES</span></div>
+        <div><span class="lbl">avg fill</span><span class="val">$0.520</span></div>
+        <div><span class="lbl">slippage</span><span class="val">+$0.012</span></div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- RIGHT: info cards -->
+  <aside class="info-stack">
+    <div class="panel">
+      <div class="panel-h">Market<span class="badge">META &gt; $680</span></div>
+      <div class="info-rows">
+        <div class="info-row"><span class="lbl">strike</span><span class="val">$680.00</span></div>
+        <div class="info-row"><span class="lbl">spot</span><span class="val">$679.84</span></div>
+        <div class="info-row"><span class="lbl">implied</span><span class="val accent">52%</span></div>
+        <div class="info-row"><span class="lbl">expires</span><span class="val countdown">2h 13m</span></div>
+        <div class="info-row"><span class="lbl">oracle</span><span class="val">Pyth</span></div>
+        <div class="info-row"><span class="lbl">settle by</span><span class="val">anyone</span></div>
+        <div class="info-row"><span class="lbl">market pda</span><span class="val" style="font-size: 11px;">9q5S…rVBN</span></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-h">This Market — Position<span class="badge">live P&amp;L</span></div>
+      <div class="pos-card">
+        <div class="pos-head">
+          <span class="pos-side yes">YES · 5 contracts</span>
+          <span class="pos-pnl up">+$0.10</span>
+        </div>
+        <div class="pos-stats">
+          <div class="pos-stat"><span class="lbl">entry</span><span class="val">$0.62</span></div>
+          <div class="pos-stat"><span class="lbl">current</span><span class="val">$0.64</span></div>
+          <div class="pos-stat"><span class="lbl">cost</span><span class="val">$3.10</span></div>
+          <div class="pos-stat"><span class="lbl">if win</span><span class="val">$5.00</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-h">Settlement</div>
+      <div class="info-rows">
+        <div class="info-row"><span class="lbl">if META ≥ $680</span><span class="val up">+$0.40</span></div>
+        <div class="info-row"><span class="lbl">if META &lt; $680</span><span class="val" style="color: var(--no);">-$3.10</span></div>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<!-- STICKY BOTTOM BAR — Drift signature -->
+<div class="bottom-bar">
+  <div class="bottom-inner">
+    <div class="portfolio-summary">
+      <div class="item"><div class="lbl">portfolio value</div><div class="val">$123.45</div></div>
+      <div class="item"><div class="lbl">total P&amp;L 24h</div><div class="val up">+$2.84</div></div>
+      <div class="item"><div class="lbl">open positions</div><div class="val">3</div></div>
+    </div>
+    <div class="open-positions-strip">
+      <div class="pos-chip"><span class="market">META &gt; $680</span><span class="side yes">YES 5</span><span class="pnl up">+$0.10</span></div>
+      <div class="pos-chip"><span class="market">NVDA &gt; $1,340</span><span class="side no">NO 3</span><span class="pnl down">-$0.06</span></div>
+      <div class="pos-chip"><span class="market">AAPL &gt; $230</span><span class="side yes">YES 8</span><span class="pnl up">+$2.80</span></div>
+    </div>
+    <button class="portfolio-toggle">Portfolio →</button>
+  </div>
+</div>
+
+<div class="mockup-badge">v3 · drift · trade</div>
+
+<script>
+  function toggleTheme() {
+    const root = document.documentElement;
+    const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('bm-theme', next); } catch (e) {}
+  }
+  (function() {
+    try { const s = localStorage.getItem('bm-theme'); if (s === 'light') document.documentElement.setAttribute('data-theme', 'light'); } catch (e) {}
+  })();
+</script>
+
+</body>
+</html>

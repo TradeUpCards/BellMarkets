@@ -1,0 +1,1098 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BellMarkets — v1 Hyperliquid · Landing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root[data-theme="dark"] {
+    --bg: #0a0a0a;
+    --panel: #111111;
+    --panel-2: #161616;
+    --border: #1f1f1f;
+    --border-strong: #2a2a2a;
+    --text: #fafafa;
+    --text-muted: #888;
+    --text-subtle: #555;
+    --accent: #bef264;
+    --accent-fg: #0a0a0a;
+    --accent-glow: rgba(190, 242, 100, 0.15);
+    --yes: #22c55e;
+    --yes-bg: rgba(34, 197, 94, 0.08);
+    --no: #ef4444;
+    --no-bg: rgba(239, 68, 68, 0.08);
+    --amber: #fbbf24;
+    --row-hover: #181818;
+  }
+  :root[data-theme="light"] {
+    --bg: #fafafa;
+    --panel: #ffffff;
+    --panel-2: #f5f5f5;
+    --border: #e5e5e5;
+    --border-strong: #d4d4d4;
+    --text: #0a0a0a;
+    --text-muted: #6b7280;
+    --text-subtle: #9ca3af;
+    --accent: #84cc16;
+    --accent-fg: #0a0a0a;
+    --accent-glow: rgba(132, 204, 22, 0.12);
+    --yes: #16a34a;
+    --yes-bg: rgba(22, 163, 74, 0.08);
+    --no: #dc2626;
+    --no-bg: rgba(220, 38, 38, 0.08);
+    --amber: #d97706;
+    --row-hover: #f3f4f6;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    transition: background 120ms ease, color 120ms ease;
+  }
+  .mono { font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; }
+  a { color: inherit; text-decoration: none; }
+  button { font-family: inherit; cursor: pointer; }
+
+  /* HEADER */
+  header.top {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  .header-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 28px;
+    max-width: 1600px;
+    margin: 0 auto;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+  }
+  .logo {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    font-size: 16px;
+    letter-spacing: -0.5px;
+  }
+  .logo .dot { color: var(--accent); }
+  .nav {
+    display: flex;
+    gap: 24px;
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .nav a {
+    color: var(--text-muted);
+    transition: color 120ms;
+  }
+  .nav a.active, .nav a:hover { color: var(--text); }
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-muted);
+  }
+  .status-pill .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--yes);
+    box-shadow: 0 0 8px var(--yes);
+  }
+  .status-pill.warn .dot { background: var(--amber); box-shadow: 0 0 8px var(--amber); }
+  .theme-toggle {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    transition: all 120ms;
+  }
+  .theme-toggle:hover { color: var(--text); border-color: var(--border-strong); }
+  .btn-connect {
+    background: var(--accent);
+    color: var(--accent-fg);
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 13px;
+    transition: filter 120ms;
+  }
+  .btn-connect:hover { filter: brightness(1.1); }
+
+  /* TICKER STRIP */
+  .ticker-strip {
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+    overflow: hidden;
+  }
+  .ticker-strip-inner {
+    display: flex;
+    gap: 0;
+    max-width: 1600px;
+    margin: 0 auto;
+  }
+  .ticker-cell {
+    flex: 1;
+    padding: 14px 20px;
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    transition: background 120ms;
+  }
+  .ticker-cell:last-child { border-right: none; }
+  .ticker-cell:hover { background: var(--row-hover); cursor: pointer; }
+  .ticker-symbol {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+  }
+  .ticker-price {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 16px;
+    font-weight: 600;
+  }
+  .ticker-change {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .ticker-change.up { color: var(--yes); }
+  .ticker-change.down { color: var(--no); }
+
+  /* MAIN */
+  main {
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 48px 28px 80px;
+  }
+
+  /* HERO */
+  .hero {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 48px;
+    margin-bottom: 64px;
+    align-items: end;
+  }
+  .hero-text h1 {
+    font-size: 64px;
+    font-weight: 700;
+    letter-spacing: -2px;
+    line-height: 1;
+    margin-bottom: 24px;
+  }
+  .hero-text h1 .accent { color: var(--accent); }
+  .hero-text p {
+    font-size: 17px;
+    color: var(--text-muted);
+    max-width: 540px;
+    margin-bottom: 32px;
+    line-height: 1.6;
+  }
+  .hero-ctas {
+    display: flex;
+    gap: 12px;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: var(--accent-fg);
+    border: none;
+    padding: 12px 22px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 14px;
+    transition: filter 120ms;
+  }
+  .btn-primary:hover { filter: brightness(1.1); }
+  .btn-secondary {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border-strong);
+    padding: 12px 22px;
+    border-radius: 8px;
+    font-weight: 500;
+    font-size: 14px;
+    transition: all 120ms;
+  }
+  .btn-secondary:hover { border-color: var(--text); }
+
+  /* STATS BLOCK */
+  .stats-block {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+  }
+  .stats-block h3 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-muted);
+    margin-bottom: 20px;
+    font-weight: 600;
+  }
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .stat-row:last-child { border-bottom: none; }
+  .stat-label { color: var(--text-muted); font-size: 13px; }
+  .stat-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 18px;
+    font-weight: 600;
+  }
+  .stat-value.accent { color: var(--accent); }
+
+  /* MARKETS GRID */
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: end;
+    margin-bottom: 24px;
+  }
+  .section-header h2 {
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: -0.5px;
+  }
+  .section-header .meta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .section-header .meta .live-dot {
+    display: inline-block;
+    width: 6px; height: 6px;
+    background: var(--yes);
+    border-radius: 50%;
+    margin-right: 6px;
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  .markets-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 16px;
+    margin-bottom: 64px;
+  }
+  .market-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    transition: border-color 120ms, transform 120ms;
+    cursor: pointer;
+  }
+  .market-card:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+  }
+  .market-card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    margin-bottom: 16px;
+  }
+  .market-ticker {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    font-size: 18px;
+  }
+  .market-spot {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+  .market-change {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 4px;
+  }
+  .market-change.up { background: var(--yes-bg); color: var(--yes); }
+  .market-change.down { background: var(--no-bg); color: var(--no); }
+  .strike-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto auto;
+    gap: 12px;
+    align-items: center;
+    padding: 8px 0;
+    border-top: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+  }
+  .strike-row:first-child { border-top: none; }
+  .strike-price { color: var(--text-muted); }
+  .strike-prob {
+    font-weight: 600;
+    color: var(--text);
+  }
+  .strike-yes, .strike-no {
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-weight: 500;
+    font-size: 11px;
+  }
+  .strike-yes { background: var(--yes-bg); color: var(--yes); }
+  .strike-no { background: var(--no-bg); color: var(--no); }
+  .market-footer {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-subtle);
+  }
+  .market-footer .countdown { color: var(--amber); font-weight: 600; }
+
+  /* RECENT ACTIVITY */
+  .activity-row {
+    display: grid;
+    grid-template-columns: 100px 1fr 80px 100px 100px 80px;
+    gap: 16px;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    transition: background 120ms;
+  }
+  .activity-row:hover { background: var(--row-hover); }
+  .activity-row:last-child { border-bottom: none; }
+  .activity-header {
+    background: var(--panel-2);
+    color: var(--text-muted);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: 600;
+  }
+  .activity-time { color: var(--text-subtle); }
+  .activity-wallet { color: var(--text-muted); }
+  .activity-side.yes { color: var(--yes); }
+  .activity-side.no { color: var(--no); }
+
+  .activity-table {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 64px;
+  }
+
+  /* HOW IT WORKS */
+  .how-it-works {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 64px;
+  }
+  .step {
+    background: var(--panel);
+    padding: 28px 24px;
+    position: relative;
+  }
+  .step-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    font-weight: 700;
+    letter-spacing: 1px;
+    margin-bottom: 12px;
+  }
+  .step h4 {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+  .step p {
+    font-size: 13px;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+
+  /* FOOTER */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 32px 28px;
+    margin-top: 64px;
+  }
+  .footer-inner {
+    max-width: 1600px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-subtle);
+  }
+  .footer-links { display: flex; gap: 20px; }
+  .footer-links a { color: var(--text-muted); transition: color 120ms; }
+  .footer-links a:hover { color: var(--text); }
+
+  /* Mode-mockup badge */
+  .mockup-badge {
+    position: fixed;
+    bottom: 16px;
+    left: 16px;
+    z-index: 100;
+    background: var(--panel);
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    box-shadow: 0 0 20px var(--accent-glow);
+  }
+
+  /* Responsive */
+  @media (max-width: 1024px) {
+    .hero { grid-template-columns: 1fr; }
+    .hero-text h1 { font-size: 48px; }
+    .how-it-works { grid-template-columns: repeat(2, 1fr); }
+    .activity-row { grid-template-columns: 80px 1fr 60px 90px; }
+    .activity-row > :nth-child(5), .activity-row > :nth-child(6) { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="header-inner">
+    <div class="brand">
+      <a href="v1-landing.html" class="logo">bell<span class="dot">.</span>markets</a>
+      <nav class="nav">
+        <a href="v1-landing.html" class="active">Markets</a>
+        <a href="v1-trade.html">Trade</a>
+        <a href="#">Portfolio</a>
+        <a href="#">History</a>
+        <a href="#">Docs</a>
+      </nav>
+    </div>
+    <div class="header-right">
+      <span class="status-pill"><span class="dot"></span>devnet · 42ms</span>
+      <span class="status-pill"><span class="dot"></span>pyth · fresh</span>
+      <button class="theme-toggle" onclick="toggleTheme()">◐ theme</button>
+      <button class="btn-connect">Connect Wallet</button>
+    </div>
+  </div>
+</header>
+
+<!-- Live ticker strip (7 MAG7 stocks) -->
+<div class="ticker-strip">
+  <div class="ticker-strip-inner">
+    <div class="ticker-cell">
+      <div class="ticker-symbol">AAPL</div>
+      <div class="ticker-price">$229.84</div>
+      <div class="ticker-change up">+1.24 (+0.54%)</div>
+    </div>
+    <div class="ticker-cell">
+      <div class="ticker-symbol">MSFT</div>
+      <div class="ticker-price">$441.62</div>
+      <div class="ticker-change up">+3.21 (+0.73%)</div>
+    </div>
+    <div class="ticker-cell">
+      <div class="ticker-symbol">GOOGL</div>
+      <div class="ticker-price">$184.27</div>
+      <div class="ticker-change down">-0.92 (-0.50%)</div>
+    </div>
+    <div class="ticker-cell">
+      <div class="ticker-symbol">AMZN</div>
+      <div class="ticker-price">$201.13</div>
+      <div class="ticker-change up">+0.41 (+0.20%)</div>
+    </div>
+    <div class="ticker-cell">
+      <div class="ticker-symbol">NVDA</div>
+      <div class="ticker-price">$1,342.71</div>
+      <div class="ticker-change up">+18.42 (+1.39%)</div>
+    </div>
+    <div class="ticker-cell">
+      <div class="ticker-symbol">META</div>
+      <div class="ticker-price">$679.84</div>
+      <div class="ticker-change up">+2.15 (+0.32%)</div>
+    </div>
+    <div class="ticker-cell">
+      <div class="ticker-symbol">TSLA</div>
+      <div class="ticker-price">$261.04</div>
+      <div class="ticker-change down">-1.83 (-0.70%)</div>
+    </div>
+  </div>
+</div>
+
+<main>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-text">
+      <h1>Binary <span class="accent">stock options.</span><br>Same-day expiry. On-chain.</h1>
+      <p>
+        Trade Yes / No on daily MAG7 closes. $1 USDC max payout per contract.
+        Permissionless settlement via Pyth at 4:00 PM ET. No custody, no margin, no KYC.
+      </p>
+      <div class="hero-ctas">
+        <button class="btn-primary">Start trading →</button>
+        <button class="btn-secondary">How it works</button>
+      </div>
+    </div>
+    <div class="stats-block">
+      <h3>Today's session · live</h3>
+      <div class="stat-row">
+        <span class="stat-label">Markets open</span>
+        <span class="stat-value accent">35</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Volume (24h)</span>
+        <span class="stat-value">$184,723</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Active traders</span>
+        <span class="stat-value">127</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Settles in</span>
+        <span class="stat-value" style="color: var(--amber);">02h 13m 47s</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Program</span>
+        <span class="stat-value" style="font-size: 13px;">599h7V…kS7uV</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- MARKETS GRID -->
+  <div class="section-header">
+    <h2>Markets</h2>
+    <div class="meta"><span class="live-dot"></span>live · updated 2s ago</div>
+  </div>
+
+  <div class="markets-grid">
+    <!-- META -->
+    <a href="v1-trade.html" class="market-card">
+      <div class="market-card-head">
+        <div>
+          <div class="market-ticker">META</div>
+          <div class="market-spot">spot $679.84</div>
+        </div>
+        <div class="market-change up">+0.32%</div>
+      </div>
+      <div class="strike-row">
+        <span class="strike-price">$620</span>
+        <span class="strike-yes">$0.92</span>
+        <span class="strike-no">$0.08</span>
+        <span class="strike-prob">92%</span>
+      </div>
+      <div class="strike-row">
+        <span class="strike-price">$640</span>
+        <span class="strike-yes">$0.84</span>
+        <span class="strike-no">$0.16</span>
+        <span class="strike-prob">84%</span>
+      </div>
+      <div class="strike-row">
+        <span class="strike-price">$660</span>
+        <span class="strike-yes">$0.71</span>
+        <span class="strike-no">$0.29</span>
+        <span class="strike-prob">71%</span>
+      </div>
+      <div class="strike-row">
+        <span class="strike-price">$680</span>
+        <span class="strike-yes">$0.50</span>
+        <span class="strike-no">$0.50</span>
+        <span class="strike-prob">50%</span>
+      </div>
+      <div class="strike-row">
+        <span class="strike-price">$700</span>
+        <span class="strike-yes">$0.28</span>
+        <span class="strike-no">$0.72</span>
+        <span class="strike-prob">28%</span>
+      </div>
+      <div class="strike-row">
+        <span class="strike-price">$720</span>
+        <span class="strike-yes">$0.14</span>
+        <span class="strike-no">$0.86</span>
+        <span class="strike-prob">14%</span>
+      </div>
+      <div class="strike-row">
+        <span class="strike-price">$740</span>
+        <span class="strike-yes">$0.06</span>
+        <span class="strike-no">$0.94</span>
+        <span class="strike-prob">6%</span>
+      </div>
+      <div class="market-footer">
+        <span>vol $42,184</span>
+        <span class="countdown">02h 13m</span>
+      </div>
+    </a>
+
+    <!-- NVDA -->
+    <a href="v1-trade.html" class="market-card">
+      <div class="market-card-head">
+        <div>
+          <div class="market-ticker">NVDA</div>
+          <div class="market-spot">spot $1,342.71</div>
+        </div>
+        <div class="market-change up">+1.39%</div>
+      </div>
+      <div class="strike-row">
+        <span class="strike-price">$1,220</span>
+        <span class="strike-yes">$0.96</span>
+        <span class="strike-no">$0.04</span>
+        <span class="strike-prob">96%</span>
+      </div>
+      <div class="strike-row">
+        <span class="strike-price">$1,260</span>
+        <span class="strike-yes">$0.88</span>
+        <span class="strike-no">$0.12</span>
+        <span class="strike-prob">88%</span>
+      </div>
+      <div class="strike-row">
+        <span class="strike-price">$1,300</span>
+        <span class="strike-yes">$0.74</span>
+        <span class="strike-no">$0.26</span>
+        <span class="strike-prob">74%</span>
+      </div>
+      <div class="strike-row">
+        <span class="strike-price">$1,340</span>
+        <span class="strike-yes">$0.52</span>
+        <span class="strike-no">$0.48</span>
+        <span class="strike-prob">52%</span>
+      </div>
+      <div class="strike-row">
+        <span class="strike-price">$1,380</span>
+        <span class="strike-yes">$0.31</span>
+        <span class="strike-no">$0.69</span>
+        <span class="strike-prob">31%</span>
+      </div>
+      <div class="strike-row">
+        <span class="strike-price">$1,420</span>
+        <span class="strike-yes">$0.16</span>
+        <span class="strike-no">$0.84</span>
+        <span class="strike-prob">16%</span>
+      </div>
+      <div class="strike-row">
+        <span class="strike-price">$1,460</span>
+        <span class="strike-yes">$0.07</span>
+        <span class="strike-no">$0.93</span>
+        <span class="strike-prob">7%</span>
+      </div>
+      <div class="market-footer">
+        <span>vol $61,892</span>
+        <span class="countdown">02h 13m</span>
+      </div>
+    </a>
+
+    <!-- AAPL -->
+    <a href="v1-trade.html" class="market-card">
+      <div class="market-card-head">
+        <div>
+          <div class="market-ticker">AAPL</div>
+          <div class="market-spot">spot $229.84</div>
+        </div>
+        <div class="market-change up">+0.54%</div>
+      </div>
+      <div class="strike-row">
+        <span class="strike-price">$210</span>
+        <span class="strike-yes">$0.94</span>
+        <span class="strike-no">$0.06</span>
+        <span class="strike-prob">94%</span>
+      </div>
+      <div class="strike-row">
+        <span class="strike-price">$220</span>
+        <span class="strike-yes">$0.78</span>
+        <span class="strike-no">$0.22</span>
+        <span class="strike-prob">78%</span>
+      </div>
+      <div class="strike-row">
+        <span class="strike-price">$230</span>
+        <span class="strike-yes">$0.51</span>
+        <span class="strike-no">$0.49</span>
+        <span class="strike-prob">51%</span>
+      </div>
+      <div class="strike-row">
+        <span class="strike-price">$240</span>
+        <span class="strike-yes">$0.24</span>
+        <span class="strike-no">$0.76</span>
+        <span class="strike-prob">24%</span>
+      </div>
+      <div class="strike-row">
+        <span class="strike-price">$250</span>
+        <span class="strike-yes">$0.09</span>
+        <span class="strike-no">$0.91</span>
+        <span class="strike-prob">9%</span>
+      </div>
+      <div class="market-footer">
+        <span>vol $28,743</span>
+        <span class="countdown">02h 13m</span>
+      </div>
+    </a>
+
+    <!-- MSFT -->
+    <a href="v1-trade.html" class="market-card">
+      <div class="market-card-head">
+        <div>
+          <div class="market-ticker">MSFT</div>
+          <div class="market-spot">spot $441.62</div>
+        </div>
+        <div class="market-change up">+0.73%</div>
+      </div>
+      <div class="strike-row">
+        <span class="strike-price">$400</span>
+        <span class="strike-yes">$0.95</span>
+        <span class="strike-no">$0.05</span>
+        <span class="strike-prob">95%</span>
+      </div>
+      <div class="strike-row">
+        <span class="strike-price">$420</span>
+        <span class="strike-yes">$0.81</span>
+        <span class="strike-no">$0.19</span>
+        <span class="strike-prob">81%</span>
+      </div>
+      <div class="strike-row">
+        <span class="strike-price">$440</span>
+        <span class="strike-yes">$0.54</span>
+        <span class="strike-no">$0.46</span>
+        <span class="strike-prob">54%</span>
+      </div>
+      <div class="strike-row">
+        <span class="strike-price">$460</span>
+        <span class="strike-yes">$0.27</span>
+        <span class="strike-no">$0.73</span>
+        <span class="strike-prob">27%</span>
+      </div>
+      <div class="strike-row">
+        <span class="strike-price">$480</span>
+        <span class="strike-yes">$0.11</span>
+        <span class="strike-no">$0.89</span>
+        <span class="strike-prob">11%</span>
+      </div>
+      <div class="market-footer">
+        <span>vol $19,621</span>
+        <span class="countdown">02h 13m</span>
+      </div>
+    </a>
+
+    <!-- GOOGL -->
+    <a href="v1-trade.html" class="market-card">
+      <div class="market-card-head">
+        <div>
+          <div class="market-ticker">GOOGL</div>
+          <div class="market-spot">spot $184.27</div>
+        </div>
+        <div class="market-change down">-0.50%</div>
+      </div>
+      <div class="strike-row">
+        <span class="strike-price">$170</span>
+        <span class="strike-yes">$0.91</span>
+        <span class="strike-no">$0.09</span>
+        <span class="strike-prob">91%</span>
+      </div>
+      <div class="strike-row">
+        <span class="strike-price">$180</span>
+        <span class="strike-yes">$0.68</span>
+        <span class="strike-no">$0.32</span>
+        <span class="strike-prob">68%</span>
+      </div>
+      <div class="strike-row">
+        <span class="strike-price">$190</span>
+        <span class="strike-yes">$0.36</span>
+        <span class="strike-no">$0.64</span>
+        <span class="strike-prob">36%</span>
+      </div>
+      <div class="strike-row">
+        <span class="strike-price">$200</span>
+        <span class="strike-yes">$0.13</span>
+        <span class="strike-no">$0.87</span>
+        <span class="strike-prob">13%</span>
+      </div>
+      <div class="market-footer">
+        <span>vol $12,408</span>
+        <span class="countdown">02h 13m</span>
+      </div>
+    </a>
+
+    <!-- AMZN -->
+    <a href="v1-trade.html" class="market-card">
+      <div class="market-card-head">
+        <div>
+          <div class="market-ticker">AMZN</div>
+          <div class="market-spot">spot $201.13</div>
+        </div>
+        <div class="market-change up">+0.20%</div>
+      </div>
+      <div class="strike-row">
+        <span class="strike-price">$180</span>
+        <span class="strike-yes">$0.93</span>
+        <span class="strike-no">$0.07</span>
+        <span class="strike-prob">93%</span>
+      </div>
+      <div class="strike-row">
+        <span class="strike-price">$190</span>
+        <span class="strike-yes">$0.76</span>
+        <span class="strike-no">$0.24</span>
+        <span class="strike-prob">76%</span>
+      </div>
+      <div class="strike-row">
+        <span class="strike-price">$200</span>
+        <span class="strike-yes">$0.53</span>
+        <span class="strike-no">$0.47</span>
+        <span class="strike-prob">53%</span>
+      </div>
+      <div class="strike-row">
+        <span class="strike-price">$210</span>
+        <span class="strike-yes">$0.29</span>
+        <span class="strike-no">$0.71</span>
+        <span class="strike-prob">29%</span>
+      </div>
+      <div class="strike-row">
+        <span class="strike-price">$220</span>
+        <span class="strike-yes">$0.12</span>
+        <span class="strike-no">$0.88</span>
+        <span class="strike-prob">12%</span>
+      </div>
+      <div class="market-footer">
+        <span>vol $16,237</span>
+        <span class="countdown">02h 13m</span>
+      </div>
+    </a>
+
+    <!-- TSLA -->
+    <a href="v1-trade.html" class="market-card">
+      <div class="market-card-head">
+        <div>
+          <div class="market-ticker">TSLA</div>
+          <div class="market-spot">spot $261.04</div>
+        </div>
+        <div class="market-change down">-0.70%</div>
+      </div>
+      <div class="strike-row">
+        <span class="strike-price">$240</span>
+        <span class="strike-yes">$0.85</span>
+        <span class="strike-no">$0.15</span>
+        <span class="strike-prob">85%</span>
+      </div>
+      <div class="strike-row">
+        <span class="strike-price">$250</span>
+        <span class="strike-yes">$0.69</span>
+        <span class="strike-no">$0.31</span>
+        <span class="strike-prob">69%</span>
+      </div>
+      <div class="strike-row">
+        <span class="strike-price">$260</span>
+        <span class="strike-yes">$0.48</span>
+        <span class="strike-no">$0.52</span>
+        <span class="strike-prob">48%</span>
+      </div>
+      <div class="strike-row">
+        <span class="strike-price">$270</span>
+        <span class="strike-yes">$0.26</span>
+        <span class="strike-no">$0.74</span>
+        <span class="strike-prob">26%</span>
+      </div>
+      <div class="strike-row">
+        <span class="strike-price">$280</span>
+        <span class="strike-yes">$0.13</span>
+        <span class="strike-no">$0.87</span>
+        <span class="strike-prob">13%</span>
+      </div>
+      <div class="market-footer">
+        <span>vol $23,718</span>
+        <span class="countdown">02h 13m</span>
+      </div>
+    </a>
+  </div>
+
+  <!-- RECENT ACTIVITY -->
+  <div class="section-header">
+    <h2>Recent fills</h2>
+    <div class="meta"><span class="live-dot"></span>last 24 trades</div>
+  </div>
+  <div class="activity-table">
+    <div class="activity-row activity-header">
+      <span>time</span>
+      <span>market</span>
+      <span>side</span>
+      <span>price</span>
+      <span>size</span>
+      <span>wallet</span>
+    </div>
+    <div class="activity-row">
+      <span class="activity-time">14:42:18</span>
+      <span>META > $680</span>
+      <span class="activity-side yes">BUY YES</span>
+      <span>$0.51</span>
+      <span>200 USDC</span>
+      <span class="activity-wallet">8Tz9…f4Lp</span>
+    </div>
+    <div class="activity-row">
+      <span class="activity-time">14:42:11</span>
+      <span>NVDA > $1,340</span>
+      <span class="activity-side no">BUY NO</span>
+      <span>$0.48</span>
+      <span>500 USDC</span>
+      <span class="activity-wallet">3Hx2…a9Vm</span>
+    </div>
+    <div class="activity-row">
+      <span class="activity-time">14:41:54</span>
+      <span>AAPL > $230</span>
+      <span class="activity-side yes">SELL YES</span>
+      <span>$0.52</span>
+      <span>100 USDC</span>
+      <span class="activity-wallet">4aPZ…G2iy</span>
+    </div>
+    <div class="activity-row">
+      <span class="activity-time">14:41:32</span>
+      <span>TSLA > $260</span>
+      <span class="activity-side no">BUY NO</span>
+      <span>$0.53</span>
+      <span>1,000 USDC</span>
+      <span class="activity-wallet">9q5S…rVBN</span>
+    </div>
+    <div class="activity-row">
+      <span class="activity-time">14:41:08</span>
+      <span>META > $680</span>
+      <span class="activity-side yes">BUY YES</span>
+      <span>$0.50</span>
+      <span>50 USDC</span>
+      <span class="activity-wallet">2Rt7…h8Zq</span>
+    </div>
+    <div class="activity-row">
+      <span class="activity-time">14:40:51</span>
+      <span>GOOGL > $190</span>
+      <span class="activity-side yes">BUY YES</span>
+      <span>$0.37</span>
+      <span>300 USDC</span>
+      <span class="activity-wallet">7Fy3…b1Wn</span>
+    </div>
+    <div class="activity-row">
+      <span class="activity-time">14:40:33</span>
+      <span>MSFT > $440</span>
+      <span class="activity-side no">SELL NO</span>
+      <span>$0.45</span>
+      <span>150 USDC</span>
+      <span class="activity-wallet">5Kp9…m6Xy</span>
+    </div>
+    <div class="activity-row">
+      <span class="activity-time">14:40:12</span>
+      <span>NVDA > $1,300</span>
+      <span class="activity-side yes">BUY YES</span>
+      <span>$0.73</span>
+      <span>250 USDC</span>
+      <span class="activity-wallet">6Ln4…c2Vp</span>
+    </div>
+  </div>
+
+  <!-- HOW IT WORKS -->
+  <div class="section-header">
+    <h2>How it works</h2>
+    <div class="meta">non-custodial · 4 steps</div>
+  </div>
+  <div class="how-it-works">
+    <div class="step">
+      <div class="step-num">01 / pick</div>
+      <h4>Pick a market</h4>
+      <p>Choose a MAG7 stock and a strike. "Will META close above $680 today?"</p>
+    </div>
+    <div class="step">
+      <div class="step-num">02 / trade</div>
+      <h4>Trade Yes or No</h4>
+      <p>Buy Yes if bullish, Buy No if bearish. Sell anytime before 4 PM ET. One signature per action.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">03 / settle</div>
+      <h4>Settle on-chain</h4>
+      <p>At 4 PM ET, Pyth oracle posts the closing price. Outcome writes immutably to chain.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">04 / redeem</div>
+      <h4>Redeem USDC</h4>
+      <p>Winning tokens claim $1 USDC each. Burn losing tokens. Redeemable indefinitely.</p>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  <div class="footer-inner">
+    <div>© 2026 BellMarkets · solana devnet · apache 2.0</div>
+    <div class="footer-links">
+      <a href="#">docs</a>
+      <a href="#">github</a>
+      <a href="#">discord</a>
+      <a href="#">audit</a>
+      <a href="#">status</a>
+    </div>
+  </div>
+</footer>
+
+<div class="mockup-badge">v1 · hyperliquid</div>
+
+<script>
+  // Theme toggle with localStorage persistence
+  function toggleTheme() {
+    const root = document.documentElement;
+    const current = root.getAttribute('data-theme');
+    const next = current === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('bm-theme', next); } catch (e) {}
+  }
+  (function() {
+    try {
+      const saved = localStorage.getItem('bm-theme');
+      if (saved === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    } catch (e) {}
+  })();
+</script>
+
+</body>
+</html>

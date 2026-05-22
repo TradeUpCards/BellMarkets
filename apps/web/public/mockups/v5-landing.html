@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BellMarkets — v5 Linear · Landing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root[data-theme="dark"] {
+    --bg: #0c0c0e; --panel: #131316; --panel-2: #1a1a1e;
+    --border: #232328; --border-strong: #2d2d34;
+    --text: #ededf1; --text-muted: #8b8b95; --text-subtle: #56565e;
+    --accent: #fb923c; --accent-2: #f97316; --accent-fg: #0c0c0e;
+    --accent-bg: rgba(251, 146, 60, 0.10); --accent-glow: rgba(251, 146, 60, 0.18);
+    --yes: #4ade80; --yes-bg: rgba(74, 222, 128, 0.10);
+    --no: #f87171; --no-bg: rgba(248, 113, 113, 0.10);
+    --amber: #fbbf24; --row-hover: #1c1c20;
+  }
+  :root[data-theme="light"] {
+    --bg: #fafafa; --panel: #ffffff; --panel-2: #f5f5f7;
+    --border: #e8e8eb; --border-strong: #d4d4d8;
+    --text: #0c0c0e; --text-muted: #6b6b75; --text-subtle: #a3a3ad;
+    --accent: #ea580c; --accent-2: #c2410c; --accent-fg: #ffffff;
+    --accent-bg: rgba(234, 88, 12, 0.10); --accent-glow: rgba(234, 88, 12, 0.15);
+    --yes: #16a34a; --yes-bg: rgba(22, 163, 74, 0.10);
+    --no: #dc2626; --no-bg: rgba(220, 38, 38, 0.10);
+    --amber: #d97706; --row-hover: #f0f0f2;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 14px; line-height: 1.55; letter-spacing: -0.01em;
+    -webkit-font-smoothing: antialiased; transition: background 120ms, color 120ms;
+  }
+  .mono { font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; }
+  a { color: inherit; text-decoration: none; }
+  button { font-family: inherit; cursor: pointer; }
+
+  header.top {
+    position: sticky; top: 0; z-index: 50;
+    background: rgba(12, 12, 14, 0.85); border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(12px);
+  }
+  :root[data-theme="light"] header.top { background: rgba(250, 250, 250, 0.9); }
+  .header-inner {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 32px; max-width: 1300px; margin: 0 auto;
+  }
+  .brand { display: flex; align-items: center; gap: 36px; }
+  .logo {
+    font-weight: 700; font-size: 16px; letter-spacing: -0.5px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .logo-mark {
+    width: 8px; height: 8px; background: var(--accent);
+    border-radius: 2px;
+  }
+  .nav { display: flex; gap: 28px; font-size: 14px; font-weight: 500; }
+  .nav a { color: var(--text-muted); transition: color 120ms; }
+  .nav a.active, .nav a:hover { color: var(--text); }
+  .header-right { display: flex; align-items: center; gap: 8px; }
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 10px; font-size: 12px; color: var(--text-muted);
+  }
+  .status-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--yes); }
+  .theme-toggle {
+    background: transparent; border: 1px solid var(--border);
+    color: var(--text-muted); padding: 7px 12px;
+    border-radius: 6px; font-size: 13px;
+  }
+  .btn-connect {
+    background: var(--text); color: var(--bg); border: none;
+    padding: 8px 18px; border-radius: 6px;
+    font-weight: 600; font-size: 13px;
+  }
+  .btn-connect:hover { opacity: 0.9; }
+
+  main { max-width: 1300px; margin: 0 auto; padding: 80px 32px 80px; }
+
+  /* HERO — minimal, focused */
+  .hero { margin-bottom: 80px; max-width: 800px; }
+  .hero-tag {
+    display: inline-block; padding: 4px 12px;
+    background: var(--accent-bg); color: var(--accent);
+    border-radius: 999px; font-size: 12px; font-weight: 600;
+    letter-spacing: 0; margin-bottom: 20px;
+  }
+  .hero h1 {
+    font-size: 56px; font-weight: 700; letter-spacing: -2px; line-height: 1.05;
+    margin-bottom: 20px;
+  }
+  .hero h1 .accent { color: var(--accent); }
+  .hero p {
+    font-size: 17px; color: var(--text-muted); max-width: 600px;
+    margin-bottom: 28px; line-height: 1.55;
+  }
+  .hero-actions { display: flex; gap: 12px; }
+  .btn-primary {
+    background: var(--accent); color: var(--accent-fg);
+    padding: 12px 22px; border: none; border-radius: 6px;
+    font-weight: 600; font-size: 14px;
+    box-shadow: 0 0 20px var(--accent-glow);
+  }
+  .btn-secondary {
+    background: transparent; color: var(--text);
+    padding: 12px 22px; border: 1px solid var(--border-strong); border-radius: 6px;
+    font-weight: 500; font-size: 14px;
+  }
+
+  /* STATS — minimal numbers */
+  .stats {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 48px;
+    padding: 32px 0;
+    border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+    margin-bottom: 80px;
+  }
+  .stat .num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 36px; font-weight: 600; line-height: 1;
+    letter-spacing: -1px;
+    margin-bottom: 8px;
+  }
+  .stat .num.accent { color: var(--accent); }
+  .stat .lbl {
+    font-size: 13px; color: var(--text-muted);
+  }
+
+  /* SECTION */
+  .section-h {
+    display: flex; justify-content: space-between; align-items: end;
+    margin-bottom: 24px;
+  }
+  .section-h h2 {
+    font-size: 22px; font-weight: 600; letter-spacing: -0.5px;
+  }
+  .section-h .meta {
+    color: var(--text-muted); font-size: 13px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-h .live-dot {
+    width: 6px; height: 6px; background: var(--yes); border-radius: 50%;
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* MARKETS — distinctive: sparkline-driven */
+  .markets-list {
+    border-top: 1px solid var(--border);
+    margin-bottom: 80px;
+  }
+  .market-row {
+    display: grid;
+    grid-template-columns: 100px 140px 90px 120px 1fr 100px;
+    gap: 24px; padding: 20px 4px;
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+    transition: background 120ms, padding 120ms; cursor: pointer;
+  }
+  .market-row:hover {
+    background: var(--row-hover);
+    padding-left: 12px;
+  }
+  .mr-ticker {
+    font-weight: 700; font-size: 17px; letter-spacing: -0.3px;
+  }
+  .mr-spot {
+    font-family: 'JetBrains Mono', monospace; font-size: 15px;
+    font-weight: 600;
+  }
+  .mr-change {
+    font-family: 'JetBrains Mono', monospace; font-size: 13px;
+    font-weight: 600;
+  }
+  .mr-change.up { color: var(--yes); }
+  .mr-change.down { color: var(--no); }
+  .mr-spark {
+    height: 40px;
+  }
+  .mr-strikes {
+    display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+  }
+  .mr-strike {
+    display: flex; flex-direction: column; gap: 2px;
+    padding: 6px 10px; background: var(--panel-2);
+    border-radius: 6px; min-width: 56px;
+  }
+  .mr-strike .px {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    color: var(--text-muted);
+  }
+  .mr-strike .prob {
+    font-family: 'JetBrains Mono', monospace; font-size: 13px;
+    font-weight: 700;
+  }
+  .mr-strike.atm .prob { color: var(--accent); }
+  .mr-cta {
+    text-align: right;
+    color: var(--text-muted); font-size: 13px;
+    font-weight: 500;
+  }
+  .market-row:hover .mr-cta { color: var(--accent); }
+
+  /* HOW — minimal */
+  .how {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 32px;
+    margin-bottom: 80px;
+  }
+  .h-step {
+    padding-top: 20px; border-top: 1px solid var(--accent);
+  }
+  .h-step .n {
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    color: var(--accent); font-weight: 600; margin-bottom: 12px;
+  }
+  .h-step h4 { font-size: 17px; font-weight: 600; margin-bottom: 6px; }
+  .h-step p { font-size: 13px; color: var(--text-muted); line-height: 1.55; }
+
+  /* CTA Block */
+  .cta-block {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 12px; padding: 48px;
+    text-align: center; margin-bottom: 80px;
+  }
+  .cta-block h3 {
+    font-size: 28px; font-weight: 600; letter-spacing: -0.5px;
+    margin-bottom: 12px;
+  }
+  .cta-block p { color: var(--text-muted); margin-bottom: 24px; max-width: 500px; margin-left: auto; margin-right: auto; }
+
+  footer {
+    border-top: 1px solid var(--border); padding: 32px;
+  }
+  .footer-inner {
+    max-width: 1300px; margin: 0 auto;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 13px; color: var(--text-subtle);
+  }
+  .footer-links { display: flex; gap: 24px; }
+  .footer-links a { color: var(--text-muted); }
+
+  .mockup-badge {
+    position: fixed; bottom: 16px; left: 16px; z-index: 100;
+    background: var(--panel); border: 1px solid var(--accent); color: var(--accent);
+    padding: 6px 12px; border-radius: 6px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    font-weight: 600; letter-spacing: 0.5px;
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="header-inner">
+    <div class="brand">
+      <a href="v5-landing.html" class="logo"><span class="logo-mark"></span>BellMarkets</a>
+      <nav class="nav">
+        <a href="v5-landing.html" class="active">Markets</a>
+        <a href="v5-trade.html">Trade</a>
+        <a href="#">Portfolio</a>
+        <a href="#">Docs</a>
+      </nav>
+    </div>
+    <div class="header-right">
+      <span class="status-pill"><span class="dot"></span>devnet</span>
+      <button class="theme-toggle" onclick="toggleTheme()">◐</button>
+      <button class="btn-connect">Connect</button>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-tag">35 markets · settles in 02h 13m</div>
+    <h1>
+      Same-day binary stock options.<br><span class="accent">On-chain.</span> Non-custodial. $1 USDC.
+    </h1>
+    <p>
+      Trade Yes/No on daily MAG7 closes. Settled via Pyth oracle at 4 PM ET.
+      Permissionless. Built on Solana.
+    </p>
+    <div class="hero-actions">
+      <button class="btn-primary">Launch trading →</button>
+      <button class="btn-secondary">How it works</button>
+    </div>
+  </section>
+
+  <!-- STATS -->
+  <div class="stats">
+    <div class="stat">
+      <div class="num accent mono">35</div>
+      <div class="lbl">markets live</div>
+    </div>
+    <div class="stat">
+      <div class="num mono">$184k</div>
+      <div class="lbl">volume · 24h</div>
+    </div>
+    <div class="stat">
+      <div class="num mono">127</div>
+      <div class="lbl">active traders</div>
+    </div>
+    <div class="stat">
+      <div class="num mono" style="color: var(--amber);">2h 13m</div>
+      <div class="lbl">until settlement</div>
+    </div>
+  </div>
+
+  <!-- MARKETS -->
+  <div class="section-h">
+    <h2>Markets</h2>
+    <div class="meta"><span class="live-dot"></span>updated 2s ago</div>
+  </div>
+
+  <div class="markets-list">
+
+    <a href="v5-trade.html" class="market-row">
+      <div class="mr-ticker">META</div>
+      <div>
+        <div class="mr-spot">$679.84</div>
+        <div class="mr-change up">+0.32% today</div>
+      </div>
+      <div class="mr-change">$42K vol</div>
+      <svg class="mr-spark" viewBox="0 0 120 40" preserveAspectRatio="none">
+        <polyline points="0,30 12,28 24,32 36,25 48,22 60,18 72,20 84,15 96,18 108,12 120,8" fill="none" stroke="#4ade80" stroke-width="1.5"/>
+      </svg>
+      <div class="mr-strikes">
+        <div class="mr-strike"><div class="px">$620</div><div class="prob">92%</div></div>
+        <div class="mr-strike"><div class="px">$660</div><div class="prob">71%</div></div>
+        <div class="mr-strike atm"><div class="px">$680</div><div class="prob">50%</div></div>
+        <div class="mr-strike"><div class="px">$700</div><div class="prob">28%</div></div>
+        <div class="mr-strike"><div class="px">$720</div><div class="prob">14%</div></div>
+      </div>
+      <div class="mr-cta">Trade →</div>
+    </a>
+
+    <a href="v5-trade.html" class="market-row">
+      <div class="mr-ticker">NVDA</div>
+      <div>
+        <div class="mr-spot">$1,342.71</div>
+        <div class="mr-change up">+1.39% today</div>
+      </div>
+      <div class="mr-change">$62K vol</div>
+      <svg class="mr-spark" viewBox="0 0 120 40" preserveAspectRatio="none">
+        <polyline points="0,35 12,30 24,25 36,22 48,18 60,15 72,12 84,10 96,8 108,5 120,4" fill="none" stroke="#4ade80" stroke-width="1.5"/>
+      </svg>
+      <div class="mr-strikes">
+        <div class="mr-strike"><div class="px">$1,260</div><div class="prob">88%</div></div>
+        <div class="mr-strike"><div class="px">$1,300</div><div class="prob">74%</div></div>
+        <div class="mr-strike atm"><div class="px">$1,340</div><div class="prob">52%</div></div>
+        <div class="mr-strike"><div class="px">$1,380</div><div class="prob">31%</div></div>
+        <div class="mr-strike"><div class="px">$1,420</div><div class="prob">16%</div></div>
+      </div>
+      <div class="mr-cta">Trade →</div>
+    </a>
+
+    <a href="v5-trade.html" class="market-row">
+      <div class="mr-ticker">AAPL</div>
+      <div>
+        <div class="mr-spot">$229.84</div>
+        <div class="mr-change up">+0.54% today</div>
+      </div>
+      <div class="mr-change">$29K vol</div>
+      <svg class="mr-spark" viewBox="0 0 120 40" preserveAspectRatio="none">
+        <polyline points="0,32 12,30 24,28 36,30 48,25 60,22 72,18 84,15 96,18 108,15 120,12" fill="none" stroke="#4ade80" stroke-width="1.5"/>
+      </svg>
+      <div class="mr-strikes">
+        <div class="mr-strike"><div class="px">$210</div><div class="prob">94%</div></div>
+        <div class="mr-strike"><div class="px">$220</div><div class="prob">78%</div></div>
+        <div class="mr-strike atm"><div class="px">$230</div><div class="prob">51%</div></div>
+        <div class="mr-strike"><div class="px">$240</div><div class="prob">24%</div></div>
+        <div class="mr-strike"><div class="px">$250</div><div class="prob">9%</div></div>
+      </div>
+      <div class="mr-cta">Trade →</div>
+    </a>
+
+    <a href="v5-trade.html" class="market-row">
+      <div class="mr-ticker">MSFT</div>
+      <div>
+        <div class="mr-spot">$441.62</div>
+        <div class="mr-change up">+0.73% today</div>
+      </div>
+      <div class="mr-change">$20K vol</div>
+      <svg class="mr-spark" viewBox="0 0 120 40" preserveAspectRatio="none">
+        <polyline points="0,30 12,28 24,25 36,22 48,20 60,18 72,16 84,15 96,12 108,10 120,8" fill="none" stroke="#4ade80" stroke-width="1.5"/>
+      </svg>
+      <div class="mr-strikes">
+        <div class="mr-strike"><div class="px">$420</div><div class="prob">81%</div></div>
+        <div class="mr-strike atm"><div class="px">$440</div><div class="prob">54%</div></div>
+        <div class="mr-strike"><div class="px">$460</div><div class="prob">27%</div></div>
+        <div class="mr-strike"><div class="px">$480</div><div class="prob">11%</div></div>
+      </div>
+      <div class="mr-cta">Trade →</div>
+    </a>
+
+    <a href="v5-trade.html" class="market-row">
+      <div class="mr-ticker">GOOGL</div>
+      <div>
+        <div class="mr-spot">$184.27</div>
+        <div class="mr-change down">-0.50% today</div>
+      </div>
+      <div class="mr-change">$12K vol</div>
+      <svg class="mr-spark" viewBox="0 0 120 40" preserveAspectRatio="none">
+        <polyline points="0,20 12,22 24,18 36,22 48,25 60,28 72,30 84,32 96,30 108,33 120,35" fill="none" stroke="#f87171" stroke-width="1.5"/>
+      </svg>
+      <div class="mr-strikes">
+        <div class="mr-strike"><div class="px">$170</div><div class="prob">91%</div></div>
+        <div class="mr-strike"><div class="px">$180</div><div class="prob">68%</div></div>
+        <div class="mr-strike atm"><div class="px">$184</div><div class="prob">50%</div></div>
+        <div class="mr-strike"><div class="px">$190</div><div class="prob">36%</div></div>
+        <div class="mr-strike"><div class="px">$200</div><div class="prob">13%</div></div>
+      </div>
+      <div class="mr-cta">Trade →</div>
+    </a>
+
+    <a href="v5-trade.html" class="market-row">
+      <div class="mr-ticker">AMZN</div>
+      <div>
+        <div class="mr-spot">$201.13</div>
+        <div class="mr-change up">+0.20% today</div>
+      </div>
+      <div class="mr-change">$16K vol</div>
+      <svg class="mr-spark" viewBox="0 0 120 40" preserveAspectRatio="none">
+        <polyline points="0,28 12,26 24,28 36,25 48,24 60,22 72,20 84,22 96,18 108,20 120,18" fill="none" stroke="#4ade80" stroke-width="1.5"/>
+      </svg>
+      <div class="mr-strikes">
+        <div class="mr-strike"><div class="px">$180</div><div class="prob">93%</div></div>
+        <div class="mr-strike"><div class="px">$190</div><div class="prob">76%</div></div>
+        <div class="mr-strike atm"><div class="px">$200</div><div class="prob">53%</div></div>
+        <div class="mr-strike"><div class="px">$210</div><div class="prob">29%</div></div>
+        <div class="mr-strike"><div class="px">$220</div><div class="prob">12%</div></div>
+      </div>
+      <div class="mr-cta">Trade →</div>
+    </a>
+
+    <a href="v5-trade.html" class="market-row">
+      <div class="mr-ticker">TSLA</div>
+      <div>
+        <div class="mr-spot">$261.04</div>
+        <div class="mr-change down">-0.70% today</div>
+      </div>
+      <div class="mr-change">$24K vol</div>
+      <svg class="mr-spark" viewBox="0 0 120 40" preserveAspectRatio="none">
+        <polyline points="0,18 12,22 24,20 36,24 48,28 60,25 72,30 84,32 96,28 108,30 120,32" fill="none" stroke="#f87171" stroke-width="1.5"/>
+      </svg>
+      <div class="mr-strikes">
+        <div class="mr-strike"><div class="px">$240</div><div class="prob">85%</div></div>
+        <div class="mr-strike"><div class="px">$250</div><div class="prob">69%</div></div>
+        <div class="mr-strike atm"><div class="px">$260</div><div class="prob">48%</div></div>
+        <div class="mr-strike"><div class="px">$270</div><div class="prob">26%</div></div>
+        <div class="mr-strike"><div class="px">$280</div><div class="prob">13%</div></div>
+      </div>
+      <div class="mr-cta">Trade →</div>
+    </a>
+
+  </div>
+
+  <!-- HOW -->
+  <div class="section-h"><h2>How it works</h2></div>
+  <div class="how">
+    <div class="h-step">
+      <div class="n">01</div>
+      <h4>Pick a market</h4>
+      <p>Choose a MAG7 stock and a strike price for today's close.</p>
+    </div>
+    <div class="h-step">
+      <div class="n">02</div>
+      <h4>Trade</h4>
+      <p>Buy Yes if bullish, Buy No if bearish. One signature per action.</p>
+    </div>
+    <div class="h-step">
+      <div class="n">03</div>
+      <h4>Settle</h4>
+      <p>Pyth oracle posts close at 4 PM ET. Outcome locks on-chain.</p>
+    </div>
+    <div class="h-step">
+      <div class="n">04</div>
+      <h4>Redeem</h4>
+      <p>Winning tokens claim $1 USDC. Losers redeem to zero.</p>
+    </div>
+  </div>
+
+  <!-- CTA -->
+  <div class="cta-block">
+    <h3>Ready to trade?</h3>
+    <p>Connect a Solana wallet to start. Devnet USDC airdrop available.</p>
+    <button class="btn-primary">Launch trading →</button>
+  </div>
+
+</main>
+
+<footer>
+  <div class="footer-inner">
+    <div>© 2026 BellMarkets · Solana devnet · 599h7V…kS7uV</div>
+    <div class="footer-links">
+      <a href="#">Docs</a><a href="#">GitHub</a><a href="#">Discord</a><a href="#">Status</a>
+    </div>
+  </div>
+</footer>
+
+<div class="mockup-badge">v5 · linear</div>
+
+<script>
+  function toggleTheme() {
+    const root = document.documentElement;
+    const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('bm-theme', next); } catch (e) {}
+  }
+  (function() {
+    try { const s = localStorage.getItem('bm-theme'); if (s === 'light') document.documentElement.setAttribute('data-theme', 'light'); } catch (e) {}
+  })();
+</script>
+
+</body>
+</html>

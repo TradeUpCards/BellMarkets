@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BellMarkets — Visual Direction Progression</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #fafaf7;
+    --panel: #ffffff;
+    --text: #1a1a1a;
+    --text-muted: #6a6a6a;
+    --text-subtle: #999;
+    --border: #e0e0dd;
+    --border-strong: #c0c0bd;
+    --brand: #6A4FB3;
+    --brand-bg: #F0EBFA;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Inter', -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    font-size: 14px; line-height: 1.6;
+  }
+  .container {
+    max-width: 1300px;
+    margin: 0 auto;
+    padding: 56px 32px 80px;
+  }
+
+  /* HEADER */
+  header.page-header {
+    margin-bottom: 56px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 32px;
+  }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--brand);
+    margin-bottom: 14px;
+    font-weight: 700;
+    background: var(--brand-bg);
+    padding: 6px 12px;
+    border-radius: 20px;
+  }
+  .badge::before {
+    content: "";
+    width: 8px; height: 8px;
+    background: var(--brand);
+    border-radius: 50%;
+  }
+  h1 {
+    font-size: 48px; font-weight: 800; letter-spacing: -1.5px; line-height: 1.05;
+    margin-bottom: 16px;
+  }
+  .subtitle {
+    font-size: 18px; color: var(--text-muted);
+    max-width: 800px; line-height: 1.55;
+  }
+
+  /* INTRO */
+  .intro {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 14px; padding: 32px;
+    margin-bottom: 48px;
+  }
+  .intro h2 {
+    font-size: 20px; font-weight: 700;
+    margin-bottom: 12px;
+  }
+  .intro p {
+    color: var(--text-muted); margin-bottom: 12px;
+    max-width: 720px;
+  }
+  .intro ul {
+    margin: 16px 0 0 20px; color: var(--text-muted);
+  }
+  .intro li { margin-bottom: 6px; }
+  .intro code {
+    background: #f0f0ed; padding: 1px 6px; border-radius: 3px;
+    font-family: 'JetBrains Mono', monospace; font-size: 13px;
+    color: var(--text);
+  }
+
+  /* TOC */
+  .toc {
+    display: grid; grid-template-columns: repeat(5, 1fr);
+    gap: 12px; margin-bottom: 64px;
+  }
+  .toc a {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px;
+    text-decoration: none; color: var(--text);
+    transition: all 120ms;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .toc a:hover {
+    border-color: var(--brand); transform: translateY(-2px);
+  }
+  .toc-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; font-weight: 700;
+    color: var(--brand); letter-spacing: 1px;
+  }
+  .toc-name { font-weight: 700; font-size: 15px; }
+  .toc-vibe { font-size: 12px; color: var(--text-muted); }
+
+  /* CANDIDATE BLOCK */
+  .candidate {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 16px; padding: 0;
+    margin-bottom: 32px;
+    overflow: hidden;
+  }
+  .candidate-h {
+    padding: 28px 32px;
+    border-bottom: 1px solid var(--border);
+    display: grid; grid-template-columns: auto 1fr auto; gap: 24px; align-items: center;
+  }
+  .candidate-num {
+    font-family: 'JetBrains Mono', monospace; font-size: 13px;
+    color: var(--text-muted); font-weight: 600; letter-spacing: 1px;
+  }
+  .candidate-h h2 {
+    font-size: 28px; font-weight: 700; letter-spacing: -0.5px;
+  }
+  .candidate-h h2 .sub {
+    color: var(--text-muted); font-weight: 400; font-size: 18px; margin-left: 8px;
+  }
+  .candidate-colors {
+    display: flex; gap: 6px;
+  }
+  .swatch {
+    width: 28px; height: 28px; border-radius: 6px;
+    border: 1px solid var(--border);
+  }
+
+  .candidate-body { padding: 28px 32px; }
+  .candidate-row {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 32px;
+    margin-bottom: 24px;
+  }
+  .candidate-desc h3 {
+    font-size: 13px; text-transform: uppercase; letter-spacing: 1.5px;
+    color: var(--text-muted); margin-bottom: 12px; font-weight: 700;
+  }
+  .candidate-desc p { color: var(--text-muted); margin-bottom: 12px; }
+  .candidate-desc ul { margin-left: 20px; color: var(--text-muted); }
+  .candidate-desc li { margin-bottom: 4px; }
+  .candidate-dna {
+    background: #f5f5f2; border-radius: 10px; padding: 20px;
+  }
+  .candidate-dna h3 {
+    font-size: 13px; text-transform: uppercase; letter-spacing: 1.5px;
+    color: var(--text-muted); margin-bottom: 14px; font-weight: 700;
+  }
+  .dna-row {
+    display: flex; justify-content: space-between; padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .dna-row:last-child { border-bottom: none; }
+  .dna-row .lbl { color: var(--text-muted); }
+  .dna-row .val {
+    font-family: 'JetBrains Mono', monospace; font-weight: 600;
+  }
+
+  .candidate-links {
+    display: flex; gap: 12px;
+    padding-top: 20px; border-top: 1px solid var(--border);
+  }
+  .link-btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 10px 18px;
+    background: var(--text); color: var(--bg);
+    border: none; border-radius: 8px;
+    font-weight: 600; font-size: 13px;
+    text-decoration: none;
+  }
+  .link-btn:hover { opacity: 0.85; }
+  .link-btn.outline {
+    background: transparent; color: var(--text);
+    border: 1px solid var(--border-strong);
+  }
+
+  /* COMPARE LINKS */
+  .compare-block {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 14px; padding: 32px;
+    margin-bottom: 48px;
+    text-align: center;
+  }
+  .compare-block h2 { font-size: 22px; font-weight: 700; margin-bottom: 12px; }
+  .compare-block p { color: var(--text-muted); margin-bottom: 20px; }
+  .compare-links { display: flex; gap: 12px; justify-content: center; }
+
+  /* DECISION FRAMEWORK */
+  .decision {
+    background: var(--brand-bg); border: 1px solid var(--brand);
+    border-radius: 14px; padding: 32px;
+    margin-bottom: 32px;
+  }
+  .decision h2 { font-size: 22px; font-weight: 700; margin-bottom: 16px; color: var(--brand); }
+  .decision ul { margin-left: 20px; color: var(--text); }
+  .decision li { margin-bottom: 8px; }
+
+  footer {
+    text-align: center; color: var(--text-subtle);
+    padding-top: 48px; border-top: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+<header class="page-header">
+  <div class="badge">design exploration</div>
+  <h1>BellMarkets — Visual Direction Progression</h1>
+  <p class="subtitle">
+    Five high-fidelity HTML mockups exploring distinct design philosophies for a non-custodial Solana
+    binary-options dApp. Each candidate is a coherent design system applied across the landing page and
+    trading terminal. Pick one as the foundation; combine elements if useful.
+  </p>
+</header>
+
+<!-- INTRO -->
+<div class="intro">
+  <h2>What you're looking at</h2>
+  <p>
+    Each candidate has two files: <code>vN-landing.html</code> (markets list) and <code>vN-trade.html</code>
+    (trading terminal — the load-bearing page). All five share the same content (MAG7 stocks, prices, wallet
+    addresses, program ID) so direct comparison is apples-to-apples.
+  </p>
+  <p>
+    Every candidate has a <strong>dark mode default</strong> with a working <strong>light mode toggle</strong>
+    (◐ button in the header; preference persists via localStorage).
+  </p>
+  <ul>
+    <li><strong>v1 — Hyperliquid:</strong> max-density, mono-heavy, yellow-green. Power-user feel.</li>
+    <li><strong>v2 — Polymarket:</strong> approachable, amber accent, big probability percentages.</li>
+    <li><strong>v3 — Drift Protocol:</strong> Solana DeFi standard. Violet gradient + sticky bottom position monitor.</li>
+    <li><strong>v4 — Bloomberg / dYdX:</strong> institutional terminal. 4-pane layout, IBM Plex Mono, cyan accent.</li>
+    <li><strong>v5 — Linear:</strong> modern restrained. Sparkline-driven. Sharp orange. Most breathable.</li>
+  </ul>
+</div>
+
+<!-- TOC -->
+<div class="toc">
+  <a href="v1-landing.html">
+    <span class="toc-num">v1 / hyperliquid</span>
+    <span class="toc-name">Max density</span>
+    <span class="toc-vibe">Yellow-green · mono-heavy</span>
+  </a>
+  <a href="v2-landing.html">
+    <span class="toc-num">v2 / polymarket</span>
+    <span class="toc-name">Approachable</span>
+    <span class="toc-vibe">Amber · probability-first</span>
+  </a>
+  <a href="v3-landing.html">
+    <span class="toc-num">v3 / drift</span>
+    <span class="toc-name">Solana DeFi</span>
+    <span class="toc-vibe">Violet · sticky portfolio</span>
+  </a>
+  <a href="v4-landing.html">
+    <span class="toc-num">v4 / bloomberg</span>
+    <span class="toc-name">Institutional</span>
+    <span class="toc-vibe">Cyan · IBM Plex Mono</span>
+  </a>
+  <a href="v5-landing.html">
+    <span class="toc-num">v5 / linear</span>
+    <span class="toc-name">Modern restrained</span>
+    <span class="toc-vibe">Orange · sparklines</span>
+  </a>
+</div>
+
+<!-- v1 -->
+<div class="candidate">
+  <div class="candidate-h">
+    <div class="candidate-num">01 / HYPERLIQUID</div>
+    <h2>Hyperliquid<span class="sub">power-user terminal density</span></h2>
+    <div class="candidate-colors">
+      <div class="swatch" style="background: #0a0a0a;"></div>
+      <div class="swatch" style="background: #111111;"></div>
+      <div class="swatch" style="background: #bef264;"></div>
+      <div class="swatch" style="background: #22c55e;"></div>
+      <div class="swatch" style="background: #ef4444;"></div>
+    </div>
+  </div>
+  <div class="candidate-body">
+    <div class="candidate-row">
+      <div class="candidate-desc">
+        <h3>Vibe</h3>
+        <p>
+          Maximum information density. Built for power users who scan, not read. Monospace numbers everywhere.
+          Compact rows. Status pills in the header (latency, oracle freshness). Order book is first-class.
+        </p>
+        <p><strong>Strongest for:</strong> "we built a serious trading platform" — graders who trade on
+        Hyperliquid or Drift will recognize the visual language immediately.</p>
+      </div>
+      <div class="candidate-dna">
+        <h3>DNA</h3>
+        <div class="dna-row"><span class="lbl">accent</span><span class="val" style="color: #bef264;">#bef264</span></div>
+        <div class="dna-row"><span class="lbl">body</span><span class="val">Geist Sans</span></div>
+        <div class="dna-row"><span class="lbl">numbers</span><span class="val">JetBrains Mono</span></div>
+        <div class="dna-row"><span class="lbl">density</span><span class="val">very high</span></div>
+        <div class="dna-row"><span class="lbl">trade page</span><span class="val">3-col grid</span></div>
+        <div class="dna-row"><span class="lbl">order book</span><span class="val">prominent · L2</span></div>
+      </div>
+    </div>
+    <div class="candidate-links">
+      <a href="v1-landing.html" class="link-btn">View landing →</a>
+      <a href="v1-trade.html" class="link-btn outline">View trade page →</a>
+    </div>
+  </div>
+</div>
+
+<!-- v2 -->
+<div class="candidate">
+  <div class="candidate-h">
+    <div class="candidate-num">02 / POLYMARKET</div>
+    <h2>Polymarket<span class="sub">approachable · probability-first</span></h2>
+    <div class="candidate-colors">
+      <div class="swatch" style="background: #0c0a0a;"></div>
+      <div class="swatch" style="background: #161312;"></div>
+      <div class="swatch" style="background: #fbbf24;"></div>
+      <div class="swatch" style="background: #10b981;"></div>
+      <div class="swatch" style="background: #f43f5e;"></div>
+    </div>
+  </div>
+  <div class="candidate-body">
+    <div class="candidate-row">
+      <div class="candidate-desc">
+        <h3>Vibe</h3>
+        <p>
+          Approachable but professional. Cream-tinted dark mode. Big probability percentages
+          ("50% implied probability") front and center. Two HUGE buy buttons (Yes / No) instead of
+          four — Polymarket's signature simplicity. Less dense than v1.
+        </p>
+        <p><strong>Strongest for:</strong> retail trader empathy. Easiest UX to onboard a non-trader.
+        Polymarket's UX has been validated by millions of users.</p>
+      </div>
+      <div class="candidate-dna">
+        <h3>DNA</h3>
+        <div class="dna-row"><span class="lbl">accent</span><span class="val" style="color: #fbbf24;">#fbbf24</span></div>
+        <div class="dna-row"><span class="lbl">body</span><span class="val">Inter</span></div>
+        <div class="dna-row"><span class="lbl">numbers</span><span class="val">JetBrains Mono</span></div>
+        <div class="dna-row"><span class="lbl">density</span><span class="val">medium-low</span></div>
+        <div class="dna-row"><span class="lbl">trade page</span><span class="val">prob hero + 2 big btns</span></div>
+        <div class="dna-row"><span class="lbl">tone</span><span class="val">friendly</span></div>
+      </div>
+    </div>
+    <div class="candidate-links">
+      <a href="v2-landing.html" class="link-btn">View landing →</a>
+      <a href="v2-trade.html" class="link-btn outline">View trade page →</a>
+    </div>
+  </div>
+</div>
+
+<!-- v3 -->
+<div class="candidate">
+  <div class="candidate-h">
+    <div class="candidate-num">03 / DRIFT</div>
+    <h2>Drift Protocol<span class="sub">Solana DeFi standard · sticky bottom monitor</span></h2>
+    <div class="candidate-colors">
+      <div class="swatch" style="background: #0a0a14;"></div>
+      <div class="swatch" style="background: #11111d;"></div>
+      <div class="swatch" style="background: #8b5cf6;"></div>
+      <div class="swatch" style="background: #14d195;"></div>
+      <div class="swatch" style="background: #ff5c7c;"></div>
+    </div>
+  </div>
+  <div class="candidate-body">
+    <div class="candidate-row">
+      <div class="candidate-desc">
+        <h3>Vibe</h3>
+        <p>
+          The Solana DeFi standard. Violet gradient accents (Drift's signature). Balanced density.
+          Markets shown as a sortable table with strike chips per stock. <strong>Sticky bottom bar</strong>
+          showing your open positions across all markets — Drift's signature pattern.
+        </p>
+        <p><strong>Strongest for:</strong> reviewers who actively use Solana DeFi. Visual coherence with
+        the chain we built on. Sticky monitor is unique to this candidate.</p>
+      </div>
+      <div class="candidate-dna">
+        <h3>DNA</h3>
+        <div class="dna-row"><span class="lbl">accent</span><span class="val" style="color: #8b5cf6;">#8b5cf6</span></div>
+        <div class="dna-row"><span class="lbl">body</span><span class="val">Geist Sans</span></div>
+        <div class="dna-row"><span class="lbl">numbers</span><span class="val">JetBrains Mono</span></div>
+        <div class="dna-row"><span class="lbl">density</span><span class="val">medium</span></div>
+        <div class="dna-row"><span class="lbl">trade page</span><span class="val">3-col + sticky bottom</span></div>
+        <div class="dna-row"><span class="lbl">signature</span><span class="val">portfolio strip</span></div>
+      </div>
+    </div>
+    <div class="candidate-links">
+      <a href="v3-landing.html" class="link-btn">View landing →</a>
+      <a href="v3-trade.html" class="link-btn outline">View trade page →</a>
+    </div>
+  </div>
+</div>
+
+<!-- v4 -->
+<div class="candidate">
+  <div class="candidate-h">
+    <div class="candidate-num">04 / BLOOMBERG</div>
+    <h2>Bloomberg<span class="sub">institutional terminal · 4-pane layout</span></h2>
+    <div class="candidate-colors">
+      <div class="swatch" style="background: #050810;"></div>
+      <div class="swatch" style="background: #0a0e1a;"></div>
+      <div class="swatch" style="background: #06b6d4;"></div>
+      <div class="swatch" style="background: #4ade80;"></div>
+      <div class="swatch" style="background: #f87171;"></div>
+    </div>
+  </div>
+  <div class="candidate-body">
+    <div class="candidate-row">
+      <div class="candidate-desc">
+        <h3>Vibe</h3>
+        <p>
+          Institutional terminal. The densest of the five. IBM Plex Mono everywhere. Status bar across
+          the top (CONN / LAT / PYTH / SLOT / PROG / SETTLE-IN / TIME) — Bloomberg signature. Trade
+          page is a 4-column terminal (book / chart+trades / ticket / market data). Tiny type.
+        </p>
+        <p><strong>Strongest for:</strong> interview narrative — "we built this for a hiring partner
+        who works at a trading firm." Signals serious engineering for traders.</p>
+      </div>
+      <div class="candidate-dna">
+        <h3>DNA</h3>
+        <div class="dna-row"><span class="lbl">accent</span><span class="val" style="color: #06b6d4;">#06b6d4</span></div>
+        <div class="dna-row"><span class="lbl">body</span><span class="val">IBM Plex Sans</span></div>
+        <div class="dna-row"><span class="lbl">numbers</span><span class="val">IBM Plex Mono</span></div>
+        <div class="dna-row"><span class="lbl">density</span><span class="val">max</span></div>
+        <div class="dna-row"><span class="lbl">trade page</span><span class="val">4-col terminal</span></div>
+        <div class="dna-row"><span class="lbl">signature</span><span class="val">status bar</span></div>
+      </div>
+    </div>
+    <div class="candidate-links">
+      <a href="v4-landing.html" class="link-btn">View landing →</a>
+      <a href="v4-trade.html" class="link-btn outline">View trade page →</a>
+    </div>
+  </div>
+</div>
+
+<!-- v5 -->
+<div class="candidate">
+  <div class="candidate-h">
+    <div class="candidate-num">05 / LINEAR</div>
+    <h2>Linear<span class="sub">modern restrained · sparkline-driven</span></h2>
+    <div class="candidate-colors">
+      <div class="swatch" style="background: #0c0c0e;"></div>
+      <div class="swatch" style="background: #131316;"></div>
+      <div class="swatch" style="background: #fb923c;"></div>
+      <div class="swatch" style="background: #4ade80;"></div>
+      <div class="swatch" style="background: #f87171;"></div>
+    </div>
+  </div>
+  <div class="candidate-body">
+    <div class="candidate-row">
+      <div class="candidate-desc">
+        <h3>Vibe</h3>
+        <p>
+          Modern restrained — Linear.app's visual language applied to DeFi. Sharp orange accent.
+          Most breathing room of the five. Markets list features <strong>sparkline charts per stock</strong>
+          (unique to this candidate). Clean type hierarchy. No status pills, no busy chrome.
+        </p>
+        <p><strong>Strongest for:</strong> 2026 design sensibility. Most "tasteful" to non-trader
+        reviewers (designers, design-conscious engineers). Lowest information density.</p>
+      </div>
+      <div class="candidate-dna">
+        <h3>DNA</h3>
+        <div class="dna-row"><span class="lbl">accent</span><span class="val" style="color: #fb923c;">#fb923c</span></div>
+        <div class="dna-row"><span class="lbl">body</span><span class="val">Inter</span></div>
+        <div class="dna-row"><span class="lbl">numbers</span><span class="val">JetBrains Mono</span></div>
+        <div class="dna-row"><span class="lbl">density</span><span class="val">low</span></div>
+        <div class="dna-row"><span class="lbl">trade page</span><span class="val">2-col + ticket sidebar</span></div>
+        <div class="dna-row"><span class="lbl">signature</span><span class="val">sparkline per stock</span></div>
+      </div>
+    </div>
+    <div class="candidate-links">
+      <a href="v5-landing.html" class="link-btn">View landing →</a>
+      <a href="v5-trade.html" class="link-btn outline">View trade page →</a>
+    </div>
+  </div>
+</div>
+
+<!-- COMPARE -->
+<div class="compare-block">
+  <h2>Side-by-side comparison</h2>
+  <p>View all 5 candidates simultaneously in narrow columns for direct visual comparison.</p>
+  <div class="compare-links">
+    <a href="compare-landing.html" class="link-btn">Compare all landings →</a>
+    <a href="compare-trade.html" class="link-btn outline">Compare all trade pages →</a>
+  </div>
+</div>
+
+<!-- DECISION -->
+<div class="decision">
+  <h2>Picking a direction</h2>
+  <p>Two ways to decide:</p>
+  <ul>
+    <li><strong>Pick one outright</strong> — the candidate that nails the design DNA you want. Cleo builds
+    the React frontend against it directly.</li>
+    <li><strong>Hybrid pick</strong> — choose a base candidate, then call out 1–3 elements from other
+    candidates to incorporate. Example: "v3 base, but use v4's status bar and v5's sparklines on the
+    market list."</li>
+  </ul>
+  <p style="margin-top: 16px;">
+    Before deciding, click into each candidate's trade page (the load-bearing UX) and toggle dark/light
+    mode in the header. The trade page reveals more design DNA than the landing.
+  </p>
+</div>
+
+<footer>
+  Generated 2026-05-21 · BellMarkets · Apache 2.0
+</footer>
+
+</div>
+</body>
+</html>

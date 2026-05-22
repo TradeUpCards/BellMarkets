@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BellMarkets — v4 Bloomberg · Landing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root[data-theme="dark"] {
+    --bg: #050810; --panel: #0a0e1a; --panel-2: #0f1422; --panel-3: #141a2a;
+    --border: #1a2236; --border-strong: #283456;
+    --text: #cfd8e8; --text-muted: #6b7794; --text-subtle: #455168;
+    --accent: #06b6d4; --accent-2: #22d3ee; --accent-fg: #050810;
+    --accent-bg: rgba(6, 182, 212, 0.12); --accent-glow: rgba(6, 182, 212, 0.25);
+    --yes: #4ade80; --yes-bg: rgba(74, 222, 128, 0.10);
+    --no: #f87171; --no-bg: rgba(248, 113, 113, 0.10);
+    --amber: #fbbf24; --row-hover: #0f1525;
+    --pink: #f472b6;
+  }
+  :root[data-theme="light"] {
+    --bg: #f0f4fa; --panel: #ffffff; --panel-2: #f7f9fc; --panel-3: #eff3f8;
+    --border: #d6dde8; --border-strong: #b8c2d4;
+    --text: #0a0e1a; --text-muted: #5a6478; --text-subtle: #8b94a8;
+    --accent: #0891b2; --accent-2: #0e7490; --accent-fg: #ffffff;
+    --accent-bg: rgba(8, 145, 178, 0.10); --accent-glow: rgba(8, 145, 178, 0.20);
+    --yes: #16a34a; --yes-bg: rgba(22, 163, 74, 0.10);
+    --no: #dc2626; --no-bg: rgba(220, 38, 38, 0.10);
+    --amber: #d97706; --row-hover: #f0f4fa;
+    --pink: #db2777;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    background: var(--bg); color: var(--text);
+    font-family: 'IBM Plex Sans', system-ui, sans-serif;
+    font-size: 12px; line-height: 1.45;
+    -webkit-font-smoothing: antialiased; transition: background 120ms, color 120ms;
+  }
+  .mono { font-family: 'IBM Plex Mono', monospace; font-variant-numeric: tabular-nums; }
+  a { color: inherit; text-decoration: none; }
+  button { font-family: inherit; cursor: pointer; }
+
+  /* TOP STATUS BAR — terminal style */
+  .top-status {
+    background: var(--panel); border-bottom: 1px solid var(--border);
+    padding: 6px 16px;
+    display: flex; gap: 24px; align-items: center;
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+  }
+  .top-status > div { color: var(--text-muted); }
+  .top-status .label { color: var(--text-subtle); }
+  .top-status .val { color: var(--text); margin-left: 4px; font-weight: 600; }
+  .top-status .val.green { color: var(--yes); }
+  .top-status .val.cyan { color: var(--accent); }
+  .top-status .val.amber { color: var(--amber); }
+  .top-status .pulse {
+    display: inline-block; width: 6px; height: 6px; background: var(--yes);
+    border-radius: 50%; margin-right: 4px;
+    animation: blink 1.5s ease-in-out infinite;
+  }
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  /* HEADER */
+  header.top {
+    background: var(--bg); border-bottom: 1px solid var(--border);
+  }
+  .header-inner {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 16px; max-width: 1600px; margin: 0 auto;
+  }
+  .brand { display: flex; align-items: center; gap: 24px; }
+  .logo {
+    font-family: 'IBM Plex Mono', monospace; font-weight: 700; font-size: 14px;
+    letter-spacing: 0.5px;
+  }
+  .logo .accent { color: var(--accent); }
+  .nav { display: flex; gap: 20px; }
+  .nav a { color: var(--text-muted); font-size: 12px; font-weight: 500; transition: color 120ms; }
+  .nav a.active, .nav a:hover { color: var(--text); }
+  .header-right { display: flex; align-items: center; gap: 8px; }
+  .theme-toggle {
+    background: var(--panel); border: 1px solid var(--border); color: var(--text-muted);
+    padding: 5px 8px; font-size: 11px; font-family: 'IBM Plex Mono', monospace;
+  }
+  .btn-connect {
+    background: var(--accent); color: var(--accent-fg); border: none;
+    padding: 6px 14px; font-size: 12px; font-weight: 700;
+    font-family: 'IBM Plex Mono', monospace;
+    border: 1px solid var(--accent);
+  }
+
+  main { max-width: 1600px; margin: 0 auto; padding: 16px; }
+
+  /* HERO — terminal-style */
+  .hero {
+    background: var(--panel); border: 1px solid var(--border);
+    padding: 24px;
+    margin-bottom: 16px;
+    display: grid; grid-template-columns: 1fr auto; gap: 32px;
+    align-items: center;
+  }
+  .hero h1 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 28px; font-weight: 700; letter-spacing: -0.5px; line-height: 1.15;
+    margin-bottom: 12px;
+  }
+  .hero h1 .accent { color: var(--accent); }
+  .hero p {
+    font-size: 13px; color: var(--text-muted); max-width: 580px;
+    line-height: 1.6;
+  }
+  .hero-actions { display: flex; gap: 8px; margin-top: 16px; }
+  .btn-primary {
+    background: var(--accent); color: var(--accent-fg);
+    padding: 10px 20px; font-family: 'IBM Plex Mono', monospace;
+    font-weight: 700; font-size: 12px; letter-spacing: 0.5px; text-transform: uppercase;
+    border: 1px solid var(--accent);
+  }
+  .btn-secondary {
+    background: transparent; color: var(--text);
+    padding: 10px 20px; font-family: 'IBM Plex Mono', monospace;
+    font-weight: 600; font-size: 12px; letter-spacing: 0.5px; text-transform: uppercase;
+    border: 1px solid var(--border-strong);
+  }
+  .hero-block {
+    background: var(--panel-2); border: 1px solid var(--border);
+    padding: 16px; min-width: 280px;
+  }
+  .hero-block h3 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px; color: var(--text-muted); text-transform: uppercase;
+    letter-spacing: 1px; margin-bottom: 12px; font-weight: 700;
+  }
+  .hero-block .session-stat {
+    display: flex; justify-content: space-between; padding: 4px 0;
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+    border-bottom: 1px dotted var(--border);
+  }
+  .hero-block .session-stat:last-child { border-bottom: none; }
+  .hero-block .session-stat .lbl { color: var(--text-muted); }
+  .hero-block .session-stat .val { color: var(--text); font-weight: 700; }
+  .hero-block .session-stat .val.cyan { color: var(--accent); }
+  .hero-block .session-stat .val.amber { color: var(--amber); }
+
+  /* GRID LAYOUT — Bloomberg multi-panel */
+  .grid-2 {
+    display: grid; grid-template-columns: 1fr 380px; gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  .panel {
+    background: var(--panel); border: 1px solid var(--border);
+  }
+  .panel-h {
+    background: var(--panel-2);
+    padding: 8px 12px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+    text-transform: uppercase; letter-spacing: 1.5px;
+    color: var(--accent); font-weight: 700;
+    border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .panel-h .ts {
+    color: var(--text-subtle); font-size: 10px;
+    font-weight: 500; letter-spacing: 0.5px; text-transform: none;
+  }
+
+  /* MARKETS TABLE — dense */
+  .mkt-thead, .mkt-row {
+    display: grid;
+    grid-template-columns: 60px 80px 70px 70px 70px 70px 70px 70px 70px 70px 70px;
+    gap: 6px; padding: 6px 12px;
+    align-items: center;
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+  }
+  .mkt-thead {
+    background: var(--panel-2);
+    color: var(--text-subtle); text-transform: uppercase;
+    letter-spacing: 0.5px; font-size: 9px; font-weight: 700;
+    border-bottom: 1px solid var(--border);
+  }
+  .mkt-thead > div:not(:first-child):not(:nth-child(2)) { text-align: right; }
+  .mkt-row {
+    border-bottom: 1px solid var(--border);
+    transition: background 80ms; cursor: pointer;
+  }
+  .mkt-row:hover { background: var(--row-hover); }
+  .mkt-row .ticker { font-weight: 700; color: var(--text); }
+  .mkt-row .spot { color: var(--text-muted); text-align: right; }
+  .mkt-row .strike-cell { text-align: right; font-weight: 600; }
+  .mkt-row .strike-cell.itm { color: var(--yes); }
+  .mkt-row .strike-cell.otm { color: var(--no); }
+  .mkt-row .strike-cell.atm { color: var(--accent); }
+
+  /* SIDEBAR — top movers, latest fills */
+  .side-stack { display: flex; flex-direction: column; gap: 16px; }
+
+  .mover-row, .fill-row {
+    display: grid; padding: 5px 12px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+    border-bottom: 1px solid var(--border);
+  }
+  .mover-row { grid-template-columns: 60px 1fr auto; gap: 8px; }
+  .mover-row .ticker { font-weight: 700; }
+  .mover-row .market { color: var(--text-muted); }
+  .mover-row .chg { text-align: right; font-weight: 700; }
+  .mover-row .chg.up { color: var(--yes); }
+  .mover-row .chg.down { color: var(--no); }
+
+  .fill-row { grid-template-columns: 50px 1fr 50px 50px; gap: 8px; }
+  .fill-row .time { color: var(--text-subtle); font-size: 10px; }
+  .fill-row .market { color: var(--text-muted); }
+  .fill-row .side { text-align: right; font-weight: 700; }
+  .fill-row .side.buy { color: var(--yes); }
+  .fill-row .side.sell { color: var(--no); }
+  .fill-row .price { text-align: right; color: var(--text); }
+
+  /* TICKER STRIP */
+  .ticker-bar {
+    background: var(--panel); border: 1px solid var(--border);
+    display: flex; overflow-x: auto;
+  }
+  .ticker-item {
+    padding: 8px 14px; border-right: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+    min-width: 180px; cursor: pointer; transition: background 80ms;
+  }
+  .ticker-item:hover { background: var(--row-hover); }
+  .ticker-item .sym { font-weight: 700; color: var(--text); }
+  .ticker-item .px { color: var(--text-muted); }
+  .ticker-item .ch.up { color: var(--yes); font-weight: 600; }
+  .ticker-item .ch.down { color: var(--no); font-weight: 600; }
+
+  /* HOW STRIP */
+  .how-strip {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    background: var(--border);
+    margin-top: 16px;
+    border: 1px solid var(--border);
+  }
+  .how-step {
+    background: var(--panel); padding: 16px;
+  }
+  .how-step-n {
+    font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+    color: var(--accent); font-weight: 700; letter-spacing: 1px;
+    margin-bottom: 8px;
+  }
+  .how-step h4 { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+  .how-step p { font-size: 11px; color: var(--text-muted); line-height: 1.5; }
+
+  /* FOOTER */
+  footer {
+    background: var(--panel); border-top: 1px solid var(--border);
+    margin-top: 16px; padding: 12px 16px;
+  }
+  .footer-inner {
+    display: flex; justify-content: space-between; align-items: center;
+    font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+    color: var(--text-subtle); letter-spacing: 0.5px;
+  }
+  .footer-links { display: flex; gap: 16px; }
+  .footer-links a { color: var(--text-muted); }
+
+  .mockup-badge {
+    position: fixed; bottom: 12px; left: 12px; z-index: 100;
+    background: var(--panel); border: 1px solid var(--accent); color: var(--accent);
+    padding: 4px 10px; font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+  }
+</style>
+</head>
+<body>
+
+<!-- Top status (terminal bar) -->
+<div class="top-status">
+  <div><span class="pulse"></span><span class="label">CONN:</span><span class="val green">DEVNET</span></div>
+  <div><span class="label">LAT:</span><span class="val">42ms</span></div>
+  <div><span class="label">PYTH:</span><span class="val green">FRESH</span></div>
+  <div><span class="label">SLOT:</span><span class="val cyan">312,847,193</span></div>
+  <div><span class="label">PROG:</span><span class="val">599h7V…kS7uV</span></div>
+  <div><span class="label">SETTLE-IN:</span><span class="val amber">02:13:47</span></div>
+  <div style="margin-left: auto;"><span class="label">TIME:</span><span class="val">14:46:13 ET</span></div>
+</div>
+
+<header class="top">
+  <div class="header-inner">
+    <div class="brand">
+      <a href="v4-landing.html" class="logo">BELL<span class="accent">[.]</span>MARKETS</a>
+      <nav class="nav">
+        <a href="v4-landing.html" class="active">MARKETS</a>
+        <a href="v4-trade.html">TRADE</a>
+        <a href="#">POSITIONS</a>
+        <a href="#">ORDERS</a>
+        <a href="#">HISTORY</a>
+        <a href="#">DOCS</a>
+      </nav>
+    </div>
+    <div class="header-right">
+      <button class="theme-toggle" onclick="toggleTheme()">[ THEME ]</button>
+      <button class="btn-connect">CONNECT WALLET</button>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div>
+      <h1>BINARY <span class="accent">OUTCOME</span> CONTRACTS<br>ON SOLANA DEVNET</h1>
+      <p>
+        Trade YES/NO on daily MAG7 stock closes. Same-day expiry (0DTE).
+        $1.00 USDC payout invariant enforced on-chain. Settled via Pyth oracle at 4:00 PM ET.
+        Permissionless cranks. Non-custodial. Phoenix CLOB.
+      </p>
+      <div class="hero-actions">
+        <button class="btn-primary">LAUNCH TERMINAL →</button>
+        <button class="btn-secondary">DOCS</button>
+      </div>
+    </div>
+    <div class="hero-block">
+      <h3>SESSION · 2026-05-21</h3>
+      <div class="session-stat"><span class="lbl">MARKETS</span><span class="val cyan">35</span></div>
+      <div class="session-stat"><span class="lbl">VOLUME 24H</span><span class="val">$184,723</span></div>
+      <div class="session-stat"><span class="lbl">TRADES 24H</span><span class="val">2,847</span></div>
+      <div class="session-stat"><span class="lbl">ACTIVE WALLETS</span><span class="val">127</span></div>
+      <div class="session-stat"><span class="lbl">OPEN INTEREST</span><span class="val">38,420</span></div>
+      <div class="session-stat"><span class="lbl">SETTLES IN</span><span class="val amber">02:13:47</span></div>
+    </div>
+  </section>
+
+  <!-- Ticker bar -->
+  <div class="ticker-bar">
+    <div class="ticker-item"><span class="sym">AAPL</span><span class="px">$229.84</span><span class="ch up">+0.54%</span></div>
+    <div class="ticker-item"><span class="sym">MSFT</span><span class="px">$441.62</span><span class="ch up">+0.73%</span></div>
+    <div class="ticker-item"><span class="sym">GOOGL</span><span class="px">$184.27</span><span class="ch down">-0.50%</span></div>
+    <div class="ticker-item"><span class="sym">AMZN</span><span class="px">$201.13</span><span class="ch up">+0.20%</span></div>
+    <div class="ticker-item"><span class="sym">NVDA</span><span class="px">$1,342.71</span><span class="ch up">+1.39%</span></div>
+    <div class="ticker-item"><span class="sym">META</span><span class="px">$679.84</span><span class="ch up">+0.32%</span></div>
+    <div class="ticker-item"><span class="sym">TSLA</span><span class="px">$261.04</span><span class="ch down">-0.70%</span></div>
+  </div>
+
+  <div style="height: 16px;"></div>
+
+  <!-- Main grid: markets table + sidebar -->
+  <div class="grid-2">
+
+    <!-- Markets table -->
+    <div class="panel">
+      <div class="panel-h">
+        <span>MARKETS · YES PROBABILITY BY STRIKE</span>
+        <span class="ts">35 active · sorted by volume</span>
+      </div>
+
+      <div class="mkt-thead">
+        <div>TICKER</div><div>SPOT</div>
+        <div>-9%</div><div>-6%</div><div>-3%</div><div>ATM</div><div>+3%</div><div>+6%</div><div>+9%</div>
+        <div>VOL$</div><div>OI</div>
+      </div>
+
+      <a href="v4-trade.html" class="mkt-row">
+        <div class="ticker">META</div><div class="spot">679.84</div>
+        <div class="strike-cell itm">92%</div>
+        <div class="strike-cell itm">84%</div>
+        <div class="strike-cell itm">71%</div>
+        <div class="strike-cell atm">50%</div>
+        <div class="strike-cell otm">28%</div>
+        <div class="strike-cell otm">14%</div>
+        <div class="strike-cell otm">6%</div>
+        <div style="text-align: right; color: var(--text-muted);">42.2K</div>
+        <div style="text-align: right; color: var(--text-muted);">8,420</div>
+      </a>
+      <a href="v4-trade.html" class="mkt-row">
+        <div class="ticker">NVDA</div><div class="spot">1342.71</div>
+        <div class="strike-cell itm">96%</div>
+        <div class="strike-cell itm">88%</div>
+        <div class="strike-cell itm">74%</div>
+        <div class="strike-cell atm">52%</div>
+        <div class="strike-cell otm">31%</div>
+        <div class="strike-cell otm">16%</div>
+        <div class="strike-cell otm">7%</div>
+        <div style="text-align: right; color: var(--text-muted);">61.9K</div>
+        <div style="text-align: right; color: var(--text-muted);">12,148</div>
+      </a>
+      <a href="v4-trade.html" class="mkt-row">
+        <div class="ticker">AAPL</div><div class="spot">229.84</div>
+        <div class="strike-cell itm">94%</div>
+        <div class="strike-cell itm">78%</div>
+        <div class="strike-cell itm">—</div>
+        <div class="strike-cell atm">51%</div>
+        <div class="strike-cell otm">—</div>
+        <div class="strike-cell otm">24%</div>
+        <div class="strike-cell otm">9%</div>
+        <div style="text-align: right; color: var(--text-muted);">28.7K</div>
+        <div style="text-align: right; color: var(--text-muted);">5,729</div>
+      </a>
+      <a href="v4-trade.html" class="mkt-row">
+        <div class="ticker">MSFT</div><div class="spot">441.62</div>
+        <div class="strike-cell itm">95%</div>
+        <div class="strike-cell itm">81%</div>
+        <div class="strike-cell itm">—</div>
+        <div class="strike-cell atm">54%</div>
+        <div class="strike-cell otm">—</div>
+        <div class="strike-cell otm">27%</div>
+        <div class="strike-cell otm">11%</div>
+        <div style="text-align: right; color: var(--text-muted);">19.6K</div>
+        <div style="text-align: right; color: var(--text-muted);">3,920</div>
+      </a>
+      <a href="v4-trade.html" class="mkt-row">
+        <div class="ticker">GOOGL</div><div class="spot">184.27</div>
+        <div class="strike-cell itm">91%</div>
+        <div class="strike-cell itm">—</div>
+        <div class="strike-cell itm">68%</div>
+        <div class="strike-cell atm">—</div>
+        <div class="strike-cell otm">36%</div>
+        <div class="strike-cell otm">—</div>
+        <div class="strike-cell otm">13%</div>
+        <div style="text-align: right; color: var(--text-muted);">12.4K</div>
+        <div style="text-align: right; color: var(--text-muted);">2,481</div>
+      </a>
+      <a href="v4-trade.html" class="mkt-row">
+        <div class="ticker">AMZN</div><div class="spot">201.13</div>
+        <div class="strike-cell itm">93%</div>
+        <div class="strike-cell itm">76%</div>
+        <div class="strike-cell itm">—</div>
+        <div class="strike-cell atm">53%</div>
+        <div class="strike-cell otm">—</div>
+        <div class="strike-cell otm">29%</div>
+        <div class="strike-cell otm">12%</div>
+        <div style="text-align: right; color: var(--text-muted);">16.2K</div>
+        <div style="text-align: right; color: var(--text-muted);">3,247</div>
+      </a>
+      <a href="v4-trade.html" class="mkt-row">
+        <div class="ticker">TSLA</div><div class="spot">261.04</div>
+        <div class="strike-cell itm">85%</div>
+        <div class="strike-cell itm">69%</div>
+        <div class="strike-cell itm">—</div>
+        <div class="strike-cell atm">48%</div>
+        <div class="strike-cell otm">—</div>
+        <div class="strike-cell otm">26%</div>
+        <div class="strike-cell otm">13%</div>
+        <div style="text-align: right; color: var(--text-muted);">23.7K</div>
+        <div style="text-align: right; color: var(--text-muted);">4,756</div>
+      </a>
+    </div>
+
+    <!-- Sidebar: top movers + latest fills -->
+    <aside class="side-stack">
+
+      <div class="panel">
+        <div class="panel-h"><span>TOP MOVERS</span><span class="ts">24h</span></div>
+        <div class="mover-row"><span class="ticker">NVDA</span><span class="market">$1,340 ATM</span><span class="chg up">+1.39%</span></div>
+        <div class="mover-row"><span class="ticker">MSFT</span><span class="market">$440 ATM</span><span class="chg up">+0.73%</span></div>
+        <div class="mover-row"><span class="ticker">TSLA</span><span class="market">$260 ATM</span><span class="chg down">-0.70%</span></div>
+        <div class="mover-row"><span class="ticker">AAPL</span><span class="market">$230 ATM</span><span class="chg up">+0.54%</span></div>
+        <div class="mover-row"><span class="ticker">GOOGL</span><span class="market">$184 ATM</span><span class="chg down">-0.50%</span></div>
+        <div class="mover-row"><span class="ticker">META</span><span class="market">$680 ATM</span><span class="chg up">+0.32%</span></div>
+        <div class="mover-row"><span class="ticker">AMZN</span><span class="market">$200 ATM</span><span class="chg up">+0.20%</span></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-h"><span>LATEST FILLS</span><span class="ts">live · 24 trades</span></div>
+        <div class="fill-row" style="background: var(--panel-2); font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">
+          <span>TIME</span><span>MARKET</span><span style="text-align:right">PX</span><span style="text-align:right">SIDE</span>
+        </div>
+        <div class="fill-row"><span class="time">14:42:18</span><span class="market">META&gt;680</span><span class="price">.51</span><span class="side buy">BUY</span></div>
+        <div class="fill-row"><span class="time">14:42:11</span><span class="market">NVDA&gt;1340</span><span class="price">.48</span><span class="side sell">SELL</span></div>
+        <div class="fill-row"><span class="time">14:41:54</span><span class="market">AAPL&gt;230</span><span class="price">.52</span><span class="side buy">BUY</span></div>
+        <div class="fill-row"><span class="time">14:41:32</span><span class="market">TSLA&gt;260</span><span class="price">.53</span><span class="side sell">SELL</span></div>
+        <div class="fill-row"><span class="time">14:41:08</span><span class="market">META&gt;680</span><span class="price">.50</span><span class="side buy">BUY</span></div>
+        <div class="fill-row"><span class="time">14:40:51</span><span class="market">GOOGL&gt;190</span><span class="price">.37</span><span class="side buy">BUY</span></div>
+        <div class="fill-row"><span class="time">14:40:33</span><span class="market">MSFT&gt;440</span><span class="price">.45</span><span class="side sell">SELL</span></div>
+        <div class="fill-row"><span class="time">14:40:12</span><span class="market">NVDA&gt;1300</span><span class="price">.73</span><span class="side buy">BUY</span></div>
+        <div class="fill-row"><span class="time">14:39:55</span><span class="market">AMZN&gt;200</span><span class="price">.55</span><span class="side buy">BUY</span></div>
+        <div class="fill-row"><span class="time">14:39:42</span><span class="market">META&gt;700</span><span class="price">.28</span><span class="side buy">BUY</span></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-h">PROGRAM</div>
+        <div style="padding: 12px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--text-muted); line-height: 1.7;">
+          <div><span style="color: var(--text-subtle);">ID:</span> <span style="color: var(--text);">599h7V…kS7uV</span></div>
+          <div><span style="color: var(--text-subtle);">Anchor:</span> 0.31.1</div>
+          <div><span style="color: var(--text-subtle);">Solana:</span> 3.1.14 devnet</div>
+          <div><span style="color: var(--text-subtle);">Oracle:</span> Pyth (vendored parser)</div>
+          <div><span style="color: var(--text-subtle);">CLOB:</span> Phoenix v1</div>
+          <div><span style="color: var(--text-subtle);">Cron:</span> Trigger.dev</div>
+          <div><span style="color: var(--text-subtle);">Audit:</span> <span style="color: var(--yes);">passed</span></div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- How -->
+  <div class="how-strip">
+    <div class="how-step">
+      <div class="how-step-n">01 / PICK</div>
+      <h4>SELECT MARKET</h4>
+      <p>Choose ticker + strike. "META &gt; $680 today?"</p>
+    </div>
+    <div class="how-step">
+      <div class="how-step-n">02 / TRADE</div>
+      <h4>EXECUTE</h4>
+      <p>Buy/sell Yes or No. One signature. Phoenix CLOB.</p>
+    </div>
+    <div class="how-step">
+      <div class="how-step-n">03 / SETTLE</div>
+      <h4>PYTH ORACLE</h4>
+      <p>4:00 PM ET close. Permissionless crank. Immutable outcome.</p>
+    </div>
+    <div class="how-step">
+      <div class="how-step-n">04 / REDEEM</div>
+      <h4>CLAIM USDC</h4>
+      <p>Winners: $1.00. Losers: $0.00. Burn tokens → vault releases.</p>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  <div class="footer-inner">
+    <div>© 2026 BELLMARKETS · SOLANA DEVNET · APACHE 2.0 · BUILT FOR PEAK6 / GAUNTLETAI</div>
+    <div class="footer-links">
+      <a href="#">DOCS</a><a href="#">GITHUB</a><a href="#">STATUS</a><a href="#">AUDIT</a>
+    </div>
+  </div>
+</footer>
+
+<div class="mockup-badge">v4 · bloomberg</div>
+
+<script>
+  function toggleTheme() {
+    const root = document.documentElement;
+    const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('bm-theme', next); } catch (e) {}
+  }
+  (function() {
+    try { const s = localStorage.getItem('bm-theme'); if (s === 'light') document.documentElement.setAttribute('data-theme', 'light'); } catch (e) {}
+  })();
+</script>
+
+</body>
+</html>

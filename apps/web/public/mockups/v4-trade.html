@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BellMarkets — v4 Bloomberg · Trade Terminal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root[data-theme="dark"] {
+    --bg: #050810; --panel: #0a0e1a; --panel-2: #0f1422; --panel-3: #141a2a;
+    --border: #1a2236; --border-strong: #283456;
+    --text: #cfd8e8; --text-muted: #6b7794; --text-subtle: #455168;
+    --accent: #06b6d4; --accent-2: #22d3ee; --accent-fg: #050810;
+    --accent-bg: rgba(6, 182, 212, 0.12);
+    --yes: #4ade80; --yes-bg: rgba(74, 222, 128, 0.10);
+    --no: #f87171; --no-bg: rgba(248, 113, 113, 0.10);
+    --amber: #fbbf24; --row-hover: #0f1525;
+  }
+  :root[data-theme="light"] {
+    --bg: #f0f4fa; --panel: #ffffff; --panel-2: #f7f9fc; --panel-3: #eff3f8;
+    --border: #d6dde8; --border-strong: #b8c2d4;
+    --text: #0a0e1a; --text-muted: #5a6478; --text-subtle: #8b94a8;
+    --accent: #0891b2; --accent-2: #0e7490; --accent-fg: #ffffff;
+    --accent-bg: rgba(8, 145, 178, 0.10);
+    --yes: #16a34a; --yes-bg: rgba(22, 163, 74, 0.10);
+    --no: #dc2626; --no-bg: rgba(220, 38, 38, 0.10);
+    --amber: #d97706; --row-hover: #f0f4fa;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    background: var(--bg); color: var(--text);
+    font-family: 'IBM Plex Sans', system-ui, sans-serif;
+    font-size: 11px; line-height: 1.4;
+    -webkit-font-smoothing: antialiased; transition: background 120ms, color 120ms;
+  }
+  .mono { font-family: 'IBM Plex Mono', monospace; font-variant-numeric: tabular-nums; }
+  a { color: inherit; text-decoration: none; }
+  button { font-family: inherit; cursor: pointer; }
+
+  .top-status {
+    background: var(--panel); border-bottom: 1px solid var(--border);
+    padding: 5px 16px; display: flex; gap: 20px; align-items: center;
+    font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+  }
+  .top-status > div { color: var(--text-muted); }
+  .top-status .label { color: var(--text-subtle); }
+  .top-status .val { color: var(--text); margin-left: 4px; font-weight: 600; }
+  .top-status .val.green { color: var(--yes); }
+  .top-status .val.cyan { color: var(--accent); }
+  .top-status .val.amber { color: var(--amber); }
+  .top-status .pulse {
+    display: inline-block; width: 5px; height: 5px; background: var(--yes);
+    border-radius: 50%; margin-right: 3px;
+    animation: blink 1.5s ease-in-out infinite;
+  }
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  header.top { background: var(--bg); border-bottom: 1px solid var(--border); }
+  .header-inner {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 16px;
+  }
+  .brand { display: flex; align-items: center; gap: 20px; }
+  .logo {
+    font-family: 'IBM Plex Mono', monospace; font-weight: 700; font-size: 13px;
+    letter-spacing: 0.5px;
+  }
+  .logo .accent { color: var(--accent); }
+  .nav { display: flex; gap: 18px; }
+  .nav a { color: var(--text-muted); font-size: 11px; font-weight: 500; }
+  .nav a.active, .nav a:hover { color: var(--text); }
+  .header-right { display: flex; align-items: center; gap: 8px; }
+  .theme-toggle {
+    background: var(--panel); border: 1px solid var(--border); color: var(--text-muted);
+    padding: 5px 8px; font-size: 10px; font-family: 'IBM Plex Mono', monospace;
+  }
+  .wallet {
+    display: flex; gap: 8px; padding: 5px 10px;
+    background: var(--panel); border: 1px solid var(--border);
+    font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+  }
+  .wallet .balance { color: var(--accent); font-weight: 700; }
+
+  /* Symbol bar */
+  .symbol-bar {
+    background: var(--panel); border-bottom: 1px solid var(--border);
+    padding: 8px 16px; display: flex; align-items: center; justify-content: space-between;
+  }
+  .symbol-info {
+    display: flex; align-items: center; gap: 16px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  .symbol-info h1 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 16px; font-weight: 700; letter-spacing: 0.5px;
+  }
+  .symbol-info h1 .accent { color: var(--accent); }
+  .symbol-info .stat { display: flex; gap: 4px; font-size: 11px; }
+  .symbol-info .lbl { color: var(--text-subtle); }
+  .symbol-info .val { color: var(--text); font-weight: 600; }
+  .symbol-info .val.up { color: var(--yes); }
+  .symbol-info .val.amber { color: var(--amber); }
+
+  .strike-switch {
+    display: flex; gap: 2px; background: var(--panel-2); padding: 2px;
+    border: 1px solid var(--border);
+  }
+  .strike-btn {
+    padding: 4px 9px; background: transparent; border: none;
+    color: var(--text-muted); font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px; font-weight: 600;
+  }
+  .strike-btn.active { background: var(--accent); color: var(--accent-fg); }
+
+  /* TERMINAL GRID — 4 columns */
+  .terminal {
+    display: grid;
+    grid-template-columns: 260px 1fr 320px 280px;
+    gap: 4px;
+    padding: 4px;
+    height: calc(100vh - 96px); min-height: 700px;
+  }
+
+  .panel {
+    background: var(--panel); border: 1px solid var(--border);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .panel-h {
+    background: var(--panel-2); padding: 5px 10px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 9px;
+    text-transform: uppercase; letter-spacing: 1px;
+    color: var(--accent); font-weight: 700;
+    border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .panel-h .ts { color: var(--text-subtle); font-weight: 500; letter-spacing: 0.5px; text-transform: none; }
+  .panel-h .badge {
+    color: var(--yes); font-size: 9px; font-weight: 700; letter-spacing: 0.5px;
+  }
+
+  /* Column 1: ORDER BOOK */
+  .ob-head {
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    padding: 4px 10px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 9px;
+    color: var(--text-subtle); text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .ob-head > div:nth-child(2), .ob-head > div:nth-child(3) { text-align: right; }
+  .ob-side { flex: 1; overflow-y: auto; }
+  .ob-row {
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    padding: 3px 10px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+    position: relative; cursor: pointer;
+  }
+  .ob-row:hover { background: var(--row-hover); }
+  .ob-row .depth-bar { position: absolute; right: 0; top: 0; bottom: 0; }
+  .ob-row.ask .price { color: var(--no); font-weight: 600; }
+  .ob-row.ask .depth-bar { background: var(--no-bg); }
+  .ob-row.bid .price { color: var(--yes); font-weight: 600; }
+  .ob-row.bid .depth-bar { background: var(--yes-bg); }
+  .ob-row .size, .ob-row .total { text-align: right; color: var(--text-muted); }
+  .ob-spread {
+    background: var(--panel-2); padding: 6px 10px;
+    border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between;
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+  }
+  .ob-spread .last { color: var(--text); font-weight: 700; }
+  .ob-spread .spread { color: var(--text-muted); }
+
+  /* Column 2: CHART + RECENT TRADES */
+  .chart-section { flex: 1; padding: 12px; }
+  .chart-summary {
+    display: flex; gap: 20px; align-items: end;
+    margin-bottom: 12px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  .chart-last {
+    font-size: 32px; font-weight: 700;
+    color: var(--accent); line-height: 1;
+  }
+  .chart-change { font-size: 12px; font-weight: 600; }
+  .chart-change.up { color: var(--yes); }
+  .chart-stats { margin-left: auto; display: flex; gap: 16px; font-size: 10px; }
+  .chart-stat { display: flex; flex-direction: column; gap: 2px; }
+  .chart-stat .lbl { color: var(--text-subtle); }
+  .chart-stat .val { color: var(--text); font-weight: 700; }
+  .chart-viz {
+    height: 240px; position: relative;
+    background:
+      linear-gradient(to top, var(--accent-bg) 0%, transparent 60%),
+      repeating-linear-gradient(0deg, var(--border) 0, var(--border) 1px, transparent 1px, transparent 60px),
+      repeating-linear-gradient(90deg, var(--border) 0, var(--border) 1px, transparent 1px, transparent 80px);
+    border: 1px solid var(--border);
+  }
+  .chart-svg { position: absolute; inset: 0; }
+  .time-tabs {
+    display: flex; gap: 2px; margin-top: 8px; padding: 2px;
+    background: var(--panel-2); border: 1px solid var(--border); width: fit-content;
+  }
+  .time-tab {
+    padding: 4px 8px; background: transparent; border: none;
+    color: var(--text-muted); font-size: 10px; font-weight: 600;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  .time-tab.active { background: var(--accent); color: var(--accent-fg); }
+
+  /* Recent trades under chart */
+  .trades-section {
+    border-top: 1px solid var(--border);
+    max-height: 200px; overflow-y: auto;
+  }
+  .trade-row {
+    display: grid; grid-template-columns: 70px 60px 60px 60px 1fr;
+    padding: 3px 10px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+    border-bottom: 1px solid var(--border);
+  }
+  .trade-row.head {
+    background: var(--panel-2);
+    font-size: 9px; color: var(--text-subtle);
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .trade-row > div:nth-child(2), .trade-row > div:nth-child(3), .trade-row > div:nth-child(4) { text-align: right; }
+  .trade-row .time { color: var(--text-subtle); }
+  .trade-row .px.up { color: var(--yes); font-weight: 600; }
+  .trade-row .px.down { color: var(--no); font-weight: 600; }
+  .trade-row .sz { color: var(--text-muted); }
+  .trade-row .side.buy { color: var(--yes); font-weight: 700; }
+  .trade-row .side.sell { color: var(--no); font-weight: 700; }
+  .trade-row .wallet { color: var(--text-subtle); }
+
+  /* Column 3: TRADE TICKET */
+  .ticket {
+    padding: 10px; display: flex; flex-direction: column; gap: 10px;
+  }
+  .ticket-tabs {
+    display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 2px;
+  }
+  .ticket-tab {
+    padding: 8px; background: var(--panel-2); border: 1px solid var(--border);
+    color: var(--text-muted); font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.3px;
+  }
+  .ticket-tab.buy-yes.active { background: var(--yes-bg); border-color: var(--yes); color: var(--yes); }
+  .ticket-tab.buy-no.active { background: var(--no-bg); border-color: var(--no); color: var(--no); }
+
+  .ticket-row {
+    display: grid; grid-template-columns: 60px 1fr;
+    gap: 8px; align-items: center;
+    padding: 6px 0; border-bottom: 1px solid var(--border);
+  }
+  .ticket-row .lbl {
+    font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+    color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .ticket-row input, .ticket-row select {
+    background: var(--panel-2); border: 1px solid var(--border);
+    color: var(--text); padding: 6px 8px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 12px; font-weight: 700;
+    width: 100%;
+  }
+  .ticket-row input:focus { outline: none; border-color: var(--accent); }
+  .quick {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px;
+    margin-top: 4px;
+  }
+  .quick button {
+    padding: 4px; background: var(--panel-2); border: 1px solid var(--border);
+    color: var(--text-muted); font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px; font-weight: 700;
+  }
+  .quick button:hover { color: var(--accent); border-color: var(--accent); }
+
+  .payoff-grid {
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px;
+    padding: 8px; background: var(--panel-2); border: 1px solid var(--border);
+    margin-top: 6px;
+  }
+  .payoff-cell { display: flex; flex-direction: column; gap: 2px; }
+  .payoff-cell .lbl { font-family: 'IBM Plex Mono', monospace; font-size: 8px; color: var(--text-subtle); text-transform: uppercase; letter-spacing: 0.5px; }
+  .payoff-cell .val { font-family: 'IBM Plex Mono', monospace; font-size: 13px; font-weight: 700; }
+  .payoff-cell .val.win { color: var(--yes); }
+  .payoff-cell .val.loss { color: var(--no); }
+
+  .submit {
+    margin-top: 6px;
+    width: 100%; padding: 12px;
+    background: var(--yes); border: none; color: var(--accent-fg);
+    font-family: 'IBM Plex Mono', monospace; font-size: 12px;
+    font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+  }
+  .submit:hover { filter: brightness(1.1); }
+
+  .ticket-summary {
+    padding: 8px; background: var(--panel-2); border: 1px solid var(--border);
+    font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+  }
+  .ticket-summary > div {
+    display: flex; justify-content: space-between; padding: 2px 0;
+  }
+  .ticket-summary .lbl { color: var(--text-subtle); }
+  .ticket-summary .val { color: var(--text); font-weight: 600; }
+
+  /* Column 4: POSITIONS + MARKET DETAIL */
+  .info-rows { padding: 4px 10px 10px; }
+  .info-row {
+    display: flex; justify-content: space-between;
+    padding: 4px 0; border-bottom: 1px dotted var(--border);
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+  }
+  .info-row:last-child { border-bottom: none; }
+  .info-row .lbl { color: var(--text-muted); }
+  .info-row .val { color: var(--text); font-weight: 600; }
+  .info-row .val.accent { color: var(--accent); }
+  .info-row .val.amber { color: var(--amber); }
+  .info-row .val.up { color: var(--yes); }
+  .info-row .val.down { color: var(--no); }
+
+  .pos-card { padding: 10px; border-bottom: 1px solid var(--border); }
+  .pos-card:last-child { border-bottom: none; }
+  .pos-head {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 6px;
+  }
+  .pos-side {
+    font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+    font-weight: 700; padding: 2px 6px;
+  }
+  .pos-side.yes { background: var(--yes-bg); color: var(--yes); }
+  .pos-side.no { background: var(--no-bg); color: var(--no); }
+  .pos-pnl { font-family: 'IBM Plex Mono', monospace; font-weight: 700; font-size: 11px; }
+  .pos-pnl.up { color: var(--yes); }
+  .pos-pnl.down { color: var(--no); }
+  .pos-stats {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+  }
+  .pos-stats .lbl { color: var(--text-subtle); font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .pos-stats .val { color: var(--text); font-weight: 600; }
+
+  .mockup-badge {
+    position: fixed; bottom: 8px; left: 8px; z-index: 100;
+    background: var(--panel); border: 1px solid var(--accent); color: var(--accent);
+    padding: 3px 8px; font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+  }
+</style>
+</head>
+<body>
+
+<div class="top-status">
+  <div><span class="pulse"></span><span class="label">CONN:</span><span class="val green">DEVNET</span></div>
+  <div><span class="label">LAT:</span><span class="val">42ms</span></div>
+  <div><span class="label">PYTH:</span><span class="val green">FRESH</span></div>
+  <div><span class="label">SLOT:</span><span class="val cyan">312,847,193</span></div>
+  <div><span class="label">PROG:</span><span class="val">599h7V…kS7uV</span></div>
+  <div><span class="label">SETTLE-IN:</span><span class="val amber">02:13:47</span></div>
+  <div style="margin-left: auto;"><span class="label">TIME:</span><span class="val">14:46:13 ET</span></div>
+</div>
+
+<header class="top">
+  <div class="header-inner">
+    <div class="brand">
+      <a href="v4-landing.html" class="logo">BELL<span class="accent">[.]</span>MARKETS</a>
+      <nav class="nav">
+        <a href="v4-landing.html">MARKETS</a>
+        <a href="v4-trade.html" class="active">TRADE</a>
+        <a href="#">POSITIONS</a>
+        <a href="#">ORDERS</a>
+        <a href="#">HISTORY</a>
+      </nav>
+    </div>
+    <div class="header-right">
+      <button class="theme-toggle" onclick="toggleTheme()">[ THEME ]</button>
+      <div class="wallet"><span class="balance">$123.45 USDC</span><span style="color: var(--text-muted);">4aPZ…G2iy</span></div>
+    </div>
+  </div>
+</header>
+
+<div class="symbol-bar">
+  <div class="symbol-info">
+    <h1>META <span class="accent">&gt;</span> 680</h1>
+    <div class="stat"><span class="lbl">SPOT</span><span class="val">$679.84</span></div>
+    <div class="stat"><span class="lbl">CHG</span><span class="val up">+0.32%</span></div>
+    <div class="stat"><span class="lbl">VOL</span><span class="val">$42,184</span></div>
+    <div class="stat"><span class="lbl">OI</span><span class="val">8,420</span></div>
+    <div class="stat"><span class="lbl">IMPL</span><span class="val" style="color: var(--accent);">50%</span></div>
+    <div class="stat"><span class="lbl">EXP-IN</span><span class="val amber">02:13:47</span></div>
+  </div>
+  <div class="strike-switch">
+    <button class="strike-btn">620</button>
+    <button class="strike-btn">640</button>
+    <button class="strike-btn">660</button>
+    <button class="strike-btn active">680</button>
+    <button class="strike-btn">700</button>
+    <button class="strike-btn">720</button>
+    <button class="strike-btn">740</button>
+  </div>
+</div>
+
+<!-- 4-COLUMN TERMINAL GRID -->
+<div class="terminal">
+
+  <!-- COL 1: ORDER BOOK -->
+  <div class="panel">
+    <div class="panel-h"><span>ORDER BOOK · L2</span><span class="badge">LIVE</span></div>
+    <div class="ob-head"><div>PX</div><div>SIZE</div><div>TOTAL</div></div>
+    <div class="ob-side" style="display: flex; flex-direction: column;">
+      <div class="ob-row ask"><div class="depth-bar" style="width: 8%"></div><span class="price">0.5650</span><span class="size">820</span><span class="total">3,184</span></div>
+      <div class="ob-row ask"><div class="depth-bar" style="width: 12%"></div><span class="price">0.5600</span><span class="size">1,220</span><span class="total">2,364</span></div>
+      <div class="ob-row ask"><div class="depth-bar" style="width: 18%"></div><span class="price">0.5550</span><span class="size">490</span><span class="total">1,144</span></div>
+      <div class="ob-row ask"><div class="depth-bar" style="width: 14%"></div><span class="price">0.5500</span><span class="size">375</span><span class="total">654</span></div>
+      <div class="ob-row ask"><div class="depth-bar" style="width: 24%"></div><span class="price">0.5450</span><span class="size">722</span><span class="total">279</span></div>
+      <div class="ob-row ask"><div class="depth-bar" style="width: 12%"></div><span class="price">0.5400</span><span class="size">377</span><span class="total">377</span></div>
+    </div>
+    <div class="ob-spread"><span class="last">$0.5200 ↑</span><span class="spread">spr 0.04 · 7.7%</span></div>
+    <div class="ob-side" style="display: flex; flex-direction: column;">
+      <div class="ob-row bid"><div class="depth-bar" style="width: 20%"></div><span class="price">0.5000</span><span class="size">560</span><span class="total">560</span></div>
+      <div class="ob-row bid"><div class="depth-bar" style="width: 16%"></div><span class="price">0.4950</span><span class="size">440</span><span class="total">1,000</span></div>
+      <div class="ob-row bid"><div class="depth-bar" style="width: 30%"></div><span class="price">0.4900</span><span class="size">830</span><span class="total">1,830</span></div>
+      <div class="ob-row bid"><div class="depth-bar" style="width: 10%"></div><span class="price">0.4850</span><span class="size">270</span><span class="total">2,100</span></div>
+      <div class="ob-row bid"><div class="depth-bar" style="width: 22%"></div><span class="price">0.4800</span><span class="size">610</span><span class="total">2,710</span></div>
+      <div class="ob-row bid"><div class="depth-bar" style="width: 14%"></div><span class="price">0.4750</span><span class="size">395</span><span class="total">3,105</span></div>
+    </div>
+  </div>
+
+  <!-- COL 2: CHART + TRADES -->
+  <div class="panel">
+    <div class="panel-h"><span>PRICE · META &gt; 680 (YES)</span><span class="ts">5m candles · live</span></div>
+    <div class="chart-section">
+      <div class="chart-summary">
+        <div class="chart-last mono">0.5200</div>
+        <div class="chart-change up mono">+0.040 (+8.3%)</div>
+        <div class="chart-stats">
+          <div class="chart-stat"><div class="lbl">OPEN</div><div class="val mono">0.480</div></div>
+          <div class="chart-stat"><div class="lbl">HIGH</div><div class="val mono">0.545</div></div>
+          <div class="chart-stat"><div class="lbl">LOW</div><div class="val mono">0.460</div></div>
+          <div class="chart-stat"><div class="lbl">VWAP</div><div class="val mono">0.504</div></div>
+        </div>
+      </div>
+      <div class="chart-viz">
+        <svg class="chart-svg" viewBox="0 0 800 240" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="g4" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#06b6d4" stop-opacity="0.5"/>
+              <stop offset="100%" stop-color="#06b6d4" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <path d="M 0,200 L 40,195 L 80,190 L 120,185 L 160,170 L 200,165 L 240,150 L 280,160 L 320,140 L 360,125 L 400,135 L 440,110 L 480,115 L 520,90 L 560,95 L 600,75 L 640,80 L 680,60 L 720,65 L 760,50 L 800,45 L 800,240 L 0,240 Z" fill="url(#g4)"/>
+          <polyline points="0,200 40,195 80,190 120,185 160,170 200,165 240,150 280,160 320,140 360,125 400,135 440,110 480,115 520,90 560,95 600,75 640,80 680,60 720,65 760,50 800,45" fill="none" stroke="#06b6d4" stroke-width="1.5"/>
+          <circle cx="800" cy="45" r="3" fill="#06b6d4"/>
+        </svg>
+      </div>
+      <div class="time-tabs">
+        <button class="time-tab">1m</button>
+        <button class="time-tab active">5m</button>
+        <button class="time-tab">15m</button>
+        <button class="time-tab">1h</button>
+        <button class="time-tab">4h</button>
+        <button class="time-tab">1d</button>
+      </div>
+    </div>
+    <div class="trades-section">
+      <div class="trade-row head"><div>TIME</div><div>PX</div><div>SIZE</div><div>SIDE</div><div>WALLET</div></div>
+      <div class="trade-row"><div class="time">14:42:18</div><div class="px up">.5200</div><div class="sz">200</div><div class="side buy">BUY</div><div class="wallet">8Tz9…f4Lp</div></div>
+      <div class="trade-row"><div class="time">14:42:11</div><div class="px down">.4800</div><div class="sz">500</div><div class="side sell">SELL</div><div class="wallet">3Hx2…a9Vm</div></div>
+      <div class="trade-row"><div class="time">14:41:54</div><div class="px up">.5200</div><div class="sz">100</div><div class="side buy">BUY</div><div class="wallet">4aPZ…G2iy</div></div>
+      <div class="trade-row"><div class="time">14:41:32</div><div class="px up">.5100</div><div class="sz">75</div><div class="side buy">BUY</div><div class="wallet">2Rt7…h8Zq</div></div>
+      <div class="trade-row"><div class="time">14:41:08</div><div class="px down">.5000</div><div class="sz">320</div><div class="side sell">SELL</div><div class="wallet">7Fy3…b1Wn</div></div>
+      <div class="trade-row"><div class="time">14:40:51</div><div class="px up">.5100</div><div class="sz">180</div><div class="side buy">BUY</div><div class="wallet">5Kp9…m6Xy</div></div>
+      <div class="trade-row"><div class="time">14:40:33</div><div class="px down">.4900</div><div class="sz">450</div><div class="side sell">SELL</div><div class="wallet">9q5S…rVBN</div></div>
+    </div>
+  </div>
+
+  <!-- COL 3: TICKET -->
+  <div class="panel">
+    <div class="panel-h"><span>ORDER TICKET</span><span class="ts">META &gt; 680</span></div>
+    <div class="ticket">
+      <div class="ticket-tabs">
+        <button class="ticket-tab buy-yes active">BUY YES</button>
+        <button class="ticket-tab buy-no">BUY NO</button>
+        <button class="ticket-tab buy-yes">SELL Y</button>
+        <button class="ticket-tab buy-no">SELL N</button>
+      </div>
+
+      <div class="ticket-row">
+        <div class="lbl">TYPE</div>
+        <select><option>MARKET</option><option>LIMIT</option></select>
+      </div>
+      <div class="ticket-row">
+        <div class="lbl">SIZE</div>
+        <input value="200" placeholder="0">
+      </div>
+      <div class="ticket-row" style="grid-template-columns: 60px 1fr;">
+        <div class="lbl"></div>
+        <div class="quick">
+          <button>25%</button><button>50%</button><button>75%</button><button>MAX</button>
+        </div>
+      </div>
+      <div class="ticket-row">
+        <div class="lbl">PRICE</div>
+        <input value="0.5200" disabled style="opacity: 0.6;">
+      </div>
+
+      <div class="payoff-grid">
+        <div class="payoff-cell"><div class="lbl">PAY</div><div class="val">$104</div></div>
+        <div class="payoff-cell"><div class="lbl">WIN</div><div class="val win">+$96</div></div>
+        <div class="payoff-cell"><div class="lbl">LOSS</div><div class="val loss">-$104</div></div>
+      </div>
+
+      <button class="submit">BUY YES · 200 @ 0.5200</button>
+
+      <div class="ticket-summary">
+        <div><span class="lbl">CONTRACTS</span><span class="val">200 YES</span></div>
+        <div><span class="lbl">AVG FILL</span><span class="val">$0.5200</span></div>
+        <div><span class="lbl">SLIPPAGE</span><span class="val">+$0.012</span></div>
+        <div><span class="lbl">FEES</span><span class="val">$0.00</span></div>
+        <div><span class="lbl">TOTAL</span><span class="val">$104.00</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- COL 4: POSITIONS + MARKET DATA -->
+  <div style="display: flex; flex-direction: column; gap: 4px;">
+    <div class="panel">
+      <div class="panel-h">YOUR POSITION</div>
+      <div class="pos-card">
+        <div class="pos-head">
+          <span class="pos-side yes">YES · 5</span>
+          <span class="pos-pnl up">+$0.10</span>
+        </div>
+        <div class="pos-stats">
+          <div><div class="lbl">ENTRY</div><div class="val">$0.62</div></div>
+          <div><div class="lbl">MARK</div><div class="val">$0.64</div></div>
+          <div><div class="lbl">COST</div><div class="val">$3.10</div></div>
+          <div><div class="lbl">VALUE</div><div class="val">$3.20</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-h">MARKET DATA</div>
+      <div class="info-rows">
+        <div class="info-row"><span class="lbl">strike</span><span class="val">$680.00</span></div>
+        <div class="info-row"><span class="lbl">expiry</span><span class="val">4:00 PM ET</span></div>
+        <div class="info-row"><span class="lbl">countdown</span><span class="val amber">02:13:47</span></div>
+        <div class="info-row"><span class="lbl">implied %</span><span class="val accent">50.0%</span></div>
+        <div class="info-row"><span class="lbl">yes bid</span><span class="val up">$0.500</span></div>
+        <div class="info-row"><span class="lbl">yes ask</span><span class="val down">$0.540</span></div>
+        <div class="info-row"><span class="lbl">no bid</span><span class="val up">$0.460</span></div>
+        <div class="info-row"><span class="lbl">no ask</span><span class="val down">$0.500</span></div>
+        <div class="info-row"><span class="lbl">spread</span><span class="val">$0.040</span></div>
+        <div class="info-row"><span class="lbl">spread %</span><span class="val">7.7%</span></div>
+        <div class="info-row"><span class="lbl">vwap</span><span class="val">$0.504</span></div>
+        <div class="info-row"><span class="lbl">volume</span><span class="val">$42,184</span></div>
+        <div class="info-row"><span class="lbl">open int.</span><span class="val">8,420</span></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-h">ON-CHAIN</div>
+      <div class="info-rows">
+        <div class="info-row"><span class="lbl">market pda</span><span class="val" style="font-size: 10px;">9q5S…rVBN</span></div>
+        <div class="info-row"><span class="lbl">yes mint</span><span class="val" style="font-size: 10px;">2Yz8…h1Qx</span></div>
+        <div class="info-row"><span class="lbl">no mint</span><span class="val" style="font-size: 10px;">3Nb9…k2Lr</span></div>
+        <div class="info-row"><span class="lbl">vault</span><span class="val" style="font-size: 10px;">5Tg7…n3Mz</span></div>
+        <div class="info-row"><span class="lbl">pyth feed</span><span class="val" style="font-size: 10px;">8Tz9…f4Lp</span></div>
+        <div class="info-row"><span class="lbl">phoenix</span><span class="val" style="font-size: 10px;">6Wq4…d8Yj</span></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="mockup-badge">v4 · bloomberg · terminal</div>
+
+<script>
+  function toggleTheme() {
+    const root = document.documentElement;
+    const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('bm-theme', next); } catch (e) {}
+  }
+  (function() {
+    try { const s = localStorage.getItem('bm-theme'); if (s === 'light') document.documentElement.setAttribute('data-theme', 'light'); } catch (e) {}
+  })();
+</script>
+
+</body>
+</html>
