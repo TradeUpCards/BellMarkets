@@ -57,7 +57,7 @@ A reviewer landing on `/` should immediately read it as "this team understands w
 
 ### Color + theme
 
-- **Dark mode default, never offer light.** Black bg (`#0a0a0a` or `#000`), near-black panels (`#0f0f0f`-`#141414`), white-on-grey text, accents only on actionable elements.
+- **Dark mode default with light mode toggle available.** Default dark on every page load. Toggle in the header lets users switch to light. Dark palette: black bg (`#0a0a0a` or `#000`), near-black panels (`#0f0f0f`-`#141414`), white-on-grey text. Light palette: white bg, off-white panels (`#fafafa`-`#f5f5f5`), dark-grey text. Accent colors hold the same hue but adjust brightness/saturation per mode. Each component must render correctly in BOTH modes — verified in design QA before merge.
 - **Trading color semantics:**
   - **Green** = Yes / bullish / win / profit. Use a green that reads "money green" (e.g., `#10b981`, `#22c55e`, or Polymarket-style). NOT a neutral green.
   - **Red** = No / bearish / loss. Specifically `#ef4444` or similar; matches Polymarket/Drift.
@@ -137,7 +137,7 @@ A reviewer landing on `/` should immediately read it as "this team understands w
 | Brand accent color | Electric violet `#8b5cf6` (suggested) | Distinct from green (Yes) and red (No); high contrast on black; reads "modern DeFi" without copying any specific competitor. **Cleo can override** if she has a stronger candidate. |
 | Font primary | Geist Sans (already shadcn default in apps/web) | Modern, neutral, doesn't feel like Inter-default-look. |
 | Font numerics | JetBrains Mono (already installed) | Universal trading-app convention. |
-| Dark mode | Default and only. No light mode toggle. | Trading apps are universally dark. Toggle = wasted UI surface. |
+| Dark mode | Default on page load. Light mode toggle available in header. Toggle persists per user via localStorage. | Trading apps are universally dark-default, but offering a light option is a positive differentiator (signals "we considered preference / accessibility"). Cost: ~1-2hrs of Cleo time across pages to test both palettes; benefit: graders who use light mode notice the polish. |
 
 ---
 
