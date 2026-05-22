@@ -4,12 +4,13 @@
 // failing after the window, alerts the admin for manual `admin_settle`
 // (which has its own ≥1hr on-chain delay gate — Hard YES #7).
 //
-// Day-1 status: stub — no on-chain calls yet. The job logs that it
-// *would* settle the day's open markets and exits successfully.
+// Day-2 status: stub. The settlement loop body is Day-3 work (real
+// settle_market wiring + the 30s × 15min retry harness). Day-2 scope
+// (per Cory's dispatch) was the morning-create-markets wiring only.
 //
 // Cron: `5 21 * * 1-5` = 4:05 PM ET on US weekdays during EDT (UTC-4).
 // DST: the EST half of the year needs `5 22 * * 1-5` instead. Same
-// known-issue tracking as morning.ts. Out of scope for Day 1.
+// known-issue tracking as morning.ts.
 //
 // DR-002 hard rule: settle_market is permissionless. This nudger is a
 // convenience caller, not an authority. Removing the nudger entirely
@@ -26,22 +27,26 @@ export const settlementNudgerJob = schedules.task({
   maxDuration: 900, // 15min — matches the PRD-mandated retry window
   run: async (payload, { ctx }) => {
     const config = loadConfig();
-    const logBase = { jobId: "settlement-nudger", runAt: payload.timestamp.toISOString(), ctxRunId: ctx.run.id };
+    const logBase = {
+      jobId: "settlement-nudger",
+      runAt: payload.timestamp.toISOString(),
+      ctxRunId: ctx.run.id,
+    };
 
-    if (!config.programId) {
+    if (!config.bellMarketsProgramId) {
       console.info(
         JSON.stringify({
           ...logBase,
           stub: true,
-          reason: "PROGRAM_ID not yet configured — Aria's program is not deployed. Would iterate open StrikeMarket accounts and call settle_market on each.",
+          reason: "BELL_MARKETS_PROGRAM_ID unset — log-only stub. Would iterate open StrikeMarket accounts and call settle_market on each.",
         }),
       );
       return { ok: true, stub: true } as const;
     }
 
-    requireConfig(config, ["heliusRpcUrl", "programId", "adminKeypairPath"]);
+    requireConfig(config, ["heliusRpcUrl", "bellMarketsProgramId", "platformAdminKeypairPath"]);
     throw new Error(
-      "settlement-nudger: config is complete but on-chain wiring is not implemented yet. Unset PROGRAM_ID until Aria's program is deployed.",
+      "settlement-nudger: config is complete but on-chain wiring is Day-3 scope. Unset BELL_MARKETS_PROGRAM_ID until the settle_market loop + retry harness are wired.",
     );
   },
 });

@@ -37,6 +37,13 @@ export type PreviousCloseResponse = {
   ticker: Ticker;
   /** USD, human-readable (e.g., 680 for $680). */
   price: number;
+  /**
+   * Pyth feed exponent (typically -8 for US equity feeds). Needed by the
+   * caller to scale strike prices into the same i64 representation the
+   * on-chain settle handler compares against (oracle.rs returns `i64 price`
+   * + `i32 expo` in the same units).
+   */
+  expo: number;
   /** Timestamp of the previous-close read (unix seconds). */
   publishTime: number;
 };
@@ -132,5 +139,5 @@ export function parsePreviousCloseResponse(ticker: Ticker, body: unknown): Previ
     throw new PythClientError(`Pyth price decoded to non-positive value for ${ticker}`);
   }
   const publishTime = priceField.publish_time ?? 0;
-  return { ticker, price: humanPrice, publishTime };
+  return { ticker, price: humanPrice, expo: priceField.expo, publishTime };
 }
