@@ -1,0 +1,1459 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BellMarkets — v6 Pulse · Trade · META &gt; $680</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root[data-theme="dark"] {
+    --bg: #0a0a0c; --bg-elevated: #0f0f12; --panel: #14141a; --panel-2: #1a1a22; --panel-3: #22222c;
+    --border: #1f1f28; --border-strong: #2a2a36; --border-glow: rgba(251, 146, 60, 0.25);
+    --text: #f5f5f7; --text-muted: #9ca3af; --text-subtle: #6b7280;
+    --accent: #fb923c; --accent-2: #f97316; --accent-3: #ea580c; --accent-fg: #0a0a0c;
+    --accent-bg: rgba(251, 146, 60, 0.10); --accent-bg-strong: rgba(251, 146, 60, 0.20);
+    --accent-glow: rgba(251, 146, 60, 0.18);
+    --accent-gradient: linear-gradient(135deg, #fb923c 0%, #f43f5e 100%);
+    --yes: #22c55e; --yes-bg: rgba(34, 197, 94, 0.10); --yes-strong: #16a34a;
+    --yes-gradient: linear-gradient(135deg, #22c55e 0%, #10b981 100%);
+    --no: #ef4444; --no-bg: rgba(239, 68, 68, 0.10); --no-strong: #dc2626;
+    --no-gradient: linear-gradient(135deg, #ef4444 0%, #f97316 100%);
+    --amber: #fbbf24; --row-hover: #1c1c24;
+  }
+  :root[data-theme="light"] {
+    --bg: #fafaf7; --bg-elevated: #ffffff; --panel: #ffffff; --panel-2: #f5f5f0; --panel-3: #ebebe5;
+    --border: #e5e5e0; --border-strong: #d4d4cf; --border-glow: rgba(234, 88, 12, 0.25);
+    --text: #0a0a0c; --text-muted: #6b6b75; --text-subtle: #a3a3ad;
+    --accent: #ea580c; --accent-2: #c2410c; --accent-3: #9a3412; --accent-fg: #ffffff;
+    --accent-bg: rgba(234, 88, 12, 0.10); --accent-bg-strong: rgba(234, 88, 12, 0.18);
+    --accent-glow: rgba(234, 88, 12, 0.20);
+    --accent-gradient: linear-gradient(135deg, #ea580c 0%, #db2777 100%);
+    --yes: #16a34a; --yes-bg: rgba(22, 163, 74, 0.10); --yes-strong: #15803d;
+    --yes-gradient: linear-gradient(135deg, #16a34a 0%, #059669 100%);
+    --no: #dc2626; --no-bg: rgba(220, 38, 38, 0.10); --no-strong: #b91c1c;
+    --no-gradient: linear-gradient(135deg, #dc2626 0%, #ea580c 100%);
+    --amber: #d97706; --row-hover: #f0f0eb;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Geist', sans-serif; font-size: 13px; line-height: 1.5;
+    letter-spacing: -0.01em; -webkit-font-smoothing: antialiased;
+    transition: background 200ms, color 200ms;
+  }
+  body {
+    background-image:
+      radial-gradient(ellipse 80% 50% at 50% -20%, var(--accent-glow), transparent 60%);
+    background-attachment: fixed;
+    min-height: 100vh;
+  }
+  .mono { font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; }
+  a { color: inherit; text-decoration: none; }
+  button { font-family: inherit; cursor: pointer; }
+
+  /* ===== HEADER (same as landing) ===== */
+  header.top {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(10, 10, 12, 0.7);
+    backdrop-filter: blur(20px) saturate(180%);
+    border-bottom: 1px solid var(--border);
+  }
+  :root[data-theme="light"] header.top { background: rgba(250, 250, 247, 0.7); }
+  .header-inner {
+    display: grid; grid-template-columns: auto 1fr auto;
+    gap: 24px; align-items: center; padding: 12px 24px;
+    max-width: 1700px; margin: 0 auto;
+  }
+  .brand { display: flex; align-items: center; gap: 28px; }
+  .logo {
+    font-weight: 800; font-size: 16px; letter-spacing: -0.04em;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .logo-mark {
+    width: 26px; height: 26px;
+    background: var(--accent-gradient);
+    border-radius: 7px; position: relative;
+    box-shadow: 0 0 14px var(--accent-glow);
+  }
+  .logo-mark::before {
+    content: ""; position: absolute; inset: 4px; background: var(--bg); border-radius: 3px;
+  }
+  .logo-mark::after {
+    content: ""; position: absolute; inset: 7px; background: var(--accent); border-radius: 2px;
+  }
+  .nav { display: flex; gap: 22px; font-size: 13px; font-weight: 500; }
+  .nav a { color: var(--text-muted); transition: color 150ms; position: relative; padding: 6px 0; }
+  .nav a:hover { color: var(--text); }
+  .nav a.active { color: var(--text); }
+  .nav a.active::after {
+    content: ""; position: absolute; bottom: -1px; left: 0; right: 0;
+    height: 2px; background: var(--accent); border-radius: 2px;
+  }
+  .searchbar { position: relative; max-width: 320px; margin: 0 auto; width: 100%; }
+  .searchbar input {
+    width: 100%; background: var(--panel-2); border: 1px solid var(--border);
+    color: var(--text); padding: 7px 12px 7px 34px; border-radius: 8px;
+    font-size: 12px; font-family: inherit; transition: all 150ms;
+  }
+  .searchbar input:focus {
+    outline: none; border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+  }
+  .searchbar-icon {
+    position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+    color: var(--text-subtle); font-size: 13px;
+  }
+  .searchbar-kbd {
+    position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+    background: var(--panel-3); border: 1px solid var(--border);
+    padding: 1px 5px; border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    color: var(--text-subtle);
+  }
+  .header-right { display: flex; align-items: center; gap: 8px; }
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 10px; background: var(--panel); border: 1px solid var(--border);
+    border-radius: 999px; font-size: 11px;
+    font-family: 'JetBrains Mono', monospace; color: var(--text-muted);
+  }
+  .status-pill .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--yes); box-shadow: 0 0 8px var(--yes);
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 6px var(--yes); opacity: 1; }
+    50% { box-shadow: 0 0 14px var(--yes); opacity: 0.7; }
+  }
+  .theme-toggle {
+    width: 30px; height: 30px;
+    background: var(--panel); border: 1px solid var(--border);
+    color: var(--text-muted); border-radius: 8px;
+    transition: all 150ms;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .theme-toggle:hover { color: var(--text); }
+  .wallet {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--panel); border: 1px solid var(--border);
+    padding: 6px 12px; border-radius: 999px;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  }
+  .wallet .balance {
+    color: var(--accent); font-weight: 700;
+  }
+  .wallet .addr { color: var(--text-muted); }
+
+  /* ===== MARKET TITLE BAR ===== */
+  .market-bar {
+    max-width: 1700px; margin: 0 auto; padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+  }
+  .market-bar-top {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 16px;
+  }
+  .market-title-block {
+    display: flex; align-items: center; gap: 16px;
+  }
+  .market-title-mark {
+    width: 48px; height: 48px;
+    background: var(--accent-bg);
+    border: 1px solid var(--accent);
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace; font-weight: 800; font-size: 17px;
+    color: var(--accent);
+    box-shadow: 0 0 20px var(--accent-glow);
+  }
+  .market-title h1 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 24px; font-weight: 700; letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+  .market-title h1 .gt { color: var(--accent); margin: 0 4px; }
+  .market-title-sub {
+    color: var(--text-muted); font-size: 12px; margin-top: 2px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .market-title-sub .meta-chip {
+    background: var(--panel); border: 1px solid var(--border);
+    padding: 2px 8px; border-radius: 999px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    color: var(--text);
+  }
+  .market-title-sub .meta-chip.live {
+    background: var(--yes-bg); border-color: var(--yes); color: var(--yes);
+    display: flex; align-items: center; gap: 5px;
+  }
+  .market-title-sub .meta-chip.live::before {
+    content: ""; width: 5px; height: 5px; background: var(--yes); border-radius: 50%;
+    animation: pulse-glow 1.5s ease-in-out infinite;
+  }
+
+  .market-nav-controls {
+    display: flex; gap: 8px;
+  }
+  .nav-arrow-btn, .market-switcher-btn {
+    padding: 8px 14px;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text);
+    font-size: 12px; font-weight: 600;
+    display: flex; align-items: center; gap: 6px;
+    transition: all 150ms;
+  }
+  .nav-arrow-btn:hover, .market-switcher-btn:hover {
+    border-color: var(--accent); color: var(--accent);
+  }
+  .market-switcher-btn { gap: 8px; }
+  .market-switcher-btn kbd {
+    background: var(--panel-3); border: 1px solid var(--border);
+    padding: 1px 5px; border-radius: 3px;
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    color: var(--text-subtle);
+  }
+
+  /* Stats row */
+  .market-stats {
+    display: grid; grid-template-columns: repeat(7, 1fr);
+    gap: 1px; background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 10px; overflow: hidden;
+  }
+  .market-stat {
+    background: var(--panel);
+    padding: 12px 16px;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .market-stat .lbl {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 1.2px;
+    color: var(--text-subtle); font-weight: 600;
+  }
+  .market-stat .val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 16px; font-weight: 700; letter-spacing: -0.01em;
+  }
+  .market-stat .val.up { color: var(--yes); }
+  .market-stat .val.down { color: var(--no); }
+  .market-stat .val.accent { color: var(--accent); }
+  .market-stat .val.amber { color: var(--amber); }
+  .market-stat .delta {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    color: var(--text-subtle);
+  }
+
+  /* ===== STRIKE PILLS ===== */
+  .strike-pills {
+    max-width: 1700px; margin: 0 auto; padding: 14px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px;
+  }
+  .strike-pills-label {
+    font-size: 11px; color: var(--text-muted); font-weight: 600;
+    text-transform: uppercase; letter-spacing: 1px;
+  }
+  .strike-pills-track { display: flex; gap: 6px; flex: 1; overflow-x: auto; }
+  .strike-pill {
+    flex-shrink: 0;
+    display: flex; flex-direction: column; gap: 1px; align-items: center;
+    padding: 8px 14px;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; cursor: pointer;
+    transition: all 150ms; min-width: 76px;
+    position: relative;
+  }
+  .strike-pill:hover { border-color: var(--border-strong); background: var(--panel-2); }
+  .strike-pill .price {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    color: var(--text-muted); font-weight: 500;
+  }
+  .strike-pill .prob {
+    font-family: 'JetBrains Mono', monospace; font-size: 14px;
+    font-weight: 700; color: var(--text);
+  }
+  .strike-pill.active {
+    background: var(--accent-bg); border-color: var(--accent);
+    box-shadow: 0 0 16px var(--accent-glow);
+  }
+  .strike-pill.active .price { color: var(--accent); }
+  .strike-pill.active .prob { color: var(--accent); }
+  .strike-pill.active::after {
+    content: ""; position: absolute; bottom: -1px; left: 8px; right: 8px;
+    height: 2px; background: var(--accent); border-radius: 0 0 2px 2px;
+  }
+  .strike-pill.in-money .prob { color: var(--yes); }
+  .strike-pill.out-money .prob { color: var(--no); opacity: 0.85; }
+
+  /* ===== MAIN GRID — LEFT (chart + position + settlement) | RIGHT (trade + book + trades) ===== */
+  .trade-grid {
+    max-width: 1700px; margin: 0 auto; padding: 16px 24px 80px;
+    display: grid; grid-template-columns: 1fr 380px; gap: 16px;
+  }
+
+  /* LEFT COLUMN */
+  .left-col { display: flex; flex-direction: column; gap: 16px; }
+
+  /* Chart card — dominant */
+  .chart-card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 14px; overflow: hidden;
+    position: relative;
+  }
+  .chart-header {
+    padding: 16px 20px; border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: end;
+    background: linear-gradient(180deg, var(--accent-bg) 0%, transparent 100%);
+  }
+  .chart-headline {
+    display: flex; align-items: baseline; gap: 16px;
+  }
+  .chart-price {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 42px; font-weight: 800; line-height: 1;
+    letter-spacing: -0.04em;
+    background: var(--accent-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .chart-price-meta { display: flex; flex-direction: column; gap: 4px; }
+  .chart-delta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px; font-weight: 700;
+  }
+  .chart-delta.up { color: var(--yes); }
+  .chart-stats-row {
+    display: flex; gap: 16px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  }
+  .chart-stats-row > div { display: flex; flex-direction: column; gap: 2px; }
+  .chart-stats-row .lbl { font-size: 10px; color: var(--text-subtle); text-transform: uppercase; letter-spacing: 1px; }
+  .chart-stats-row .val { color: var(--text); font-weight: 600; font-size: 13px; }
+
+  .chart-controls {
+    display: flex; gap: 4px;
+  }
+  .chart-tabs {
+    display: flex; background: var(--panel-2); padding: 3px; border-radius: 8px;
+  }
+  .chart-tab {
+    padding: 6px 12px; background: transparent; border: none;
+    color: var(--text-muted); font-size: 12px; font-weight: 600;
+    border-radius: 5px; transition: all 150ms;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .chart-tab.active { background: var(--panel); color: var(--text); }
+  .chart-tab:hover:not(.active) { color: var(--text); }
+  .chart-icons {
+    display: flex; gap: 2px; background: var(--panel-2); padding: 3px; border-radius: 8px;
+  }
+  .chart-icon-btn {
+    width: 28px; height: 28px;
+    background: transparent; border: none; color: var(--text-muted);
+    border-radius: 5px; transition: all 150ms;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px;
+  }
+  .chart-icon-btn:hover { background: var(--panel); color: var(--text); }
+  .chart-icon-btn.active { background: var(--panel); color: var(--accent); }
+
+  .chart-viz {
+    height: 380px; position: relative;
+    background:
+      linear-gradient(180deg, transparent 0%, var(--accent-bg) 80%, transparent 100%);
+  }
+  .chart-grid-bg {
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(0deg, var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 60px 38px;
+    opacity: 0.3;
+    pointer-events: none;
+  }
+  .chart-y-axis {
+    position: absolute; right: 12px; top: 12px; bottom: 12px;
+    display: flex; flex-direction: column; justify-content: space-between;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-subtle);
+    pointer-events: none; text-align: right;
+  }
+  .chart-y-axis div {
+    padding: 0 6px;
+    border-right: 2px solid transparent;
+  }
+  .chart-y-axis div.current {
+    background: var(--accent);
+    color: var(--accent-fg);
+    font-weight: 700;
+    border-radius: 4px;
+    padding: 2px 6px;
+  }
+  .chart-strike-line {
+    position: absolute; left: 0; right: 60px;
+    height: 1px;
+    background: repeating-linear-gradient(90deg, var(--amber) 0 4px, transparent 4px 8px);
+    pointer-events: none;
+  }
+  .chart-strike-label {
+    position: absolute; right: 60px; transform: translateY(-50%);
+    background: var(--amber); color: var(--bg);
+    padding: 1px 6px; border-radius: 3px;
+    font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700;
+  }
+
+  /* ===== POSITION + SETTLEMENT (below chart) ===== */
+  .position-settle-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+  }
+  .info-card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 14px; overflow: hidden;
+  }
+  .info-card-h {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .info-card-h h3 { font-size: 13px; font-weight: 700; letter-spacing: -0.01em; }
+  .info-card-h .live-badge {
+    background: var(--yes-bg); color: var(--yes);
+    padding: 3px 8px; border-radius: 999px;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.5px;
+    text-transform: uppercase;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .info-card-h .live-badge::before {
+    content: ""; width: 5px; height: 5px; background: var(--yes);
+    border-radius: 50%; animation: pulse-glow 1.5s ease-in-out infinite;
+  }
+
+  /* Position card */
+  .pos-body { padding: 16px 18px; }
+  .pos-summary {
+    display: flex; justify-content: space-between; align-items: end;
+    margin-bottom: 16px;
+  }
+  .pos-side-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 12px; border-radius: 999px;
+    background: var(--yes-bg); color: var(--yes);
+    font-family: 'JetBrains Mono', monospace; font-size: 13px;
+    font-weight: 700;
+  }
+  .pos-side-badge.no { background: var(--no-bg); color: var(--no); }
+  .pos-pnl {
+    text-align: right;
+  }
+  .pos-pnl-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 24px; font-weight: 800; letter-spacing: -0.02em;
+    line-height: 1;
+  }
+  .pos-pnl-val.up { color: var(--yes); }
+  .pos-pnl-val.down { color: var(--no); }
+  .pos-pnl-pct {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    color: var(--text-muted); margin-top: 4px; font-weight: 600;
+  }
+
+  .pos-stats-grid {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .pos-stat {
+    background: var(--panel-2);
+    padding: 10px 12px; border-radius: 8px;
+  }
+  .pos-stat .lbl {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 1px;
+    color: var(--text-subtle); font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .pos-stat .val {
+    font-size: 14px; font-weight: 700;
+  }
+
+  /* Settlement scenarios */
+  .settle-body { padding: 16px 18px; }
+  .scenario {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    position: relative;
+  }
+  .scenario:last-child { margin-bottom: 0; }
+  .scenario-h {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 6px;
+  }
+  .scenario-title {
+    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .scenario-title .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+  }
+  .scenario.exit-now .scenario-title .dot { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+  .scenario.hold-yes .scenario-title .dot { background: var(--yes); }
+  .scenario.hold-no .scenario-title .dot { background: var(--no); }
+  .scenario-prob {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    color: var(--text-muted); font-weight: 600;
+  }
+  .scenario-result {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .scenario-action {
+    font-size: 11px; color: var(--text-muted);
+  }
+  .scenario-pnl {
+    font-size: 16px; font-weight: 800; letter-spacing: -0.02em;
+  }
+  .scenario-pnl.up { color: var(--yes); }
+  .scenario-pnl.down { color: var(--no); }
+  .scenario-pnl.accent { color: var(--accent); }
+
+  /* ===== RIGHT COLUMN: trade panel + order book + trades ===== */
+  .right-col {
+    display: flex; flex-direction: column; gap: 12px;
+    position: sticky; top: 80px; align-self: start;
+    max-height: calc(100vh - 100px); overflow-y: auto;
+  }
+
+  /* Trade panel — buy/sell big */
+  .trade-card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 14px; overflow: hidden;
+  }
+  .trade-tabs {
+    display: grid; grid-template-columns: 1fr 1fr;
+    background: var(--panel-2); border-bottom: 1px solid var(--border);
+  }
+  .trade-tab {
+    padding: 14px; background: transparent; border: none;
+    color: var(--text-muted); font-size: 14px; font-weight: 700;
+    transition: all 150ms; position: relative;
+  }
+  .trade-tab:hover:not(.active) { color: var(--text); background: var(--panel); }
+  .trade-tab.active { color: var(--text); background: var(--panel); }
+  .trade-tab.active::after {
+    content: ""; position: absolute; bottom: 0; left: 12px; right: 12px;
+    height: 2px;
+  }
+  .trade-tab.buy.active::after { background: var(--yes); }
+  .trade-tab.sell.active::after { background: var(--no); }
+
+  .yes-no-toggle {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 4px;
+    padding: 14px 14px 0;
+  }
+  .yn-tab {
+    padding: 12px;
+    border: 1px solid var(--border);
+    background: var(--panel-2);
+    color: var(--text-muted);
+    border-radius: 10px;
+    display: flex; flex-direction: column; gap: 4px; align-items: center;
+    font-weight: 700;
+    transition: all 150ms;
+    cursor: pointer;
+  }
+  .yn-tab:hover { border-color: var(--border-strong); }
+  .yn-tab.yes.active {
+    background: var(--yes-bg); border-color: var(--yes); color: var(--yes);
+    box-shadow: 0 0 16px rgba(34, 197, 94, 0.2);
+  }
+  .yn-tab.no.active {
+    background: var(--no-bg); border-color: var(--no); color: var(--no);
+    box-shadow: 0 0 16px rgba(239, 68, 68, 0.2);
+  }
+  .yn-tab .lbl {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px;
+  }
+  .yn-tab .price {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 22px; font-weight: 800; letter-spacing: -0.02em;
+  }
+  .yn-tab .sub {
+    font-size: 10px; opacity: 0.7;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .trade-form { padding: 14px; }
+  .order-type-row {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 4px;
+    background: var(--panel-2); padding: 3px; border-radius: 7px;
+    margin-bottom: 14px;
+  }
+  .order-type-btn {
+    padding: 8px; background: transparent; border: none;
+    color: var(--text-muted); font-size: 12px; font-weight: 600;
+    border-radius: 5px;
+  }
+  .order-type-btn.active { background: var(--panel); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+
+  .field { margin-bottom: 12px; }
+  .field-label {
+    display: flex; justify-content: space-between;
+    font-size: 11px; color: var(--text-muted); font-weight: 600;
+    margin-bottom: 6px;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .field-label .available {
+    font-family: 'JetBrains Mono', monospace; color: var(--text-subtle);
+    text-transform: none; letter-spacing: 0;
+  }
+  .input-wrap {
+    display: flex; align-items: center;
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 0 12px;
+    transition: all 150ms;
+  }
+  .input-wrap:focus-within {
+    border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow);
+  }
+  .input-wrap input {
+    flex: 1; background: transparent; border: none; outline: none;
+    color: var(--text); padding: 11px 0;
+    font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 700;
+  }
+  .input-wrap .suffix {
+    color: var(--text-muted); font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; font-weight: 600;
+  }
+  .quick-amounts {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px;
+    margin-top: 6px;
+  }
+  .quick-amount {
+    padding: 6px; background: var(--panel-2); border: 1px solid var(--border);
+    color: var(--text-muted); font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; font-weight: 600; border-radius: 5px;
+    transition: all 150ms;
+  }
+  .quick-amount:hover { border-color: var(--accent); color: var(--accent); }
+
+  .payoff-grid {
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px;
+    padding: 10px; background: var(--panel-2); border-radius: 8px;
+    margin: 12px 0;
+  }
+  .payoff-cell { text-align: center; display: flex; flex-direction: column; gap: 3px; }
+  .payoff-cell .lbl {
+    font-size: 9px; color: var(--text-subtle); text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .payoff-cell .val {
+    font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+  .payoff-cell .val.win { color: var(--yes); }
+  .payoff-cell .val.loss { color: var(--no); }
+
+  .submit-btn {
+    width: 100%; padding: 14px; border: none; border-radius: 10px;
+    color: white; font-size: 14px; font-weight: 800; letter-spacing: 0.5px;
+    text-transform: uppercase;
+    transition: all 150ms;
+    font-family: inherit;
+    box-shadow: 0 0 24px rgba(34, 197, 94, 0.3);
+  }
+  .submit-btn.yes { background: var(--yes-gradient); }
+  .submit-btn.no { background: var(--no-gradient); box-shadow: 0 0 24px rgba(239, 68, 68, 0.3); }
+  .submit-btn:hover { transform: translateY(-1px); filter: brightness(1.1); }
+  .submit-btn .btn-price {
+    font-family: 'JetBrains Mono', monospace; opacity: 0.9; margin-left: 6px;
+  }
+
+  .submit-meta {
+    margin-top: 10px; padding: 10px;
+    background: var(--panel-2); border-radius: 8px;
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  }
+  .submit-meta > div { display: flex; justify-content: space-between; }
+  .submit-meta .lbl { color: var(--text-subtle); }
+  .submit-meta .val { color: var(--text); font-weight: 600; }
+
+  /* Order book */
+  .ob-card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 14px; overflow: hidden;
+  }
+  .ob-h {
+    padding: 12px 16px; border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .ob-h h3 { font-size: 12px; font-weight: 700; letter-spacing: -0.01em; }
+  .ob-h .ob-side-pick {
+    display: flex; background: var(--panel-2); padding: 2px; border-radius: 6px; font-size: 10px;
+  }
+  .ob-h .ob-side-pick button {
+    padding: 4px 8px; background: transparent; border: none;
+    font-family: 'JetBrains Mono', monospace; font-weight: 600;
+    color: var(--text-muted); border-radius: 4px;
+  }
+  .ob-h .ob-side-pick button.active { background: var(--panel); color: var(--text); }
+  .ob-rows-h {
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    padding: 6px 16px;
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    color: var(--text-subtle); text-transform: uppercase; letter-spacing: 1px;
+  }
+  .ob-rows-h > div:nth-child(2), .ob-rows-h > div:nth-child(3) { text-align: right; }
+  .ob-row {
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    padding: 4px 16px;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    position: relative; cursor: pointer;
+    transition: background 100ms;
+  }
+  .ob-row:hover { background: var(--row-hover); }
+  .ob-row .depth-bar {
+    position: absolute; right: 0; top: 0; bottom: 0;
+    pointer-events: none;
+  }
+  .ob-row.ask .price { color: var(--no); font-weight: 700; }
+  .ob-row.ask .depth-bar { background: linear-gradient(90deg, transparent 0%, var(--no-bg) 100%); }
+  .ob-row.bid .price { color: var(--yes); font-weight: 700; }
+  .ob-row.bid .depth-bar { background: linear-gradient(90deg, transparent 0%, var(--yes-bg) 100%); }
+  .ob-row .size, .ob-row .total { text-align: right; color: var(--text-muted); }
+
+  .ob-spread {
+    background: var(--panel-2);
+    padding: 8px 16px;
+    border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  }
+  .ob-spread .last {
+    font-size: 14px; font-weight: 800; letter-spacing: -0.02em;
+    color: var(--accent);
+  }
+  .ob-spread .spread { color: var(--text-muted); }
+
+  /* Recent trades */
+  .trades-card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 14px; overflow: hidden;
+  }
+  .trades-h {
+    padding: 12px 16px; border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .trades-h h3 { font-size: 12px; font-weight: 700; }
+  .trades-h .badge {
+    background: var(--yes-bg); color: var(--yes);
+    padding: 2px 8px; border-radius: 999px;
+    font-size: 9px; font-weight: 700; letter-spacing: 0.5px;
+    text-transform: uppercase;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .trades-h .badge::before {
+    content: ""; width: 5px; height: 5px; background: var(--yes); border-radius: 50%;
+    animation: pulse-glow 1.5s ease-in-out infinite;
+  }
+  .trade-rows-h {
+    display: grid; grid-template-columns: 1fr 1fr 1fr 1fr;
+    padding: 6px 16px;
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    color: var(--text-subtle); text-transform: uppercase; letter-spacing: 1px;
+  }
+  .trade-rows-h > div:not(:first-child) { text-align: right; }
+  .trade-row {
+    display: grid; grid-template-columns: 1fr 1fr 1fr 1fr;
+    padding: 5px 16px;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  }
+  .trade-row .time { color: var(--text-subtle); }
+  .trade-row .price { text-align: right; font-weight: 700; }
+  .trade-row .price.up { color: var(--yes); }
+  .trade-row .price.down { color: var(--no); }
+  .trade-row .size { text-align: right; color: var(--text-muted); }
+  .trade-row .side { text-align: right; font-weight: 700; font-size: 10px; }
+  .trade-row .side.buy { color: var(--yes); }
+  .trade-row .side.sell { color: var(--no); }
+
+  /* ===== HOTKEY HINT BAR ===== */
+  .hotkey-bar {
+    position: fixed; bottom: 16px; right: 16px; z-index: 90;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; padding: 6px 12px;
+    display: flex; align-items: center; gap: 12px;
+    font-size: 10px; color: var(--text-muted);
+    backdrop-filter: blur(12px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  }
+  .hotkey-bar kbd {
+    background: var(--panel-3); border: 1px solid var(--border);
+    padding: 1px 5px; border-radius: 3px;
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    color: var(--text);
+  }
+
+  /* ===== CMD-K PALETTE ===== */
+  .palette-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
+    z-index: 200;
+    display: none;
+    align-items: flex-start; justify-content: center;
+    padding-top: 12vh;
+  }
+  body.palette-show .palette-overlay { display: flex; }
+  .palette {
+    width: 600px; max-width: 90%;
+    background: var(--panel); border: 1px solid var(--border-strong);
+    border-radius: 14px; overflow: hidden;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px var(--border-glow);
+  }
+  .palette-input-wrap {
+    padding: 16px 20px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px;
+  }
+  .palette-input-wrap input {
+    flex: 1; background: transparent; border: none; outline: none;
+    color: var(--text); font-size: 16px; font-family: inherit;
+  }
+  .palette-results { padding: 8px; max-height: 400px; overflow-y: auto; }
+  .palette-group-h {
+    padding: 8px 12px; font-size: 10px;
+    text-transform: uppercase; letter-spacing: 1.5px;
+    color: var(--text-subtle); font-weight: 700;
+  }
+  .palette-item {
+    display: grid; grid-template-columns: 32px 1fr auto;
+    gap: 12px; align-items: center;
+    padding: 10px 12px; border-radius: 8px; cursor: pointer;
+  }
+  .palette-item:hover, .palette-item.active { background: var(--accent-bg); }
+  .palette-item-mark {
+    width: 28px; height: 28px;
+    background: var(--panel-2);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace; font-weight: 700;
+    font-size: 11px; color: var(--accent);
+  }
+  .palette-item-text { display: flex; flex-direction: column; gap: 2px; }
+  .palette-item-title { font-size: 13px; font-weight: 600; }
+  .palette-item-sub {
+    font-size: 11px; color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .palette-item-meta {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    color: var(--text-muted);
+  }
+  .palette-footer {
+    padding: 10px 16px; border-top: 1px solid var(--border);
+    background: var(--panel-2);
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 10px; color: var(--text-subtle);
+  }
+  .palette-footer kbd {
+    background: var(--panel-3); border: 1px solid var(--border);
+    padding: 1px 5px; border-radius: 3px;
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+  }
+
+  .mockup-badge {
+    position: fixed; bottom: 16px; left: 16px; z-index: 100;
+    background: var(--panel); border: 1px solid var(--accent);
+    color: var(--accent); padding: 6px 14px;
+    border-radius: 999px; font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; font-weight: 700; letter-spacing: 1px;
+    text-transform: uppercase; box-shadow: 0 0 20px var(--accent-glow);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .mockup-badge::before {
+    content: ""; width: 6px; height: 6px;
+    background: var(--accent); border-radius: 50%;
+    animation: pulse-glow 1.5s ease-in-out infinite;
+  }
+
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--panel-3); border-radius: 4px; border: 1px solid var(--bg); }
+  ::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="header-inner">
+    <div class="brand">
+      <a href="v6-landing.html" class="logo"><span class="logo-mark"></span>bellmarkets</a>
+      <nav class="nav">
+        <a href="v6-landing.html">Markets</a>
+        <a href="v6-trade.html" class="active">Trade</a>
+        <a href="#">Portfolio</a>
+        <a href="#">Activity</a>
+      </nav>
+    </div>
+    <div class="searchbar">
+      <span class="searchbar-icon">⌕</span>
+      <input type="text" placeholder="Switch market — META, NVDA, AAPL..." />
+      <span class="searchbar-kbd">⌘K</span>
+    </div>
+    <div class="header-right">
+      <span class="status-pill"><span class="dot"></span>devnet · 42ms</span>
+      <button class="theme-toggle" onclick="toggleTheme()">◐</button>
+      <div class="wallet">
+        <span class="balance">$123.45</span>
+        <span class="addr">4aPZ…G2iy</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- Market title bar -->
+<div class="market-bar">
+  <div class="market-bar-top">
+    <div class="market-title-block">
+      <div class="market-title-mark">M</div>
+      <div class="market-title">
+        <h1>META <span class="gt">&gt;</span> $680</h1>
+        <div class="market-title-sub">
+          <span class="meta-chip">close today</span>
+          <span class="meta-chip live">live</span>
+          <span class="meta-chip">9q5S…rVBN</span>
+        </div>
+      </div>
+    </div>
+    <div class="market-nav-controls">
+      <button class="nav-arrow-btn" title="Previous market">← AAPL</button>
+      <button class="market-switcher-btn">⌕ Browse <kbd>⌘K</kbd></button>
+      <button class="nav-arrow-btn" title="Next market">NVDA →</button>
+    </div>
+  </div>
+
+  <div class="market-stats">
+    <div class="market-stat">
+      <span class="lbl">Spot</span>
+      <span class="val mono">$679.84</span>
+      <span class="delta mono up" style="color: var(--yes);">+$2.15 (+0.32%)</span>
+    </div>
+    <div class="market-stat">
+      <span class="lbl">YES Price</span>
+      <span class="val accent mono">$0.520</span>
+      <span class="delta mono" style="color: var(--yes);">+$0.04 (+8.3%)</span>
+    </div>
+    <div class="market-stat">
+      <span class="lbl">NO Price</span>
+      <span class="val mono" style="color: var(--no);">$0.480</span>
+      <span class="delta mono" style="color: var(--no);">-$0.04 (-8.3%)</span>
+    </div>
+    <div class="market-stat">
+      <span class="lbl">Implied prob</span>
+      <span class="val accent mono">52%</span>
+      <span class="delta">YES wins</span>
+    </div>
+    <div class="market-stat">
+      <span class="lbl">24h Vol</span>
+      <span class="val mono">$42,184</span>
+      <span class="delta">at this strike</span>
+    </div>
+    <div class="market-stat">
+      <span class="lbl">Open Interest</span>
+      <span class="val mono">8,420</span>
+      <span class="delta">contracts</span>
+    </div>
+    <div class="market-stat">
+      <span class="lbl">Settles</span>
+      <span class="val amber mono">02:13:47</span>
+      <span class="delta">4:00 PM ET</span>
+    </div>
+  </div>
+</div>
+
+<!-- Strike pills -->
+<div class="strike-pills">
+  <span class="strike-pills-label">Strikes</span>
+  <div class="strike-pills-track">
+    <button class="strike-pill in-money"><span class="price">$620</span><span class="prob">92%</span></button>
+    <button class="strike-pill in-money"><span class="price">$640</span><span class="prob">84%</span></button>
+    <button class="strike-pill in-money"><span class="price">$660</span><span class="prob">71%</span></button>
+    <button class="strike-pill active"><span class="price">$680</span><span class="prob">50%</span></button>
+    <button class="strike-pill out-money"><span class="price">$700</span><span class="prob">28%</span></button>
+    <button class="strike-pill out-money"><span class="price">$720</span><span class="prob">14%</span></button>
+    <button class="strike-pill out-money"><span class="price">$740</span><span class="prob">6%</span></button>
+  </div>
+</div>
+
+<!-- Trade grid -->
+<div class="trade-grid">
+
+  <!-- ===== LEFT COLUMN ===== -->
+  <main class="left-col">
+
+    <!-- Chart -->
+    <div class="chart-card">
+      <div class="chart-header">
+        <div>
+          <div class="chart-headline">
+            <div class="chart-price mono">$0.520</div>
+            <div class="chart-price-meta">
+              <span class="chart-delta up mono">+$0.04 · +8.3%</span>
+              <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-muted);">YES price today</span>
+            </div>
+          </div>
+          <div class="chart-stats-row" style="margin-top: 14px;">
+            <div><span class="lbl">Open</span><span class="val mono">0.480</span></div>
+            <div><span class="lbl">High</span><span class="val mono">0.545</span></div>
+            <div><span class="lbl">Low</span><span class="val mono">0.460</span></div>
+            <div><span class="lbl">VWAP</span><span class="val mono">0.504</span></div>
+            <div><span class="lbl">Spread</span><span class="val mono">0.04</span></div>
+          </div>
+        </div>
+        <div class="chart-controls">
+          <div class="chart-tabs">
+            <button class="chart-tab">15m</button>
+            <button class="chart-tab">1h</button>
+            <button class="chart-tab active">4h</button>
+            <button class="chart-tab">1d</button>
+          </div>
+          <div class="chart-icons">
+            <button class="chart-icon-btn active" title="Line">📈</button>
+            <button class="chart-icon-btn" title="Candle">📊</button>
+            <button class="chart-icon-btn" title="Indicators">⚡</button>
+          </div>
+        </div>
+      </div>
+      <div class="chart-viz">
+        <div class="chart-grid-bg"></div>
+        <svg viewBox="0 0 800 380" preserveAspectRatio="none" style="position: absolute; inset: 0; padding: 12px 60px 12px 12px;">
+          <defs>
+            <linearGradient id="cv-grad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#fb923c" stop-opacity="0.5"/>
+              <stop offset="50%" stop-color="#fb923c" stop-opacity="0.15"/>
+              <stop offset="100%" stop-color="#fb923c" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <path d="M 0,310 L 40,300 L 80,290 L 120,295 L 160,275 L 200,270 L 240,250 L 280,255 L 320,235 L 360,220 L 400,225 L 440,200 L 480,205 L 520,180 L 560,170 L 600,155 L 640,145 L 680,135 L 720,125 L 760,110 L 800,90 L 800,380 L 0,380 Z" fill="url(#cv-grad)"/>
+          <polyline points="0,310 40,300 80,290 120,295 160,275 200,270 240,250 280,255 320,235 360,220 400,225 440,200 480,205 520,180 560,170 600,155 640,145 680,135 720,125 760,110 800,90" fill="none" stroke="#fb923c" stroke-width="2"/>
+          <circle cx="800" cy="90" r="4" fill="#fb923c"/>
+          <circle cx="800" cy="90" r="8" fill="#fb923c" opacity="0.3">
+            <animate attributeName="r" values="6;16;6" dur="2s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="0.5;0;0.5" dur="2s" repeatCount="indefinite"/>
+          </circle>
+        </svg>
+        <div class="chart-strike-line" style="top: 50%;"></div>
+        <div class="chart-strike-label" style="top: 50%;">strike $680 (ATM)</div>
+        <div class="chart-y-axis">
+          <div>0.65</div>
+          <div>0.60</div>
+          <div>0.55</div>
+          <div class="current mono">0.52</div>
+          <div>0.50</div>
+          <div>0.45</div>
+          <div>0.40</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Position + Settlement scenarios -->
+    <div class="position-settle-grid">
+
+      <div class="info-card">
+        <div class="info-card-h">
+          <h3>Your position</h3>
+          <span class="live-badge">P&L live</span>
+        </div>
+        <div class="pos-body">
+          <div class="pos-summary">
+            <div>
+              <span class="pos-side-badge">⬆ YES · 5 contracts</span>
+              <div style="margin-top: 8px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-muted);">
+                Opened at avg $0.62 · 32 min ago
+              </div>
+            </div>
+            <div class="pos-pnl">
+              <div class="pos-pnl-val up mono">−$0.50</div>
+              <div class="pos-pnl-pct">unrealized · −16.1%</div>
+            </div>
+          </div>
+          <div class="pos-stats-grid">
+            <div class="pos-stat">
+              <div class="lbl">Cost basis</div>
+              <div class="val">$3.10</div>
+            </div>
+            <div class="pos-stat">
+              <div class="lbl">Current value</div>
+              <div class="val">$2.60</div>
+            </div>
+            <div class="pos-stat">
+              <div class="lbl">If YES wins</div>
+              <div class="val" style="color: var(--yes);">$5.00</div>
+            </div>
+            <div class="pos-stat">
+              <div class="lbl">If YES loses</div>
+              <div class="val" style="color: var(--no);">$0.00</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="info-card">
+        <div class="info-card-h">
+          <h3>Settlement preview</h3>
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-muted);">3 scenarios</span>
+        </div>
+        <div class="settle-body">
+
+          <div class="scenario exit-now">
+            <div class="scenario-h">
+              <span class="scenario-title"><span class="dot"></span>Exit now (sell on Phoenix)</span>
+              <span class="scenario-prob">market price</span>
+            </div>
+            <div class="scenario-result">
+              <span class="scenario-action mono">sell 5 YES @ $0.50 bid</span>
+              <span class="scenario-pnl down mono">−$0.60</span>
+            </div>
+          </div>
+
+          <div class="scenario hold-yes">
+            <div class="scenario-h">
+              <span class="scenario-title"><span class="dot"></span>Hold to settle · YES wins</span>
+              <span class="scenario-prob">52% probability</span>
+            </div>
+            <div class="scenario-result">
+              <span class="scenario-action mono">META closes ≥ $680</span>
+              <span class="scenario-pnl up mono">+$1.90</span>
+            </div>
+          </div>
+
+          <div class="scenario hold-no">
+            <div class="scenario-h">
+              <span class="scenario-title"><span class="dot"></span>Hold to settle · YES loses</span>
+              <span class="scenario-prob">48% probability</span>
+            </div>
+            <div class="scenario-result">
+              <span class="scenario-action mono">META closes &lt; $680</span>
+              <span class="scenario-pnl down mono">−$3.10</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Market info / on-chain -->
+    <div class="info-card">
+      <div class="info-card-h">
+        <h3>Market info</h3>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-muted);">on-chain · devnet</span>
+      </div>
+      <div style="padding: 14px 18px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; font-family: 'JetBrains Mono', monospace; font-size: 12px;">
+        <div>
+          <div style="font-size: 10px; color: var(--text-subtle); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;">Strike</div>
+          <div style="font-weight: 700; font-size: 13px;">$680.00</div>
+        </div>
+        <div>
+          <div style="font-size: 10px; color: var(--text-subtle); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;">Expiry</div>
+          <div style="font-weight: 700; font-size: 13px;">4:00 PM ET</div>
+        </div>
+        <div>
+          <div style="font-size: 10px; color: var(--text-subtle); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;">Oracle</div>
+          <div style="font-weight: 700; font-size: 13px;">Pyth · fresh</div>
+        </div>
+        <div>
+          <div style="font-size: 10px; color: var(--text-subtle); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;">Settled by</div>
+          <div style="font-weight: 700; font-size: 13px;">anyone (DR-002)</div>
+        </div>
+        <div>
+          <div style="font-size: 10px; color: var(--text-subtle); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;">Market PDA</div>
+          <div style="font-weight: 700; font-size: 13px; color: var(--accent);">9q5S…rVBN</div>
+        </div>
+        <div>
+          <div style="font-size: 10px; color: var(--text-subtle); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;">YES mint</div>
+          <div style="font-weight: 700; font-size: 13px;">2Yz8…h1Qx</div>
+        </div>
+        <div>
+          <div style="font-size: 10px; color: var(--text-subtle); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;">NO mint</div>
+          <div style="font-weight: 700; font-size: 13px;">3Nb9…k2Lr</div>
+        </div>
+        <div>
+          <div style="font-size: 10px; color: var(--text-subtle); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;">USDC vault</div>
+          <div style="font-weight: 700; font-size: 13px;">5Tg7…n3Mz</div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ===== RIGHT COLUMN ===== -->
+  <aside class="right-col">
+
+    <!-- Trade panel -->
+    <div class="trade-card">
+      <div class="trade-tabs">
+        <button class="trade-tab buy active">Buy</button>
+        <button class="trade-tab sell">Sell</button>
+      </div>
+      <div class="yes-no-toggle">
+        <button class="yn-tab yes active">
+          <span class="lbl">YES</span>
+          <span class="price">$0.52</span>
+          <span class="sub">52% prob · win $1.00</span>
+        </button>
+        <button class="yn-tab no">
+          <span class="lbl">NO</span>
+          <span class="price">$0.48</span>
+          <span class="sub">48% prob · win $1.00</span>
+        </button>
+      </div>
+      <div class="trade-form">
+        <div class="order-type-row">
+          <button class="order-type-btn active">Market</button>
+          <button class="order-type-btn">Limit</button>
+        </div>
+        <div class="field">
+          <div class="field-label">
+            <span>Amount</span>
+            <span class="available">$123.45 available</span>
+          </div>
+          <div class="input-wrap">
+            <input value="200" placeholder="0">
+            <span class="suffix">USDC</span>
+          </div>
+          <div class="quick-amounts">
+            <button class="quick-amount">25%</button>
+            <button class="quick-amount">50%</button>
+            <button class="quick-amount">75%</button>
+            <button class="quick-amount">MAX</button>
+          </div>
+        </div>
+        <div class="payoff-grid">
+          <div class="payoff-cell">
+            <span class="lbl">Pay</span>
+            <span class="val">$104</span>
+          </div>
+          <div class="payoff-cell">
+            <span class="lbl">Win</span>
+            <span class="val win">+$96</span>
+          </div>
+          <div class="payoff-cell">
+            <span class="lbl">Lose</span>
+            <span class="val loss">−$104</span>
+          </div>
+        </div>
+        <button class="submit-btn yes">
+          Buy YES <span class="btn-price">@ $0.52</span>
+        </button>
+        <div class="submit-meta">
+          <div><span class="lbl">contracts</span><span class="val">200 YES</span></div>
+          <div><span class="lbl">avg fill</span><span class="val">$0.520</span></div>
+          <div><span class="lbl">implied</span><span class="val">52%</span></div>
+          <div><span class="lbl">slippage</span><span class="val">+$0.012</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Order book -->
+    <div class="ob-card">
+      <div class="ob-h">
+        <h3>Order book</h3>
+        <div class="ob-side-pick">
+          <button class="active">YES</button>
+          <button>NO</button>
+        </div>
+      </div>
+      <div class="ob-rows-h"><div>price</div><div>size</div><div>total</div></div>
+      <div class="ob-row ask">
+        <div class="depth-bar" style="width: 18%"></div>
+        <span class="price">0.555</span><span class="size">490</span><span class="total">1,964</span>
+      </div>
+      <div class="ob-row ask">
+        <div class="depth-bar" style="width: 14%"></div>
+        <span class="price">0.550</span><span class="size">375</span><span class="total">1,474</span>
+      </div>
+      <div class="ob-row ask">
+        <div class="depth-bar" style="width: 26%"></div>
+        <span class="price">0.545</span><span class="size">722</span><span class="total">1,099</span>
+      </div>
+      <div class="ob-row ask">
+        <div class="depth-bar" style="width: 12%"></div>
+        <span class="price">0.540</span><span class="size">377</span><span class="total">377</span>
+      </div>
+      <div class="ob-spread">
+        <span class="last mono">$0.520</span>
+        <span class="spread mono">spread $0.040 · 7.7%</span>
+      </div>
+      <div class="ob-row bid">
+        <div class="depth-bar" style="width: 20%"></div>
+        <span class="price">0.500</span><span class="size">560</span><span class="total">560</span>
+      </div>
+      <div class="ob-row bid">
+        <div class="depth-bar" style="width: 16%"></div>
+        <span class="price">0.495</span><span class="size">440</span><span class="total">1,000</span>
+      </div>
+      <div class="ob-row bid">
+        <div class="depth-bar" style="width: 30%"></div>
+        <span class="price">0.490</span><span class="size">830</span><span class="total">1,830</span>
+      </div>
+      <div class="ob-row bid">
+        <div class="depth-bar" style="width: 10%"></div>
+        <span class="price">0.485</span><span class="size">270</span><span class="total">2,100</span>
+      </div>
+    </div>
+
+    <!-- Recent trades -->
+    <div class="trades-card">
+      <div class="trades-h">
+        <h3>Recent trades</h3>
+        <span class="badge">live</span>
+      </div>
+      <div class="trade-rows-h">
+        <div>time</div><div>price</div><div>size</div><div>side</div>
+      </div>
+      <div class="trade-row">
+        <span class="time">14:42:18</span>
+        <span class="price up">0.520</span>
+        <span class="size">200</span>
+        <span class="side buy">BUY</span>
+      </div>
+      <div class="trade-row">
+        <span class="time">14:42:11</span>
+        <span class="price down">0.480</span>
+        <span class="size">500</span>
+        <span class="side sell">SELL</span>
+      </div>
+      <div class="trade-row">
+        <span class="time">14:41:54</span>
+        <span class="price up">0.520</span>
+        <span class="size">100</span>
+        <span class="side buy">BUY</span>
+      </div>
+      <div class="trade-row">
+        <span class="time">14:41:32</span>
+        <span class="price up">0.510</span>
+        <span class="size">75</span>
+        <span class="side buy">BUY</span>
+      </div>
+      <div class="trade-row">
+        <span class="time">14:41:08</span>
+        <span class="price down">0.500</span>
+        <span class="size">320</span>
+        <span class="side sell">SELL</span>
+      </div>
+      <div class="trade-row">
+        <span class="time">14:40:51</span>
+        <span class="price up">0.510</span>
+        <span class="size">180</span>
+        <span class="side buy">BUY</span>
+      </div>
+      <div class="trade-row">
+        <span class="time">14:40:33</span>
+        <span class="price down">0.490</span>
+        <span class="size">450</span>
+        <span class="side sell">SELL</span>
+      </div>
+      <div class="trade-row">
+        <span class="time">14:40:12</span>
+        <span class="price up">0.500</span>
+        <span class="size">90</span>
+        <span class="side buy">BUY</span>
+      </div>
+    </div>
+
+  </aside>
+</div>
+
+<!-- Hotkey hint bar -->
+<div class="hotkey-bar">
+  <span><kbd>⌘K</kbd> markets</span>
+  <span><kbd>B</kbd> buy yes</span>
+  <span><kbd>N</kbd> buy no</span>
+  <span><kbd>S</kbd> sell</span>
+  <span><kbd>?</kbd> all shortcuts</span>
+</div>
+
+<!-- CMD-K palette -->
+<div class="palette-overlay" id="palette">
+  <div class="palette">
+    <div class="palette-input-wrap">
+      <span style="color: var(--text-subtle); font-size: 18px;">⌕</span>
+      <input type="text" placeholder="Switch market — META, NVDA, AAPL..." autofocus>
+      <kbd style="background: var(--panel-3); padding: 2px 6px; border-radius: 3px; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-subtle);">ESC</kbd>
+    </div>
+    <div class="palette-results">
+      <div class="palette-group-h">Trade markets · 7 strikes per ticker</div>
+      <div class="palette-item active">
+        <div class="palette-item-mark">M</div>
+        <div class="palette-item-text">
+          <span class="palette-item-title">META</span>
+          <span class="palette-item-sub">$679.84 · 7 strikes · 50% ATM · settles 2h 13m</span>
+        </div>
+        <span class="palette-item-meta">$42K vol</span>
+      </div>
+      <div class="palette-item">
+        <div class="palette-item-mark">N</div>
+        <div class="palette-item-text">
+          <span class="palette-item-title">NVDA</span>
+          <span class="palette-item-sub">$1,342.71 · 7 strikes · 52% ATM · settles 2h 13m</span>
+        </div>
+        <span class="palette-item-meta">$62K vol</span>
+      </div>
+      <div class="palette-item">
+        <div class="palette-item-mark">A</div>
+        <div class="palette-item-text">
+          <span class="palette-item-title">AAPL</span>
+          <span class="palette-item-sub">$229.84 · 5 strikes · 51% ATM · settles 2h 13m</span>
+        </div>
+        <span class="palette-item-meta">$29K vol</span>
+      </div>
+      <div class="palette-group-h">Quick actions</div>
+      <div class="palette-item">
+        <div class="palette-item-mark">⌘</div>
+        <div class="palette-item-text">
+          <span class="palette-item-title">View portfolio</span>
+          <span class="palette-item-sub">All open positions</span>
+        </div>
+        <span class="palette-item-meta">⌘P</span>
+      </div>
+    </div>
+    <div class="palette-footer">
+      <span><kbd>↑↓</kbd> navigate · <kbd>↵</kbd> select · <kbd>⌘↵</kbd> trade</span>
+      <span>⌘K · v0.1</span>
+    </div>
+  </div>
+</div>
+
+<div class="mockup-badge">v6 · pulse · linear-orange · trade</div>
+
+<script>
+  function toggleTheme() {
+    const root = document.documentElement;
+    const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('bm-theme', next); } catch (e) {}
+  }
+  (function() {
+    try { const s = localStorage.getItem('bm-theme'); if (s === 'light') document.documentElement.setAttribute('data-theme', 'light'); } catch (e) {}
+  })();
+
+  document.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      e.preventDefault();
+      document.body.classList.toggle('palette-show');
+    }
+    if (e.key === 'Escape') document.body.classList.remove('palette-show');
+  });
+  document.querySelector('.palette-overlay')?.addEventListener('click', (e) => {
+    if (e.target.id === 'palette') document.body.classList.remove('palette-show');
+  });
+  document.querySelector('.searchbar input')?.addEventListener('focus', () => {
+    document.body.classList.add('palette-show');
+  });
+</script>
+
+</body>
+</html>

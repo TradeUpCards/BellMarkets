@@ -1,0 +1,1521 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BellMarkets — v7 Terminal · Markets</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root[data-theme="dark"] {
+    --bg: #060810;
+    --bg-grid: #0a0e1a;
+    --panel: #0c1018;
+    --panel-2: #11161f;
+    --panel-3: #161c28;
+    --border: #1a2032;
+    --border-strong: #283248;
+    --text: #d4dae8;
+    --text-strong: #ffffff;
+    --text-muted: #6b7794;
+    --text-subtle: #455168;
+    --accent: #06b6d4;
+    --accent-2: #22d3ee;
+    --accent-3: #0891b2;
+    --accent-fg: #060810;
+    --accent-bg: rgba(6, 182, 212, 0.12);
+    --accent-bg-strong: rgba(6, 182, 212, 0.20);
+    --accent-glow: rgba(6, 182, 212, 0.25);
+    --accent-gradient: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);
+    --yes: #4ade80;
+    --yes-bg: rgba(74, 222, 128, 0.10);
+    --yes-strong: #22c55e;
+    --no: #f87171;
+    --no-bg: rgba(248, 113, 113, 0.10);
+    --no-strong: #ef4444;
+    --amber: #fbbf24;
+    --pink: #f472b6;
+    --row-hover: #11171f;
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6fb;
+    --bg-grid: #ffffff;
+    --panel: #ffffff;
+    --panel-2: #f7f9fc;
+    --panel-3: #eff3f8;
+    --border: #d6dde8;
+    --border-strong: #b8c2d4;
+    --text: #0c1018;
+    --text-strong: #000000;
+    --text-muted: #5a6478;
+    --text-subtle: #8b94a8;
+    --accent: #0891b2;
+    --accent-2: #0e7490;
+    --accent-3: #155e75;
+    --accent-fg: #ffffff;
+    --accent-bg: rgba(8, 145, 178, 0.10);
+    --accent-bg-strong: rgba(8, 145, 178, 0.18);
+    --accent-glow: rgba(8, 145, 178, 0.20);
+    --accent-gradient: linear-gradient(135deg, #0891b2 0%, #2563eb 100%);
+    --yes: #16a34a;
+    --yes-bg: rgba(22, 163, 74, 0.10);
+    --yes-strong: #15803d;
+    --no: #dc2626;
+    --no-bg: rgba(220, 38, 38, 0.10);
+    --no-strong: #b91c1c;
+    --amber: #d97706;
+    --pink: #db2777;
+    --row-hover: #f0f4fa;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', system-ui, sans-serif;
+    font-size: 12px; line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    transition: background 200ms, color 200ms;
+  }
+  body {
+    background-image:
+      radial-gradient(ellipse 60% 30% at 20% 0%, rgba(6, 182, 212, 0.08), transparent 60%),
+      radial-gradient(ellipse 40% 30% at 80% 100%, rgba(59, 130, 246, 0.06), transparent 60%),
+      linear-gradient(180deg, var(--bg) 0%, var(--bg-grid) 100%);
+    background-attachment: fixed;
+    min-height: 100vh;
+  }
+  .mono { font-family: 'IBM Plex Mono', monospace; font-variant-numeric: tabular-nums; }
+  a { color: inherit; text-decoration: none; }
+  button { font-family: inherit; cursor: pointer; }
+
+  /* ========== TOP STATUS BAR (BLOOMBERG SIGNATURE) ========== */
+  .top-status {
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 6px 16px;
+    display: flex; gap: 20px; align-items: center;
+    font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+    letter-spacing: 0.3px;
+  }
+  .top-status > div { color: var(--text-muted); display: flex; align-items: center; gap: 4px; }
+  .top-status .label { color: var(--text-subtle); }
+  .top-status .val { color: var(--text-strong); font-weight: 600; }
+  .top-status .val.green { color: var(--yes); }
+  .top-status .val.cyan { color: var(--accent); }
+  .top-status .val.amber { color: var(--amber); }
+  .top-status .val.pink { color: var(--pink); }
+  .top-status .pulse {
+    width: 6px; height: 6px; background: var(--yes);
+    border-radius: 50%;
+    animation: pulse 1.5s ease-in-out infinite;
+    box-shadow: 0 0 6px var(--yes);
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; box-shadow: 0 0 4px var(--yes); }
+    50% { opacity: 0.5; box-shadow: 0 0 12px var(--yes); }
+  }
+
+  /* ========== HEADER ========== */
+  header.top {
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(20px) saturate(180%);
+  }
+  .header-inner {
+    display: grid; grid-template-columns: auto 1fr auto;
+    gap: 24px; align-items: center;
+    padding: 14px 16px;
+  }
+  .brand { display: flex; align-items: center; gap: 28px; }
+  .logo {
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 700; font-size: 15px;
+    letter-spacing: -0.5px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .logo-mark {
+    width: 26px; height: 26px;
+    background: var(--accent-gradient);
+    border-radius: 4px; position: relative;
+    box-shadow: 0 0 16px var(--accent-glow);
+  }
+  .logo-mark::before {
+    content: "BM"; position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'IBM Plex Mono', monospace; font-weight: 700;
+    font-size: 9px; color: var(--accent-fg);
+    letter-spacing: -0.5px;
+  }
+  .logo .label { color: var(--accent); }
+  .nav { display: flex; gap: 24px; font-size: 12px; font-weight: 500; }
+  .nav a {
+    color: var(--text-muted); transition: color 150ms;
+    position: relative; padding: 6px 0;
+    text-transform: uppercase; letter-spacing: 1px;
+  }
+  .nav a:hover { color: var(--text-strong); }
+  .nav a.active { color: var(--text-strong); }
+  .nav a.active::after {
+    content: ""; position: absolute; bottom: -1px; left: 0; right: 0;
+    height: 2px; background: var(--accent);
+  }
+
+  /* Search bar */
+  .searchbar {
+    position: relative;
+    max-width: 460px; margin: 0 auto; width: 100%;
+  }
+  .searchbar input {
+    width: 100%;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 7px 14px 7px 36px;
+    border-radius: 4px;
+    font-size: 12px; font-family: 'IBM Plex Mono', monospace;
+    letter-spacing: -0.2px;
+    transition: all 150ms;
+  }
+  .searchbar input:focus {
+    outline: none; border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-glow);
+  }
+  .searchbar input::placeholder { color: var(--text-subtle); }
+  .searchbar-icon {
+    position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+    color: var(--text-subtle);
+  }
+  .searchbar-kbd {
+    position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+    background: var(--panel-3); border: 1px solid var(--border);
+    padding: 2px 6px; border-radius: 3px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 9px;
+    color: var(--text-subtle);
+  }
+
+  .header-right { display: flex; align-items: center; gap: 8px; }
+  .theme-toggle {
+    width: 30px; height: 30px;
+    background: var(--panel); border: 1px solid var(--border);
+    color: var(--text-muted); border-radius: 4px;
+    transition: all 150ms;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .theme-toggle:hover { color: var(--text); border-color: var(--accent); }
+  .btn-connect {
+    background: var(--accent);
+    color: var(--accent-fg); border: none;
+    padding: 8px 18px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 700; font-size: 11px;
+    letter-spacing: 0.5px; text-transform: uppercase;
+    border-radius: 4px;
+    transition: all 150ms;
+    border: 1px solid var(--accent);
+  }
+  .btn-connect:hover {
+    box-shadow: 0 0 16px var(--accent-glow);
+    transform: translateY(-1px);
+  }
+
+  /* ========== MAIN LAYOUT — LEFT RAIL + MAIN ========== */
+  .layout {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    gap: 0;
+    min-height: calc(100vh - 90px);
+  }
+
+  /* ========== LEFT RAIL — persistent market navigator ========== */
+  .left-rail {
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    padding: 16px 0;
+    overflow-y: auto;
+    max-height: calc(100vh - 90px);
+    position: sticky; top: 0;
+  }
+  .rail-section {
+    padding: 0 14px 14px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 14px;
+  }
+  .rail-section:last-child { border-bottom: none; }
+  .rail-section-h {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px; text-transform: uppercase;
+    letter-spacing: 1.5px; color: var(--accent);
+    font-weight: 700; margin-bottom: 10px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .rail-section-h .count {
+    color: var(--text-muted); font-weight: 600;
+  }
+
+  .rail-filters {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 4px;
+    margin-bottom: 12px;
+  }
+  .rail-filter {
+    padding: 6px 10px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px; font-weight: 600;
+    border-radius: 4px;
+    transition: all 150ms;
+    cursor: pointer;
+    text-align: left;
+  }
+  .rail-filter:hover { color: var(--text); border-color: var(--border-strong); }
+  .rail-filter.active {
+    background: var(--accent-bg);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .rail-filter .ct {
+    font-size: 9px; color: var(--text-subtle); margin-left: 4px;
+  }
+  .rail-filter.active .ct { color: var(--accent); opacity: 0.7; }
+
+  /* Ticker list */
+  .rail-ticker-list { display: flex; flex-direction: column; gap: 2px; }
+  .rail-ticker {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 150ms;
+    align-items: center;
+  }
+  .rail-ticker:hover { background: var(--row-hover); }
+  .rail-ticker.active {
+    background: var(--accent-bg);
+    box-shadow: inset 2px 0 0 var(--accent);
+  }
+  .rail-ticker-mark {
+    width: 28px; height: 28px;
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'IBM Plex Mono', monospace; font-weight: 700;
+    font-size: 11px; color: var(--accent);
+  }
+  .rail-ticker-info {
+    display: flex; flex-direction: column; gap: 1px;
+  }
+  .rail-ticker-sym {
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 700; font-size: 12px;
+    color: var(--text-strong); letter-spacing: -0.2px;
+  }
+  .rail-ticker-spot {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px; color: var(--text-muted);
+  }
+  .rail-ticker-meta {
+    text-align: right;
+    display: flex; flex-direction: column; gap: 1px;
+  }
+  .rail-ticker-chg {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px; font-weight: 700;
+  }
+  .rail-ticker-chg.up { color: var(--yes); }
+  .rail-ticker-chg.down { color: var(--no); }
+  .rail-ticker-vol {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px; color: var(--text-subtle);
+  }
+
+  /* Watchlist + my-positions sections */
+  .rail-watchlist {
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .rail-watchlist-empty {
+    text-align: center; padding: 12px 0;
+    font-size: 11px; color: var(--text-subtle);
+    border: 1px dashed var(--border);
+    border-radius: 4px;
+  }
+  .rail-position {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 8px 10px;
+    display: flex; justify-content: space-between; align-items: center;
+    font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+  }
+  .rail-position-info { display: flex; flex-direction: column; gap: 2px; }
+  .rail-position-market { color: var(--text-strong); font-weight: 600; }
+  .rail-position-side { font-size: 9px; color: var(--text-muted); }
+  .rail-position-pnl {
+    font-size: 11px; font-weight: 700;
+  }
+  .rail-position-pnl.up { color: var(--yes); }
+  .rail-position-pnl.down { color: var(--no); }
+
+  /* ========== MAIN ========== */
+  main { padding: 16px; overflow-x: hidden; }
+
+  /* ========== TICKER STRIP (above everything) ========== */
+  .ticker-strip {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 16px;
+    display: flex;
+  }
+  .ticker-item {
+    flex: 1; padding: 10px 14px;
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; gap: 2px;
+    transition: background 150ms; cursor: pointer;
+  }
+  .ticker-item:last-child { border-right: none; }
+  .ticker-item:hover { background: var(--row-hover); }
+  .ticker-item-h {
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .ticker-item-sym {
+    font-family: 'IBM Plex Mono', monospace; font-weight: 700;
+    font-size: 11px; color: var(--text-strong);
+  }
+  .ticker-item-chg {
+    font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 700;
+  }
+  .ticker-item-chg.up { color: var(--yes); }
+  .ticker-item-chg.down { color: var(--no); }
+  .ticker-item-spot {
+    font-family: 'IBM Plex Mono', monospace; font-size: 13px; font-weight: 600;
+    color: var(--text);
+  }
+  .ticker-item-spark {
+    height: 18px; margin-top: 3px;
+  }
+
+  /* ========== HERO SECTION ========== */
+  .hero-grid {
+    display: grid; grid-template-columns: 2fr 1fr; gap: 16px;
+    margin-bottom: 20px;
+  }
+  .hero-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 24px 28px;
+    position: relative; overflow: hidden;
+  }
+  .hero-card::before {
+    content: ""; position: absolute; top: -50px; right: -50px;
+    width: 220px; height: 220px;
+    background: radial-gradient(circle, var(--accent-glow), transparent 60%);
+    pointer-events: none;
+  }
+  .hero-h1 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 32px; font-weight: 700; letter-spacing: -0.04em;
+    line-height: 1.1; margin-bottom: 10px;
+    position: relative;
+  }
+  .hero-h1 .accent { color: var(--accent); }
+  .hero-h1 .badge {
+    display: inline-block;
+    background: var(--accent-bg); color: var(--accent);
+    border: 1px solid var(--accent);
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+    font-weight: 700; letter-spacing: 1.5px;
+    text-transform: uppercase;
+    vertical-align: middle;
+    margin-left: 12px;
+  }
+  .hero-card p {
+    color: var(--text-muted); font-size: 14px;
+    line-height: 1.6; max-width: 540px;
+    margin-bottom: 18px;
+    position: relative;
+  }
+  .hero-actions { display: flex; gap: 10px; position: relative; }
+  .btn-primary {
+    background: var(--accent); color: var(--accent-fg);
+    padding: 11px 22px;
+    font-family: 'IBM Plex Mono', monospace; font-weight: 700;
+    font-size: 12px; letter-spacing: 0.5px;
+    text-transform: uppercase;
+    border-radius: 4px; border: 1px solid var(--accent);
+    transition: all 150ms;
+  }
+  .btn-primary:hover { box-shadow: 0 0 16px var(--accent-glow); transform: translateY(-1px); }
+  .btn-secondary {
+    background: transparent; color: var(--text);
+    padding: 11px 22px;
+    font-family: 'IBM Plex Mono', monospace; font-weight: 700;
+    font-size: 12px; letter-spacing: 0.5px;
+    text-transform: uppercase;
+    border-radius: 4px; border: 1px solid var(--border-strong);
+    transition: all 150ms;
+  }
+  .btn-secondary:hover { border-color: var(--text); }
+
+  /* Session block */
+  .session-block {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 20px 24px;
+  }
+  .session-block-h {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px; text-transform: uppercase;
+    letter-spacing: 1.5px; color: var(--accent);
+    font-weight: 700; margin-bottom: 14px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .session-block-h::after {
+    content: ""; flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, var(--border) 0%, transparent 100%);
+    margin-left: 12px;
+  }
+  .session-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px dotted var(--border);
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+  }
+  .session-row:last-child { border-bottom: none; }
+  .session-row .lbl { color: var(--text-muted); }
+  .session-row .val { color: var(--text-strong); font-weight: 700; }
+  .session-row .val.amber { color: var(--amber); }
+  .session-row .val.cyan { color: var(--accent); }
+
+  /* ========== PROBABILITY MATRIX (BLOOMBERG SIGNATURE — color coded) ========== */
+  .matrix-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+  .matrix-h {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+    background: linear-gradient(180deg, var(--accent-bg) 0%, transparent 100%);
+  }
+  .matrix-h h3 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 1.5px;
+    color: var(--text);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .matrix-h h3 .badge {
+    background: var(--accent-bg);
+    color: var(--accent);
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 9px;
+    border: 1px solid var(--accent);
+  }
+  .matrix-controls {
+    display: flex; gap: 4px;
+  }
+  .matrix-control {
+    padding: 5px 10px;
+    background: var(--panel-2); border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px; font-weight: 600;
+    border-radius: 3px;
+    cursor: pointer; transition: all 150ms;
+  }
+  .matrix-control:hover { color: var(--text); border-color: var(--border-strong); }
+  .matrix-control.active {
+    background: var(--accent-bg); color: var(--accent); border-color: var(--accent);
+  }
+
+  .matrix-grid {
+    display: grid;
+    grid-template-columns: 60px 1fr;
+  }
+  .matrix-thead {
+    grid-column: 1 / -1;
+    display: grid; grid-template-columns: 110px 90px repeat(7, 1fr) 110px 90px 90px;
+    background: var(--panel-2);
+    border-bottom: 1px solid var(--border);
+  }
+  .matrix-thead > div {
+    padding: 10px 12px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 9px;
+    color: var(--text-muted); text-transform: uppercase;
+    letter-spacing: 1px; font-weight: 700;
+    text-align: center;
+  }
+  .matrix-thead > div:first-child { text-align: left; }
+  .matrix-thead > div:nth-child(2) { text-align: right; }
+  .matrix-thead > div:nth-last-child(-n+3) { text-align: right; }
+
+  .matrix-row {
+    grid-column: 1 / -1;
+    display: grid; grid-template-columns: 110px 90px repeat(7, 1fr) 110px 90px 90px;
+    border-bottom: 1px solid var(--border);
+    transition: background 150ms;
+    cursor: pointer;
+  }
+  .matrix-row:last-child { border-bottom: none; }
+  .matrix-row:hover { background: var(--row-hover); }
+  .matrix-row > div {
+    padding: 14px 12px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 12px;
+    display: flex; flex-direction: column; gap: 1px;
+    justify-content: center;
+    position: relative;
+  }
+  .matrix-ticker {
+    font-weight: 700; color: var(--text-strong);
+    font-size: 13px; letter-spacing: -0.2px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .matrix-ticker-mark {
+    width: 22px; height: 22px;
+    background: var(--accent-bg); border: 1px solid var(--accent);
+    border-radius: 3px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; color: var(--accent);
+  }
+  .matrix-spot {
+    text-align: right; color: var(--text);
+    align-items: flex-end;
+  }
+  .matrix-spot .px { font-weight: 600; font-size: 12px; }
+  .matrix-spot .chg { font-size: 10px; }
+  .matrix-spot .chg.up { color: var(--yes); }
+  .matrix-spot .chg.down { color: var(--no); }
+
+  /* Color-coded probability cells — heat map */
+  .prob-cell {
+    text-align: center;
+    align-items: center;
+    font-weight: 700; font-size: 13px;
+    cursor: pointer; transition: all 150ms;
+  }
+  .prob-cell:hover {
+    background: var(--accent-bg) !important;
+    box-shadow: inset 0 0 0 1px var(--accent);
+  }
+  .prob-cell .strike {
+    font-size: 9px; color: var(--text-subtle); margin-bottom: 2px;
+    font-weight: 500;
+  }
+  .prob-cell .prob {
+    font-weight: 700;
+  }
+  /* Heat gradient cells */
+  .prob-cell.p-95-100 { background: linear-gradient(180deg, rgba(74, 222, 128, 0.22), rgba(74, 222, 128, 0.08)); }
+  .prob-cell.p-95-100 .prob { color: var(--yes); }
+  .prob-cell.p-80-94 { background: linear-gradient(180deg, rgba(74, 222, 128, 0.16), rgba(74, 222, 128, 0.04)); }
+  .prob-cell.p-80-94 .prob { color: var(--yes); opacity: 0.95; }
+  .prob-cell.p-60-79 { background: linear-gradient(180deg, rgba(74, 222, 128, 0.10), rgba(74, 222, 128, 0.02)); }
+  .prob-cell.p-60-79 .prob { color: var(--yes); opacity: 0.85; }
+  .prob-cell.p-40-59 { background: rgba(6, 182, 212, 0.08); }
+  .prob-cell.p-40-59 .prob { color: var(--accent); }
+  .prob-cell.p-20-39 { background: linear-gradient(180deg, rgba(248, 113, 113, 0.08), rgba(248, 113, 113, 0.02)); }
+  .prob-cell.p-20-39 .prob { color: var(--no); opacity: 0.85; }
+  .prob-cell.p-5-19 { background: linear-gradient(180deg, rgba(248, 113, 113, 0.16), rgba(248, 113, 113, 0.04)); }
+  .prob-cell.p-5-19 .prob { color: var(--no); }
+  .prob-cell.p-0-4 { background: linear-gradient(180deg, rgba(248, 113, 113, 0.24), rgba(248, 113, 113, 0.08)); }
+  .prob-cell.p-0-4 .prob { color: var(--no); }
+  .prob-cell.empty { color: var(--text-subtle); }
+  .prob-cell.empty .prob { color: var(--text-subtle); font-weight: 400; }
+  .prob-cell.atm { box-shadow: inset 0 0 0 2px var(--accent); }
+  .prob-cell.atm::after {
+    content: "ATM"; position: absolute; top: 2px; right: 4px;
+    background: var(--accent); color: var(--accent-fg);
+    font-size: 8px; font-weight: 700; padding: 1px 4px;
+    border-radius: 2px; letter-spacing: 0.5px;
+  }
+  /* Strike row at top — show actual strike labels */
+  .matrix-strike-header {
+    background: var(--panel-2);
+    border-bottom: 1px solid var(--border);
+    padding: 8px 12px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 9px;
+    color: var(--accent); text-transform: uppercase;
+    letter-spacing: 1.5px; font-weight: 700;
+    text-align: center;
+  }
+
+  .matrix-spark {
+    height: 32px; padding: 4px 0;
+  }
+  .matrix-vol {
+    text-align: right; color: var(--text); font-weight: 600;
+    align-items: flex-end;
+  }
+  .matrix-vol .delta { font-size: 9px; color: var(--text-subtle); }
+  .matrix-action {
+    text-align: right; align-items: flex-end;
+  }
+  .matrix-action button {
+    background: var(--panel-3);
+    border: 1px solid var(--border-strong);
+    color: var(--text);
+    padding: 5px 10px;
+    border-radius: 3px;
+    font-family: 'IBM Plex Mono', monospace; font-weight: 700;
+    font-size: 10px; letter-spacing: 0.5px;
+    transition: all 150ms;
+  }
+  .matrix-row:hover .matrix-action button {
+    background: var(--accent); color: var(--accent-fg); border-color: var(--accent);
+    box-shadow: 0 0 12px var(--accent-glow);
+  }
+
+  /* ========== ACTIVITY GRID — fills + on-chain ========== */
+  .activity-grid {
+    display: grid; grid-template-columns: 1.6fr 1fr; gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  .activity-card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 4px; overflow: hidden;
+  }
+  .activity-card-h {
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .activity-card-h h3 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 1.5px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .activity-card-h .live {
+    color: var(--yes); font-size: 10px;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .activity-card-h .live::before {
+    content: ""; width: 6px; height: 6px;
+    background: var(--yes); border-radius: 50%;
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+
+  .fill-row {
+    display: grid; grid-template-columns: 80px 1fr auto auto auto;
+    gap: 12px; padding: 8px 18px;
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+    transition: background 150ms;
+  }
+  .fill-row:last-child { border-bottom: none; }
+  .fill-row:hover { background: var(--row-hover); }
+  .fill-row .time { color: var(--text-subtle); font-size: 10px; }
+  .fill-row .market { color: var(--text); font-weight: 600; }
+  .fill-row .market .ticker { color: var(--accent); font-weight: 700; }
+  .fill-row .side {
+    padding: 2px 7px;
+    border-radius: 3px;
+    font-weight: 700; font-size: 9px;
+    letter-spacing: 0.5px;
+    text-align: center;
+  }
+  .fill-row .side.buy-yes { background: var(--yes-bg); color: var(--yes); border: 1px solid var(--yes); }
+  .fill-row .side.buy-no { background: var(--no-bg); color: var(--no); border: 1px solid var(--no); }
+  .fill-row .side.sell-yes { background: var(--yes-bg); color: var(--yes); border: 1px dashed var(--yes); }
+  .fill-row .price { font-weight: 600; }
+  .fill-row .size {
+    text-align: right; color: var(--text); font-weight: 700;
+  }
+  .fill-row .wallet {
+    text-align: right; color: var(--text-subtle); font-size: 10px;
+  }
+
+  /* On-chain panel */
+  .chain-panel-rows { padding: 6px 18px 12px; }
+  .chain-panel-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 7px 0;
+    border-bottom: 1px dotted var(--border);
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+  }
+  .chain-panel-row:last-child { border-bottom: none; }
+  .chain-panel-row .lbl { color: var(--text-muted); }
+  .chain-panel-row .val { color: var(--text-strong); font-weight: 700; }
+  .chain-panel-row .val.live {
+    color: var(--yes);
+    display: flex; align-items: center; gap: 5px;
+  }
+  .chain-panel-row .val.live::before {
+    content: ""; width: 6px; height: 6px;
+    background: var(--yes); border-radius: 50%;
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+  .chain-panel-row .val.accent { color: var(--accent); }
+  .chain-panel-row .val.amber { color: var(--amber); }
+
+  /* ========== HOW IT WORKS — terminal style ========== */
+  .how-section {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+  .how-h {
+    padding: 14px 18px; border-bottom: 1px solid var(--border);
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+    font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px;
+    color: var(--text);
+    background: linear-gradient(180deg, var(--accent-bg) 0%, transparent 100%);
+  }
+  .how-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 1px; background: var(--border);
+  }
+  .how-step {
+    background: var(--panel-2);
+    padding: 16px 18px;
+    position: relative;
+  }
+  .how-step-num {
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+    color: var(--accent); font-weight: 700;
+    letter-spacing: 1.5px; margin-bottom: 8px;
+  }
+  .how-step h4 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px; font-weight: 700;
+    margin-bottom: 6px; letter-spacing: -0.01em;
+  }
+  .how-step p {
+    font-size: 11px; color: var(--text-muted); line-height: 1.55;
+  }
+
+  /* ========== HOTKEY HINT BAR ========== */
+  .hotkey-bar {
+    position: fixed; bottom: 12px; right: 12px; z-index: 90;
+    background: var(--panel); border: 1px solid var(--border);
+    padding: 5px 10px;
+    border-radius: 4px;
+    display: flex; gap: 10px; align-items: center;
+    font-family: 'IBM Plex Mono', monospace; font-size: 9px;
+    color: var(--text-muted);
+    backdrop-filter: blur(12px);
+  }
+  .hotkey-bar kbd {
+    background: var(--panel-3); border: 1px solid var(--border);
+    padding: 1px 4px; border-radius: 2px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 9px;
+    color: var(--text);
+  }
+
+  /* Mockup badge */
+  .mockup-badge {
+    position: fixed; bottom: 12px; left: 12px; z-index: 100;
+    background: var(--panel); border: 1px solid var(--accent);
+    color: var(--accent); padding: 4px 12px;
+    border-radius: 4px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 9px;
+    font-weight: 700; letter-spacing: 1.5px;
+    text-transform: uppercase;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .mockup-badge::before {
+    content: ""; width: 6px; height: 6px;
+    background: var(--accent); border-radius: 50%;
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--panel-3); border-radius: 4px; border: 1px solid var(--bg); }
+  ::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
+</style>
+</head>
+<body>
+
+<!-- TOP STATUS BAR (Bloomberg signature) -->
+<div class="top-status">
+  <div><span class="pulse"></span><span class="label">CONN</span><span class="val green">DEVNET</span></div>
+  <div><span class="label">LAT</span><span class="val">42ms</span></div>
+  <div><span class="label">RPC</span><span class="val cyan">HELIUS</span></div>
+  <div><span class="label">PYTH</span><span class="val green">FRESH·12s</span></div>
+  <div><span class="label">SLOT</span><span class="val cyan">312,847,193</span></div>
+  <div><span class="label">PROG</span><span class="val">599h7V…kS7uV</span></div>
+  <div><span class="label">CFG</span><span class="val">6CYzWh…ev9gQ</span></div>
+  <div><span class="label">USDC</span><span class="val">4zMMC9…DncDU</span></div>
+  <div><span class="label">SETTLE</span><span class="val amber">02:13:47</span></div>
+  <div style="margin-left: auto;"><span class="label">TIME</span><span class="val">14:46:13 ET</span></div>
+</div>
+
+<header class="top">
+  <div class="header-inner">
+    <div class="brand">
+      <a href="v7-landing.html" class="logo"><span class="logo-mark"></span>BELL<span class="label">·</span>MARKETS</a>
+      <nav class="nav">
+        <a href="v7-landing.html" class="active">Markets</a>
+        <a href="v7-trade.html">Trade</a>
+        <a href="#">Positions</a>
+        <a href="#">Orders</a>
+        <a href="#">History</a>
+        <a href="#">Docs</a>
+      </nav>
+    </div>
+    <div class="searchbar">
+      <span class="searchbar-icon">⌕</span>
+      <input type="text" placeholder="META.680 / NVDA.1340 / search markets, addresses..." />
+      <span class="searchbar-kbd">⌘K</span>
+    </div>
+    <div class="header-right">
+      <button class="theme-toggle" onclick="toggleTheme()">◐</button>
+      <button class="btn-connect">Connect</button>
+    </div>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- LEFT RAIL — persistent market navigator -->
+  <aside class="left-rail">
+
+    <div class="rail-section">
+      <div class="rail-section-h">Filters <span class="count">35 markets</span></div>
+      <div class="rail-filters">
+        <button class="rail-filter active">All <span class="ct">35</span></button>
+        <button class="rail-filter">Trending <span class="ct">8</span></button>
+        <button class="rail-filter">High Vol <span class="ct">5</span></button>
+        <button class="rail-filter">Near Strike <span class="ct">14</span></button>
+        <button class="rail-filter">Settling <span class="ct">35</span></button>
+        <button class="rail-filter">Mine <span class="ct">3</span></button>
+        <button class="rail-filter">Watch <span class="ct">0</span></button>
+        <button class="rail-filter">New <span class="ct">7</span></button>
+      </div>
+    </div>
+
+    <div class="rail-section">
+      <div class="rail-section-h">All tickers <span class="count">7</span></div>
+      <div class="rail-ticker-list">
+        <div class="rail-ticker active">
+          <div class="rail-ticker-mark">M</div>
+          <div class="rail-ticker-info">
+            <span class="rail-ticker-sym">META</span>
+            <span class="rail-ticker-spot">$679.84</span>
+          </div>
+          <div class="rail-ticker-meta">
+            <span class="rail-ticker-chg up">+0.32%</span>
+            <span class="rail-ticker-vol">$42K</span>
+          </div>
+        </div>
+        <div class="rail-ticker">
+          <div class="rail-ticker-mark">N</div>
+          <div class="rail-ticker-info">
+            <span class="rail-ticker-sym">NVDA</span>
+            <span class="rail-ticker-spot">$1,342.71</span>
+          </div>
+          <div class="rail-ticker-meta">
+            <span class="rail-ticker-chg up">+1.39%</span>
+            <span class="rail-ticker-vol">$62K</span>
+          </div>
+        </div>
+        <div class="rail-ticker">
+          <div class="rail-ticker-mark">A</div>
+          <div class="rail-ticker-info">
+            <span class="rail-ticker-sym">AAPL</span>
+            <span class="rail-ticker-spot">$229.84</span>
+          </div>
+          <div class="rail-ticker-meta">
+            <span class="rail-ticker-chg up">+0.54%</span>
+            <span class="rail-ticker-vol">$29K</span>
+          </div>
+        </div>
+        <div class="rail-ticker">
+          <div class="rail-ticker-mark">M</div>
+          <div class="rail-ticker-info">
+            <span class="rail-ticker-sym">MSFT</span>
+            <span class="rail-ticker-spot">$441.62</span>
+          </div>
+          <div class="rail-ticker-meta">
+            <span class="rail-ticker-chg up">+0.73%</span>
+            <span class="rail-ticker-vol">$20K</span>
+          </div>
+        </div>
+        <div class="rail-ticker">
+          <div class="rail-ticker-mark">G</div>
+          <div class="rail-ticker-info">
+            <span class="rail-ticker-sym">GOOGL</span>
+            <span class="rail-ticker-spot">$184.27</span>
+          </div>
+          <div class="rail-ticker-meta">
+            <span class="rail-ticker-chg down">-0.50%</span>
+            <span class="rail-ticker-vol">$12K</span>
+          </div>
+        </div>
+        <div class="rail-ticker">
+          <div class="rail-ticker-mark">A</div>
+          <div class="rail-ticker-info">
+            <span class="rail-ticker-sym">AMZN</span>
+            <span class="rail-ticker-spot">$201.13</span>
+          </div>
+          <div class="rail-ticker-meta">
+            <span class="rail-ticker-chg up">+0.20%</span>
+            <span class="rail-ticker-vol">$16K</span>
+          </div>
+        </div>
+        <div class="rail-ticker">
+          <div class="rail-ticker-mark">T</div>
+          <div class="rail-ticker-info">
+            <span class="rail-ticker-sym">TSLA</span>
+            <span class="rail-ticker-spot">$261.04</span>
+          </div>
+          <div class="rail-ticker-meta">
+            <span class="rail-ticker-chg down">-0.70%</span>
+            <span class="rail-ticker-vol">$24K</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="rail-section">
+      <div class="rail-section-h">My positions <span class="count">3</span></div>
+      <div class="rail-watchlist">
+        <div class="rail-position">
+          <div class="rail-position-info">
+            <span class="rail-position-market">META.680.YES</span>
+            <span class="rail-position-side">5 contracts · entry $0.62</span>
+          </div>
+          <span class="rail-position-pnl down">−$0.50</span>
+        </div>
+        <div class="rail-position">
+          <div class="rail-position-info">
+            <span class="rail-position-market">NVDA.1340.NO</span>
+            <span class="rail-position-side">3 contracts · entry $0.50</span>
+          </div>
+          <span class="rail-position-pnl down">−$0.06</span>
+        </div>
+        <div class="rail-position">
+          <div class="rail-position-info">
+            <span class="rail-position-market">AAPL.230.YES</span>
+            <span class="rail-position-side">8 contracts · entry $0.42</span>
+          </div>
+          <span class="rail-position-pnl up">+$2.80</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="rail-section">
+      <div class="rail-section-h">Watchlist <span class="count">0</span></div>
+      <div class="rail-watchlist-empty">
+        ★ Star markets to track them here
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main>
+
+    <!-- HERO + SESSION -->
+    <div class="hero-grid">
+      <div class="hero-card">
+        <h1 class="hero-h1">BINARY OUTCOME <span class="accent">CONTRACTS</span><br>ON SOLANA DEVNET <span class="badge">live</span></h1>
+        <p>
+          Trade YES/NO on daily MAG7 stock closes. $1.00 USDC max payout per contract.
+          Same-day expiry — settles at 4:00 PM ET via Pyth oracle. Permissionless cranks.
+          Non-custodial. Phoenix CLOB. Built for traders who want serious infrastructure.
+        </p>
+        <div class="hero-actions">
+          <button class="btn-primary">Launch Terminal →</button>
+          <button class="btn-secondary">View Docs</button>
+        </div>
+      </div>
+
+      <div class="session-block">
+        <div class="session-block-h">Session · 2026-05-22 EDT</div>
+        <div class="session-row"><span class="lbl">Markets active</span><span class="val cyan">35</span></div>
+        <div class="session-row"><span class="lbl">Volume 24h</span><span class="val">$184,723</span></div>
+        <div class="session-row"><span class="lbl">Trades 24h</span><span class="val">2,847</span></div>
+        <div class="session-row"><span class="lbl">Active wallets</span><span class="val">127</span></div>
+        <div class="session-row"><span class="lbl">Open interest</span><span class="val">38,420</span></div>
+        <div class="session-row"><span class="lbl">Settle in</span><span class="val amber">02:13:47</span></div>
+        <div class="session-row"><span class="lbl">Next settle</span><span class="val">META · NVDA · AAPL · MSFT</span></div>
+      </div>
+    </div>
+
+    <!-- TICKER STRIP -->
+    <div class="ticker-strip">
+      <div class="ticker-item">
+        <div class="ticker-item-h">
+          <span class="ticker-item-sym">AAPL</span>
+          <span class="ticker-item-chg up">+0.54%</span>
+        </div>
+        <span class="ticker-item-spot">$229.84</span>
+        <svg class="ticker-item-spark" viewBox="0 0 100 18" preserveAspectRatio="none">
+          <polyline points="0,12 10,14 20,11 30,10 40,8 50,9 60,7 70,5 80,7 90,4 100,3" fill="none" stroke="#4ade80" stroke-width="1"/>
+        </svg>
+      </div>
+      <div class="ticker-item">
+        <div class="ticker-item-h">
+          <span class="ticker-item-sym">MSFT</span>
+          <span class="ticker-item-chg up">+0.73%</span>
+        </div>
+        <span class="ticker-item-spot">$441.62</span>
+        <svg class="ticker-item-spark" viewBox="0 0 100 18" preserveAspectRatio="none">
+          <polyline points="0,13 10,12 20,10 30,11 40,9 50,7 60,8 70,6 80,4 90,5 100,3" fill="none" stroke="#4ade80" stroke-width="1"/>
+        </svg>
+      </div>
+      <div class="ticker-item">
+        <div class="ticker-item-h">
+          <span class="ticker-item-sym">GOOGL</span>
+          <span class="ticker-item-chg down">-0.50%</span>
+        </div>
+        <span class="ticker-item-spot">$184.27</span>
+        <svg class="ticker-item-spark" viewBox="0 0 100 18" preserveAspectRatio="none">
+          <polyline points="0,5 10,6 20,4 30,6 40,8 50,7 60,9 70,11 80,10 90,12 100,13" fill="none" stroke="#f87171" stroke-width="1"/>
+        </svg>
+      </div>
+      <div class="ticker-item">
+        <div class="ticker-item-h">
+          <span class="ticker-item-sym">AMZN</span>
+          <span class="ticker-item-chg up">+0.20%</span>
+        </div>
+        <span class="ticker-item-spot">$201.13</span>
+        <svg class="ticker-item-spark" viewBox="0 0 100 18" preserveAspectRatio="none">
+          <polyline points="0,11 10,10 20,12 30,9 40,8 50,10 60,7 70,9 80,6 90,8 100,5" fill="none" stroke="#4ade80" stroke-width="1"/>
+        </svg>
+      </div>
+      <div class="ticker-item">
+        <div class="ticker-item-h">
+          <span class="ticker-item-sym">NVDA</span>
+          <span class="ticker-item-chg up">+1.39%</span>
+        </div>
+        <span class="ticker-item-spot">$1,342.71</span>
+        <svg class="ticker-item-spark" viewBox="0 0 100 18" preserveAspectRatio="none">
+          <polyline points="0,15 10,13 20,11 30,10 40,8 50,6 60,5 70,4 80,3 90,2 100,1" fill="none" stroke="#4ade80" stroke-width="1.2"/>
+        </svg>
+      </div>
+      <div class="ticker-item">
+        <div class="ticker-item-h">
+          <span class="ticker-item-sym">META</span>
+          <span class="ticker-item-chg up">+0.32%</span>
+        </div>
+        <span class="ticker-item-spot">$679.84</span>
+        <svg class="ticker-item-spark" viewBox="0 0 100 18" preserveAspectRatio="none">
+          <polyline points="0,10 10,9 20,11 30,8 40,7 50,9 60,6 70,7 80,5 90,6 100,4" fill="none" stroke="#06b6d4" stroke-width="1"/>
+        </svg>
+      </div>
+      <div class="ticker-item">
+        <div class="ticker-item-h">
+          <span class="ticker-item-sym">TSLA</span>
+          <span class="ticker-item-chg down">-0.70%</span>
+        </div>
+        <span class="ticker-item-spot">$261.04</span>
+        <svg class="ticker-item-spark" viewBox="0 0 100 18" preserveAspectRatio="none">
+          <polyline points="0,6 10,7 20,5 30,8 40,9 50,8 60,10 70,11 80,10 90,12 100,13" fill="none" stroke="#f87171" stroke-width="1"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- PROBABILITY MATRIX -->
+    <div class="matrix-card">
+      <div class="matrix-h">
+        <h3>YES Probability Matrix <span class="badge">35 markets</span></h3>
+        <div class="matrix-controls">
+          <button class="matrix-control active">YES prob</button>
+          <button class="matrix-control">NO prob</button>
+          <button class="matrix-control">YES bid/ask</button>
+          <button class="matrix-control">Volume</button>
+        </div>
+      </div>
+
+      <div class="matrix-grid">
+        <div class="matrix-thead">
+          <div>Ticker</div>
+          <div>Spot</div>
+          <div>−9%</div>
+          <div>−6%</div>
+          <div>−3%</div>
+          <div>ATM</div>
+          <div>+3%</div>
+          <div>+6%</div>
+          <div>+9%</div>
+          <div>Spark · 4h</div>
+          <div>Vol 24h</div>
+          <div>OI</div>
+        </div>
+
+        <a class="matrix-row" href="v7-trade.html">
+          <div class="matrix-ticker"><span class="matrix-ticker-mark">M</span>META</div>
+          <div class="matrix-spot mono">
+            <span class="px">$679.84</span>
+            <span class="chg up">+0.32%</span>
+          </div>
+          <div class="prob-cell p-95-100"><span class="strike">$620</span><span class="prob">92%</span></div>
+          <div class="prob-cell p-80-94"><span class="strike">$640</span><span class="prob">84%</span></div>
+          <div class="prob-cell p-60-79"><span class="strike">$660</span><span class="prob">71%</span></div>
+          <div class="prob-cell p-40-59 atm"><span class="strike">$680</span><span class="prob">50%</span></div>
+          <div class="prob-cell p-20-39"><span class="strike">$700</span><span class="prob">28%</span></div>
+          <div class="prob-cell p-5-19"><span class="strike">$720</span><span class="prob">14%</span></div>
+          <div class="prob-cell p-0-4"><span class="strike">$740</span><span class="prob">6%</span></div>
+          <div class="matrix-spark">
+            <svg viewBox="0 0 80 28" preserveAspectRatio="none" style="width:100%;height:100%;">
+              <polyline points="0,20 10,18 20,22 30,16 40,12 50,16 60,10 70,12 80,8" fill="none" stroke="#06b6d4" stroke-width="1.2"/>
+            </svg>
+          </div>
+          <div class="matrix-vol mono">
+            $42,184
+            <span class="delta">+18.2%</span>
+          </div>
+          <div class="matrix-action">
+            <button>OPEN →</button>
+          </div>
+        </a>
+
+        <a class="matrix-row" href="v7-trade.html">
+          <div class="matrix-ticker"><span class="matrix-ticker-mark">N</span>NVDA</div>
+          <div class="matrix-spot mono">
+            <span class="px">$1,342.71</span>
+            <span class="chg up">+1.39%</span>
+          </div>
+          <div class="prob-cell p-95-100"><span class="strike">$1,220</span><span class="prob">96%</span></div>
+          <div class="prob-cell p-80-94"><span class="strike">$1,260</span><span class="prob">88%</span></div>
+          <div class="prob-cell p-60-79"><span class="strike">$1,300</span><span class="prob">74%</span></div>
+          <div class="prob-cell p-40-59 atm"><span class="strike">$1,340</span><span class="prob">52%</span></div>
+          <div class="prob-cell p-20-39"><span class="strike">$1,380</span><span class="prob">31%</span></div>
+          <div class="prob-cell p-5-19"><span class="strike">$1,420</span><span class="prob">16%</span></div>
+          <div class="prob-cell p-0-4"><span class="strike">$1,460</span><span class="prob">7%</span></div>
+          <div class="matrix-spark">
+            <svg viewBox="0 0 80 28" preserveAspectRatio="none" style="width:100%;height:100%;">
+              <polyline points="0,24 10,22 20,18 30,14 40,11 50,8 60,6 70,4 80,2" fill="none" stroke="#4ade80" stroke-width="1.2"/>
+            </svg>
+          </div>
+          <div class="matrix-vol mono">
+            $61,892
+            <span class="delta">+32.1%</span>
+          </div>
+          <div class="matrix-action">
+            <button>OPEN →</button>
+          </div>
+        </a>
+
+        <a class="matrix-row" href="v7-trade.html">
+          <div class="matrix-ticker"><span class="matrix-ticker-mark">A</span>AAPL</div>
+          <div class="matrix-spot mono">
+            <span class="px">$229.84</span>
+            <span class="chg up">+0.54%</span>
+          </div>
+          <div class="prob-cell p-95-100"><span class="strike">$210</span><span class="prob">94%</span></div>
+          <div class="prob-cell p-60-79"><span class="strike">$220</span><span class="prob">78%</span></div>
+          <div class="prob-cell empty"><span class="strike">$225</span><span class="prob">—</span></div>
+          <div class="prob-cell p-40-59 atm"><span class="strike">$230</span><span class="prob">51%</span></div>
+          <div class="prob-cell empty"><span class="strike">$235</span><span class="prob">—</span></div>
+          <div class="prob-cell p-20-39"><span class="strike">$240</span><span class="prob">24%</span></div>
+          <div class="prob-cell p-5-19"><span class="strike">$250</span><span class="prob">9%</span></div>
+          <div class="matrix-spark">
+            <svg viewBox="0 0 80 28" preserveAspectRatio="none" style="width:100%;height:100%;">
+              <polyline points="0,22 10,20 20,22 30,18 40,14 50,16 60,12 70,14 80,10" fill="none" stroke="#4ade80" stroke-width="1.2"/>
+            </svg>
+          </div>
+          <div class="matrix-vol mono">
+            $28,743
+            <span class="delta">+11.4%</span>
+          </div>
+          <div class="matrix-action">
+            <button>OPEN →</button>
+          </div>
+        </a>
+
+        <a class="matrix-row" href="v7-trade.html">
+          <div class="matrix-ticker"><span class="matrix-ticker-mark">M</span>MSFT</div>
+          <div class="matrix-spot mono">
+            <span class="px">$441.62</span>
+            <span class="chg up">+0.73%</span>
+          </div>
+          <div class="prob-cell p-95-100"><span class="strike">$400</span><span class="prob">95%</span></div>
+          <div class="prob-cell p-80-94"><span class="strike">$420</span><span class="prob">81%</span></div>
+          <div class="prob-cell empty"><span class="strike">$430</span><span class="prob">—</span></div>
+          <div class="prob-cell p-40-59 atm"><span class="strike">$440</span><span class="prob">54%</span></div>
+          <div class="prob-cell empty"><span class="strike">$450</span><span class="prob">—</span></div>
+          <div class="prob-cell p-20-39"><span class="strike">$460</span><span class="prob">27%</span></div>
+          <div class="prob-cell p-5-19"><span class="strike">$480</span><span class="prob">11%</span></div>
+          <div class="matrix-spark">
+            <svg viewBox="0 0 80 28" preserveAspectRatio="none" style="width:100%;height:100%;">
+              <polyline points="0,22 10,20 20,18 30,16 40,14 50,12 60,10 70,8 80,6" fill="none" stroke="#4ade80" stroke-width="1.2"/>
+            </svg>
+          </div>
+          <div class="matrix-vol mono">
+            $19,621
+            <span class="delta">+8.7%</span>
+          </div>
+          <div class="matrix-action">
+            <button>OPEN →</button>
+          </div>
+        </a>
+
+        <a class="matrix-row" href="v7-trade.html">
+          <div class="matrix-ticker"><span class="matrix-ticker-mark">G</span>GOOGL</div>
+          <div class="matrix-spot mono">
+            <span class="px">$184.27</span>
+            <span class="chg down">-0.50%</span>
+          </div>
+          <div class="prob-cell p-95-100"><span class="strike">$170</span><span class="prob">91%</span></div>
+          <div class="prob-cell empty"><span class="strike">$175</span><span class="prob">—</span></div>
+          <div class="prob-cell p-60-79"><span class="strike">$180</span><span class="prob">68%</span></div>
+          <div class="prob-cell p-40-59 atm"><span class="strike">$184</span><span class="prob">50%</span></div>
+          <div class="prob-cell p-20-39"><span class="strike">$190</span><span class="prob">36%</span></div>
+          <div class="prob-cell empty"><span class="strike">$195</span><span class="prob">—</span></div>
+          <div class="prob-cell p-5-19"><span class="strike">$200</span><span class="prob">13%</span></div>
+          <div class="matrix-spark">
+            <svg viewBox="0 0 80 28" preserveAspectRatio="none" style="width:100%;height:100%;">
+              <polyline points="0,8 10,10 20,8 30,12 40,16 50,14 60,18 70,20 80,22" fill="none" stroke="#f87171" stroke-width="1.2"/>
+            </svg>
+          </div>
+          <div class="matrix-vol mono">
+            $12,408
+            <span class="delta">-3.2%</span>
+          </div>
+          <div class="matrix-action">
+            <button>OPEN →</button>
+          </div>
+        </a>
+
+        <a class="matrix-row" href="v7-trade.html">
+          <div class="matrix-ticker"><span class="matrix-ticker-mark">A</span>AMZN</div>
+          <div class="matrix-spot mono">
+            <span class="px">$201.13</span>
+            <span class="chg up">+0.20%</span>
+          </div>
+          <div class="prob-cell p-95-100"><span class="strike">$180</span><span class="prob">93%</span></div>
+          <div class="prob-cell p-60-79"><span class="strike">$190</span><span class="prob">76%</span></div>
+          <div class="prob-cell empty"><span class="strike">$195</span><span class="prob">—</span></div>
+          <div class="prob-cell p-40-59 atm"><span class="strike">$200</span><span class="prob">53%</span></div>
+          <div class="prob-cell empty"><span class="strike">$205</span><span class="prob">—</span></div>
+          <div class="prob-cell p-20-39"><span class="strike">$210</span><span class="prob">29%</span></div>
+          <div class="prob-cell p-5-19"><span class="strike">$220</span><span class="prob">12%</span></div>
+          <div class="matrix-spark">
+            <svg viewBox="0 0 80 28" preserveAspectRatio="none" style="width:100%;height:100%;">
+              <polyline points="0,18 10,16 20,18 30,14 40,12 50,16 60,10 70,14 80,8" fill="none" stroke="#4ade80" stroke-width="1.2"/>
+            </svg>
+          </div>
+          <div class="matrix-vol mono">
+            $16,237
+            <span class="delta">+6.8%</span>
+          </div>
+          <div class="matrix-action">
+            <button>OPEN →</button>
+          </div>
+        </a>
+
+        <a class="matrix-row" href="v7-trade.html">
+          <div class="matrix-ticker"><span class="matrix-ticker-mark">T</span>TSLA</div>
+          <div class="matrix-spot mono">
+            <span class="px">$261.04</span>
+            <span class="chg down">-0.70%</span>
+          </div>
+          <div class="prob-cell p-80-94"><span class="strike">$240</span><span class="prob">85%</span></div>
+          <div class="prob-cell p-60-79"><span class="strike">$250</span><span class="prob">69%</span></div>
+          <div class="prob-cell empty"><span class="strike">$255</span><span class="prob">—</span></div>
+          <div class="prob-cell p-40-59 atm"><span class="strike">$260</span><span class="prob">48%</span></div>
+          <div class="prob-cell empty"><span class="strike">$265</span><span class="prob">—</span></div>
+          <div class="prob-cell p-20-39"><span class="strike">$270</span><span class="prob">26%</span></div>
+          <div class="prob-cell p-5-19"><span class="strike">$280</span><span class="prob">13%</span></div>
+          <div class="matrix-spark">
+            <svg viewBox="0 0 80 28" preserveAspectRatio="none" style="width:100%;height:100%;">
+              <polyline points="0,8 10,10 20,8 30,12 40,16 50,14 60,18 70,20 80,22" fill="none" stroke="#f87171" stroke-width="1.2"/>
+            </svg>
+          </div>
+          <div class="matrix-vol mono">
+            $23,718
+            <span class="delta">-5.4%</span>
+          </div>
+          <div class="matrix-action">
+            <button>OPEN →</button>
+          </div>
+        </a>
+
+      </div>
+    </div>
+
+    <!-- ACTIVITY: Recent fills + On-chain -->
+    <div class="activity-grid">
+      <div class="activity-card">
+        <div class="activity-card-h">
+          <h3>Recent Fills</h3>
+          <span class="live">live · 24 trades</span>
+        </div>
+        <div class="fill-row">
+          <span class="time">14:42:18</span>
+          <span class="market"><span class="ticker">META</span>.680</span>
+          <span class="side buy-yes">BUY YES</span>
+          <span class="price mono">0.520</span>
+          <span class="size mono">$200</span>
+        </div>
+        <div class="fill-row">
+          <span class="time">14:42:11</span>
+          <span class="market"><span class="ticker">NVDA</span>.1340</span>
+          <span class="side buy-no">BUY NO</span>
+          <span class="price mono">0.480</span>
+          <span class="size mono">$500</span>
+        </div>
+        <div class="fill-row">
+          <span class="time">14:41:54</span>
+          <span class="market"><span class="ticker">AAPL</span>.230</span>
+          <span class="side sell-yes">SELL YES</span>
+          <span class="price mono">0.520</span>
+          <span class="size mono">$100</span>
+        </div>
+        <div class="fill-row">
+          <span class="time">14:41:32</span>
+          <span class="market"><span class="ticker">TSLA</span>.260</span>
+          <span class="side buy-no">BUY NO</span>
+          <span class="price mono">0.530</span>
+          <span class="size mono">$1,000</span>
+        </div>
+        <div class="fill-row">
+          <span class="time">14:41:08</span>
+          <span class="market"><span class="ticker">META</span>.680</span>
+          <span class="side buy-yes">BUY YES</span>
+          <span class="price mono">0.500</span>
+          <span class="size mono">$50</span>
+        </div>
+        <div class="fill-row">
+          <span class="time">14:40:51</span>
+          <span class="market"><span class="ticker">GOOGL</span>.190</span>
+          <span class="side buy-yes">BUY YES</span>
+          <span class="price mono">0.370</span>
+          <span class="size mono">$300</span>
+        </div>
+        <div class="fill-row">
+          <span class="time">14:40:33</span>
+          <span class="market"><span class="ticker">MSFT</span>.440</span>
+          <span class="side sell-yes">SELL YES</span>
+          <span class="price mono">0.450</span>
+          <span class="size mono">$150</span>
+        </div>
+        <div class="fill-row">
+          <span class="time">14:40:12</span>
+          <span class="market"><span class="ticker">NVDA</span>.1300</span>
+          <span class="side buy-yes">BUY YES</span>
+          <span class="price mono">0.730</span>
+          <span class="size mono">$250</span>
+        </div>
+      </div>
+
+      <div class="activity-card">
+        <div class="activity-card-h">
+          <h3>On-Chain Status</h3>
+          <span class="live">live</span>
+        </div>
+        <div class="chain-panel-rows">
+          <div class="chain-panel-row">
+            <span class="lbl">Network</span>
+            <span class="val live">devnet · 42ms</span>
+          </div>
+          <div class="chain-panel-row">
+            <span class="lbl">Pyth oracle</span>
+            <span class="val live">fresh · 12s ago</span>
+          </div>
+          <div class="chain-panel-row">
+            <span class="lbl">Confidence</span>
+            <span class="val">12 bps (max 50)</span>
+          </div>
+          <div class="chain-panel-row">
+            <span class="lbl">Slot</span>
+            <span class="val accent">312,847,193</span>
+          </div>
+          <div class="chain-panel-row">
+            <span class="lbl">Slot drift</span>
+            <span class="val">+47 / 400ms</span>
+          </div>
+          <div class="chain-panel-row">
+            <span class="lbl">Program</span>
+            <span class="val">599h7V…kS7uV</span>
+          </div>
+          <div class="chain-panel-row">
+            <span class="lbl">Config PDA</span>
+            <span class="val">6CYzWh…ev9gQ</span>
+          </div>
+          <div class="chain-panel-row">
+            <span class="lbl">USDC mint</span>
+            <span class="val">4zMMC9…DncDU</span>
+          </div>
+          <div class="chain-panel-row">
+            <span class="lbl">Settle in</span>
+            <span class="val amber">02:13:47</span>
+          </div>
+          <div class="chain-panel-row">
+            <span class="lbl">Override eligible</span>
+            <span class="val">+1h after expiry</span>
+          </div>
+          <div class="chain-panel-row">
+            <span class="lbl">Anchor / Rust</span>
+            <span class="val">0.31.1 / 1.95</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- HOW IT WORKS -->
+    <div class="how-section">
+      <div class="how-h">How it works · 4 steps</div>
+      <div class="how-grid">
+        <div class="how-step">
+          <div class="how-step-num">01 / PICK</div>
+          <h4>Choose market + strike</h4>
+          <p>Pick a MAG7 ticker and a strike price for today's 4 PM ET close.</p>
+        </div>
+        <div class="how-step">
+          <div class="how-step-num">02 / TRADE</div>
+          <h4>Atomic Buy/Sell</h4>
+          <p>One signature. Phoenix CLOB matches orders. Sell anytime before settle.</p>
+        </div>
+        <div class="how-step">
+          <div class="how-step-num">03 / SETTLE</div>
+          <h4>Pyth oracle resolves</h4>
+          <p>4:00 PM ET close written on-chain. Permissionless crank — cron is convenience, not authority.</p>
+        </div>
+        <div class="how-step">
+          <div class="how-step-num">04 / REDEEM</div>
+          <h4>Claim $1 USDC</h4>
+          <p>Winners redeem $1 per contract. Losers burn to zero. Redeemable forever.</p>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Hotkey hint bar -->
+<div class="hotkey-bar">
+  <span><kbd>⌘K</kbd> search</span>
+  <span><kbd>↑↓</kbd> nav</span>
+  <span><kbd>↵</kbd> open</span>
+  <span><kbd>?</kbd> shortcuts</span>
+</div>
+
+<div class="mockup-badge">v7 · terminal · bloomberg-cyan · landing</div>
+
+<script>
+  function toggleTheme() {
+    const root = document.documentElement;
+    const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('bm-theme', next); } catch (e) {}
+  }
+  (function() {
+    try { const s = localStorage.getItem('bm-theme'); if (s === 'light') document.documentElement.setAttribute('data-theme', 'light'); } catch (e) {}
+  })();
+</script>
+
+</body>
+</html>
