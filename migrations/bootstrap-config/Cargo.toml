@@ -1,0 +1,21 @@
+# Standalone sub-workspace for the one-shot bootstrap-config tool.
+# Kept separate from the root BellMarkets Cargo workspace (which contains only
+# the BPF program) so its host-side deps (solana-client / tokio / reqwest) don't
+# bleed into the program's BPF compile path.
+
+[workspace]
+
+[package]
+name = "bootstrap-config"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "bootstrap-config"
+path = "src/main.rs"
+
+[dependencies]
+solana-client = "2.3"
+solana-sdk = "2.3"
+borsh = "1.5"
