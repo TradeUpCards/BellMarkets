@@ -1,0 +1,554 @@
+// BellMarkets — architecture-as-code (LikeC4)
+//
+// Run locally:        npx likec4 start docs/architecture
+// Or open in browser: https://playground.likec4.dev
+//
+// This model captures the system implemented across 4 workstreams
+// (Aria/Bram/Cleo/Drew) deployed on Solana devnet. It is the
+// single source of truth for "how the pieces talk to each other"
+// and supersedes the Mermaid diagram in ARCHITECTURE.md when they
+// disagree.
+
+specification {
+
+  // ------- element kinds -------
+
+  element actor {
+    style {
+      shape person
+      color secondary
+    }
+  }
+
+  element system
+
+  element container {
+    style {
+      shape rectangle
+    }
+  }
+
+  element component
+
+  element store {
+    style {
+      shape storage
+      color muted
+    }
+  }
+
+  // ------- tags -------
+
+  tag onchain         // lives in the Anchor program / on Solana
+  tag offchain        // lives off Solana (Trigger.dev / browser / RPC)
+  tag external        // not built by us
+  tag permissionless  // any signer can invoke
+  tag admin-only      // requires platform-admin keypair
+  tag deferred        // planned but not yet shipped
+}
+
+model {
+
+  // ============ ACTORS ============
+
+  trader = actor 'Trader' {
+    description '
+      Retail user who connects a Solana wallet (Phantom, Solflare)
+      and trades binary outcomes on daily MAG7 stock closes.
+      Non-custodial — frontend never sees the private key.
+    '
+  }
+
+  admin = actor 'Platform Admin' {
+    description '
+      Operator with the `7b17F2wo…Lprp5` keypair. Signs:
+      initialize_config (one-time), create_strike_market (morning cron),
+      pause (circuit breaker), admin_settle (manual override after delay).
+      Stewards: Aria. Funded with 10 SOL.
+    '
+  }
+
+  anyCranker = actor 'Anyone (cranker)' {
+    description '
+      DR-002: settle_market is permissionless. Any wallet can crank
+      settlement after expiry. Architectural commitment: automation
+      is a convenience, not authority.
+    '
+  }
+
+  // ============ EXTERNAL SYSTEMS ============
+
+  solana = system 'Solana Devnet' {
+    description 'L1 blockchain. Cluster: api.devnet.solana.com'
+    #external
+  }
+
+  pyth = system 'Pyth Network' {
+    description '
+      Pull-based oracle. Two surfaces we touch:
+      - On-chain price accounts (read via vendored 30-line parser)
+      - Hermes HTTP API (used off-chain for spot display + staleness check)
+    '
+    #external
+  }
+
+  phoenix = system 'Phoenix v1 CLOB' {
+    description '
+      On-chain limit-order book program by Ellipsis Labs.
+      Each StrikeMarket binds to a FIFOMarket account.
+      Magic constant verified: discriminant 8167313896524341111.
+    '
+    #external
+  }
+
+  circle = system 'Circle USDC' {
+    description '
+      Devnet USDC mint: 4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU
+      Pinned in MarketConfig.usdc_mint. Faucet: faucet.circle.com
+    '
+    #external
+  }
+
+  triggerDev = system 'Trigger.dev v4' {
+    description '
+      Hosted cron platform. Free tier sufficient for MVP.
+      Hosts the two scheduled jobs. Permissionless settle means
+      cron outage does not break the protocol.
+    '
+    #external
+  }
+
+  helius = system 'Helius RPC' {
+    description '
+      Solana RPC + WebSocket provider. Subscription-driven account
+      updates (Hard YES #9: no polling).
+    '
+    #external
+  }
+
+  walletAdapter = system 'Solana Wallet Adapter' {
+    description '
+      @solana/wallet-adapter-react. Bridges Phantom / Solflare to
+      the dApp without ever exposing the private key to our code.
+    '
+    #external
+  }
+
+  // ============ BELLMARKETS SYSTEM ============
+
+  bellMarkets = system 'BellMarkets' {
+    description '
+      Non-custodial Solana dApp for trading binary outcome contracts
+      on MAG7 stock closes. $1 USDC max payout per contract.
+      Same-day expiry (4 PM ET). Permissionless settlement.
+    '
+
+    // ---------- ONCHAIN PROGRAM (Aria) ----------
+
+    program = container 'Anchor Program' {
+      description '
+        Deployed at 599h7VznYR4CxyrG5nQbhR13qtRuwPcbnNr5QqbkS7uV
+        Anchor 0.31.1 / Rust 1.95. 9 instructions shipped + 1 deferred.
+        Owned by Aria.
+      '
+      #onchain
+      technology 'Rust / Anchor 0.31.1'
+
+      // ----- instructions -----
+
+      initConfig = component 'initialize_config' {
+        description 'Creates MarketConfig PDA. One-way door (#[account(init)]).'
+        #admin-only
+      }
+
+      createMarket = component 'create_strike_market' {
+        description '
+          Per-strike market creation. Validates Phoenix magic prefix.
+          Allocates StrikeMarket PDA + Yes/No mints + USDC vault.
+        '
+        #admin-only
+      }
+
+      addStrike = component 'add_strike' {
+        description 'No-op surface for future batch creator.'
+        #admin-only
+      }
+
+      mintPair = component 'mint_pair' {
+        description '
+          THE $1 INVARIANT PRIMITIVE: 1 USDC → 1 YES + 1 NO.
+          Any user, any time before settle. Permissionless.
+        '
+        #permissionless
+      }
+
+      settleMarket = component 'settle_market' {
+        description '
+          DR-002: Permissionless. Reads Pyth, writes outcome,
+          locks settle_price. Any signer can crank after expiry.
+        '
+        #permissionless
+      }
+
+      adminSettle = component 'admin_settle' {
+        description '
+          Manual outcome override. Eligible only after expiry +
+          admin_override_delay_secs (1 hour default).
+        '
+        #admin-only
+      }
+
+      redeem = component 'redeem' {
+        description 'Burn winning token → $1 USDC. Post-settle only.'
+        #permissionless
+      }
+
+      redeemInvalid = component 'redeem_invalid' {
+        description '
+          Burn equal YES + NO for $1 USDC refund. Invalid outcome only
+          (e.g., oracle staleness during settle window).
+        '
+        #permissionless
+      }
+
+      pauseIx = component 'pause' {
+        description 'Global circuit breaker. Halts mint + trade paths.'
+        #admin-only
+      }
+
+      redeemPair = component 'redeem_pair' {
+        description '
+          PLANNED (next Aria session): burn equal YES + NO pre-settlement
+          for $1 USDC refund. Inverse of mint_pair. Required for the
+          atomic Sell No flow (POV-3) — Cleo blocked until shipped.
+        '
+        #permissionless
+        #deferred
+      }
+
+      // ----- adapters -----
+
+      pythAdapter = component 'Pyth adapter' {
+        description '30-line vendored price-account parser (Hard Rule §4.13).'
+      }
+
+      phoenixAdapter = component 'Phoenix adapter' {
+        description 'UncheckedAccount + magic-prefix verification (Hard Rule §4.12).'
+      }
+    }
+
+    // ---------- ONCHAIN DATA STORES ----------
+
+    marketConfig = store 'MarketConfig PDA' {
+      description '
+        Singleton. Address: 6CYzWhTMzsndRrnRcHgWCUfVDvrRh3Cfoze6GSVev9gQ
+        Holds admin pubkey, USDC mint, staleness/confidence policy,
+        admin-override delay, paused flag.
+      '
+      #onchain
+    }
+
+    strikeMarkets = store 'StrikeMarket PDAs' {
+      description '
+        One per (ticker, strike, expiry). Holds outcome enum,
+        settle_price, pairs_outstanding, Phoenix-market binding.
+      '
+      #onchain
+    }
+
+    yesNoMints = store 'YES / NO token mints' {
+      description 'SPL token mints, one pair per StrikeMarket. Authority = program PDA.'
+      #onchain
+    }
+
+    usdcVault = store 'USDC vault (per market)' {
+      description 'PDA-owned token account. Holds 1 USDC per pair outstanding.'
+      #onchain
+    }
+
+    // ---------- AUTOMATION SERVICE (Bram) ----------
+
+    automation = container 'Automation Service' {
+      description '
+        Trigger.dev v4 cron jobs. Owned by Bram.
+        76/76 vitest. Deferred-import pattern dodges DR-004 cascade.
+      '
+      #offchain
+      technology 'Node 22 / TypeScript / Trigger.dev'
+
+      morningJob = component 'Morning create-markets' {
+        description '
+          Cron 0 13 * * 1-5 (8 AM ET). Reads PYTH_HERMES_FEED_IDS,
+          computes ATM ± 3/6/9% strikes, calls create_strike_market
+          for each MAG7 ticker. Idempotent.
+        '
+      }
+
+      settlementJob = component 'Settlement nudger' {
+        description '
+          Cron 5 21 * * 1-5 (4:05 PM ET). For each unsettled market past
+          expiry, calls settle_market with PRD 30s × 15min retry harness.
+          Retries on PythConfidenceTooWide / PythStale / RPC blips.
+        '
+      }
+
+      retryHelper = component 'retryUntilDeadline' {
+        description '
+          Generic deadline-bounded retry. Injectable clock + sleep.
+          Pure function — testable without web3.js or Trigger.dev runtime.
+        '
+      }
+
+      heliusClient = component 'Helius RPC client' {
+        description 'Subscription wrappers + Anchor program loader. Deferred web3.js import.'
+      }
+
+      hermesClient = component 'Pyth Hermes client' {
+        description 'HTTP fetch for off-chain price reads. Injectable fetchImpl.'
+      }
+
+      strikeCalc = component 'strike-calc' {
+        description 'Pure math: ATM ± 3/6/9% with PRD-verified META + AAPL test vectors.'
+      }
+    }
+
+    // ---------- FRONTEND (Cleo) ----------
+
+    frontend = container 'Web App' {
+      description '
+        Next.js 14 / React 18 / TypeScript strict. Owned by Cleo.
+        Subscription-driven (Hard YES #9): no polling.
+        Data layer complete; visual layer pending mockup decision.
+      '
+      #offchain
+      technology 'Next.js 14 / React 18 / TanStack Query'
+
+      pages = component 'Pages' {
+        description '5 routes: /, /markets, /trade/[ticker]/[strike], /portfolio, /history'
+      }
+
+      walletConnect = component 'Wallet integration' {
+        description '@solana/wallet-adapter-react + Phantom + Solflare. No private-key access.'
+      }
+
+      hooks = component 'Anchor client hooks' {
+        description '
+          6 hooks: useAccountSubscription, useAllMarkets, useMarketAccount,
+          useTokenBalance, usePosition, useOrderBook. All subscription-driven
+          via Helius WebSocket → TanStack Query bridge.
+        '
+      }
+
+      txBuilders = component 'Atomic tx builders' {
+        description '
+          7 builders: mintPair, redeem, buyYes, sellYes, buyNo (atomic),
+          sellNo (stub — blocked on redeem_pair), phoenix.ts helper.
+          POV-3: Buy No / Sell No are first-class atomic ops.
+        '
+      }
+
+      phoenixReader = component 'Phoenix SDK reader' {
+        description '@ellipsis-labs/phoenix-sdk for order-book reads.'
+      }
+
+      idlClient = component 'useBellMarketsProgram' {
+        description 'Returns a real Program<Idl> from committed IDL at programs/bell-markets/idl/.'
+      }
+    }
+
+    // ---------- QUALITY (Drew) ----------
+
+    quality = container 'Integration + Eval Suite' {
+      description '
+        Drew\'s cross-workstream verification layer.
+        mocha+chai+ts-mocha for contracts. Vitest for service. Jest for frontend.
+      '
+      #offchain
+      technology 'mocha + chai + ts-mocha'
+
+      simulation = component 'simulate-trading-day.mjs' {
+        description '
+          Compressed-time lifecycle simulation. 60s = 1 trading day.
+          3 wallets exercise full flow: create → mint → trade → settle → redeem.
+          Replaces traditional fast-check/proptest per Hard YES.
+        '
+      }
+
+      edgeCases = component 'Mocha edge cases' {
+        description '
+          I3 second-settle immutability + DR-002 permissionless-settle
+          from unfunded keypair (proves architectural commitments).
+        '
+      }
+
+      ariaMock = component 'aria-interface mock' {
+        description 'TypeScript mirror of Anchor IDL for fast offline iteration.'
+      }
+    }
+  }
+
+  // ============ RELATIONSHIPS ============
+
+  // --- user-facing flows ---
+  trader -> walletAdapter 'Approves transactions'
+  trader -> bellMarkets.frontend 'Trades via browser'
+  walletAdapter -> trader 'Signs tx; private key never leaves'
+
+  // --- admin operates automation ---
+  admin -> bellMarkets.automation 'Operates cron (or runs locally with platform-admin keypair)'
+  admin -> bellMarkets.program 'Calls admin-only ix (initialize_config, pause, admin_settle)'
+
+  // --- anyone can crank ---
+  anyCranker -> bellMarkets.program 'settle_market / mint_pair / redeem (DR-002)'
+
+  // --- frontend → program ---
+  bellMarkets.frontend.idlClient -> bellMarkets.program 'Signed RPC calls via wallet adapter'
+  bellMarkets.frontend.txBuilders -> bellMarkets.program 'Builds + submits atomic transactions'
+  bellMarkets.frontend.hooks -> helius 'WebSocket subscriptions on account changes'
+  bellMarkets.frontend.phoenixReader -> phoenix 'Reads CLOB state'
+  bellMarkets.frontend -> walletAdapter 'Uses wallet for signing'
+
+  // --- automation → program ---
+  bellMarkets.automation.morningJob -> bellMarkets.program.createMarket 'Signs with platform admin'
+  bellMarkets.automation.settlementJob -> bellMarkets.program.settleMarket 'Cranks each unsettled market'
+  bellMarkets.automation.morningJob -> bellMarkets.automation.strikeCalc 'Computes strikes'
+  bellMarkets.automation.morningJob -> bellMarkets.automation.heliusClient 'Loads program for tx submission'
+  bellMarkets.automation.settlementJob -> bellMarkets.automation.retryHelper 'Bounds retry to PRD 15-min window'
+  bellMarkets.automation.settlementJob -> bellMarkets.automation.heliusClient 'Lists all open markets'
+  bellMarkets.automation.morningJob -> bellMarkets.automation.hermesClient 'Reads spot price for strike calc'
+  bellMarkets.automation -> triggerDev 'Scheduled via free tier'
+
+  // --- program → external ---
+  bellMarkets.program -> solana 'Deployed at 599h7V…kS7uV'
+  bellMarkets.program.pythAdapter -> pyth 'Reads on-chain price account in settle_market'
+  bellMarkets.program.phoenixAdapter -> phoenix 'Verifies magic prefix on bound market'
+  bellMarkets.program -> circle 'Vault holds USDC; mint pinned in MarketConfig'
+
+  // --- program → its own data ---
+  bellMarkets.program -> bellMarkets.marketConfig 'reads admin + policy'
+  bellMarkets.program -> bellMarkets.strikeMarkets 'mutates outcome, pairs_outstanding'
+  bellMarkets.program -> bellMarkets.yesNoMints 'mints / burns per ix'
+  bellMarkets.program -> bellMarkets.usdcVault 'transfers in (mint_pair) / out (redeem*)'
+
+  // --- quality observes ---
+  bellMarkets.quality.simulation -> bellMarkets.program 'End-to-end live program calls'
+  bellMarkets.quality.simulation -> bellMarkets.automation 'Optionally exercises cron paths'
+  bellMarkets.quality.edgeCases -> bellMarkets.program 'I3 + DR-002 invariant tests'
+}
+
+views {
+
+  // ----- TOP-LEVEL: BellMarkets in its ecosystem -----
+
+  view index {
+    title 'BellMarkets — System Context'
+    description 'How BellMarkets fits into Solana + external services'
+
+    include *
+
+    style * {
+      color primary
+    }
+    style trader, admin, anyCranker {
+      color secondary
+    }
+    style solana, pyth, phoenix, circle, triggerDev, helius, walletAdapter {
+      color muted
+    }
+  }
+
+  // ----- ZOOMED: inside BellMarkets -----
+
+  view containers of bellMarkets {
+    title 'BellMarkets — Containers'
+    description 'The 4 internal containers + their on-chain data stores'
+
+    include
+      bellMarkets,
+      bellMarkets.*,
+      trader,
+      admin,
+      anyCranker,
+      solana,
+      pyth,
+      phoenix,
+      circle,
+      triggerDev,
+      helius,
+      walletAdapter
+  }
+
+  // ----- ANCHOR PROGRAM ZOOM -----
+
+  view program of bellMarkets.program {
+    title 'Anchor Program — Instructions'
+    description '9 shipped instructions + 1 planned. Permissionless vs admin-only highlighted.'
+
+    include
+      bellMarkets.program,
+      bellMarkets.program.*,
+      bellMarkets.marketConfig,
+      bellMarkets.strikeMarkets,
+      bellMarkets.yesNoMints,
+      bellMarkets.usdcVault,
+      pyth,
+      phoenix,
+      circle
+
+    style bellMarkets.program.* {
+      color primary
+    }
+    style element.kind = component, element.tag = permissionless {
+      color green
+    }
+    style element.kind = component, element.tag = admin-only {
+      color amber
+    }
+    style element.kind = component, element.tag = deferred {
+      color muted
+    }
+  }
+
+  // ----- AUTOMATION ZOOM -----
+
+  view automation of bellMarkets.automation {
+    title 'Automation Service — Cron Jobs'
+
+    include
+      bellMarkets.automation,
+      bellMarkets.automation.*,
+      bellMarkets.program.createMarket,
+      bellMarkets.program.settleMarket,
+      triggerDev,
+      helius,
+      pyth,
+      admin
+  }
+
+  // ----- FRONTEND ZOOM -----
+
+  view frontend of bellMarkets.frontend {
+    title 'Frontend — Trade Flow'
+
+    include
+      bellMarkets.frontend,
+      bellMarkets.frontend.*,
+      bellMarkets.program,
+      trader,
+      walletAdapter,
+      helius,
+      phoenix
+  }
+
+  // ----- QUALITY ZOOM -----
+
+  view quality of bellMarkets.quality {
+    title 'Quality + Integration'
+
+    include
+      bellMarkets.quality,
+      bellMarkets.quality.*,
+      bellMarkets.program,
+      bellMarkets.automation
+  }
+}
