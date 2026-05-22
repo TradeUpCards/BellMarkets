@@ -28,12 +28,22 @@ pub struct AdminSettle<'info> {
     pub clock: Sysvar<'info, Clock>,
 }
 
-pub fn handler(_ctx: Context<AdminSettle>, _forced_outcome: Outcome) -> Result<()> {
-    // Day-1: surface. Day-2:
-    //   - require forced_outcome != Outcome::Unsettled
-    //   - require clock.unix_timestamp >= strike_market.expiry_unix + config.admin_override_delay_secs
-    //     (AdminOverrideTooEarly)
-    //   - write outcome, settled_at_unix; leave settle_price = 0 to flag admin-pathed settle
-    //   - emit AdminSettledEvent
+pub fn handler(ctx: Context<AdminSettle>, forced_outcome: Outcome) -> Result<()> {
+    require!(
+        forced_outcome != Outcome::Unsettled,
+        BellMarketsError::ForcedOutcomeUnsettled
+    );
+    let now = ctx.accounts.clock.unix_timestamp;
+    require!(
+        now >= ctx.accounts.strike_market.admin_override_eligible_at,
+        BellMarketsError::AdminOverrideTooEarly
+    );
+
+    let sm = &mut ctx.accounts.strike_market;
+    sm.outcome = forced_outcome;
+    sm.settled_at_unix = now;
+    // settle_price / settle_confidence / settle_slot intentionally left at 0
+    // to signal "admin-pathed settle" — downstream tooling can distinguish
+    // oracle-derived settles (price != 0) from admin overrides (price == 0).
     Ok(())
 }

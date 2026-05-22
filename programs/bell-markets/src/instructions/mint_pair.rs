@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{Mint, Token, TokenAccount};
+use anchor_spl::token::{self, Mint, MintTo, Token, TokenAccount, Transfer};
 use crate::state::*;
 use crate::errors::BellMarketsError;
 
@@ -58,12 +58,62 @@ pub struct MintPair<'info> {
     pub token_program: Program<'info, Token>,
 }
 
-pub fn handler(_ctx: Context<MintPair>, _amount: u64) -> Result<()> {
-    // Day-1: ix wired. Day-2:
-    //   - require!(amount > 0, ZeroAmount)
-    //   - transfer amount USDC user_usdc -> usdc_vault (CPI to spl-token)
-    //   - mint amount of yes_mint -> user_yes (signer: strike_market PDA)
-    //   - mint amount of no_mint  -> user_no  (signer: strike_market PDA)
-    //   - emit MintPairEvent
+pub fn handler(ctx: Context<MintPair>, amount: u64) -> Result<()> {
+    require!(amount > 0, BellMarketsError::ZeroAmount);
+
+    // Transfer `amount` USDC from user → strike_market vault. User is signer.
+    token::transfer(
+        CpiContext::new(
+            ctx.accounts.token_program.to_account_info(),
+            Transfer {
+                from: ctx.accounts.user_usdc.to_account_info(),
+                to: ctx.accounts.usdc_vault.to_account_info(),
+                authority: ctx.accounts.user.to_account_info(),
+            },
+        ),
+        amount,
+    )?;
+
+    // Mint `amount` of YES + NO to the user. Authority is strike_market PDA,
+    // so we sign with its seeds: [b"strike", pyth_feed, expiry_le, strike_le, bump].
+    let pyth_feed = ctx.accounts.strike_market.underlying_pyth_feed;
+    let expiry_le = ctx.accounts.strike_market.expiry_unix.to_le_bytes();
+    let strike_le = ctx.accounts.strike_market.strike_price.to_le_bytes();
+    let bump = [ctx.accounts.strike_market.bump];
+    let seeds: &[&[u8]] = &[
+        b"strike",
+        pyth_feed.as_ref(),
+        expiry_le.as_ref(),
+        strike_le.as_ref(),
+        bump.as_ref(),
+    ];
+    let signer_seeds: &[&[&[u8]]] = &[seeds];
+
+    token::mint_to(
+        CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            MintTo {
+                mint: ctx.accounts.yes_mint.to_account_info(),
+                to: ctx.accounts.user_yes.to_account_info(),
+                authority: ctx.accounts.strike_market.to_account_info(),
+            },
+            signer_seeds,
+        ),
+        amount,
+    )?;
+
+    token::mint_to(
+        CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            MintTo {
+                mint: ctx.accounts.no_mint.to_account_info(),
+                to: ctx.accounts.user_no.to_account_info(),
+                authority: ctx.accounts.strike_market.to_account_info(),
+            },
+            signer_seeds,
+        ),
+        amount,
+    )?;
+
     Ok(())
 }

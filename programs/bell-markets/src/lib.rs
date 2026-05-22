@@ -25,10 +25,12 @@ pub mod instructions;
 use instructions::*;
 use state::Outcome;
 
-// Placeholder. Replaced by `anchor build && anchor keys sync` once a real
-// keypair lands at target/deploy/bell_markets-keypair.json. The mainnet ID is
-// intentionally never declared (Hard NO #1).
-declare_id!("BeLLMrKtsProGramID1111111111111111111111111");
+// Program ID derived from keys/devnet-program-keypair.json (gitignored; also
+// mirrored at target/deploy/bell_markets-keypair.json where Anchor reads it
+// at build/deploy time). Generated 2026-05-21 Day-2 by Aria via
+// solana-keygen --silent. Mainnet ID is intentionally never declared
+// (Hard NO #1).
+declare_id!("599h7VznYR4CxyrG5nQbhR13qtRuwPcbnNr5QqbkS7uV");
 
 #[program]
 pub mod bell_markets {

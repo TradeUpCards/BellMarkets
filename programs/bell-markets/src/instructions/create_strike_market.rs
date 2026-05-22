@@ -83,12 +83,37 @@ pub struct CreateStrikeMarket<'info> {
 
 pub fn handler(
     ctx: Context<CreateStrikeMarket>,
-    _strike_price: i64,
-    _expiry_unix: i64,
+    strike_price: i64,
+    expiry_unix: i64,
 ) -> Result<()> {
-    // Day-1: prove the magic-prefix path is hooked up. Real state writes
-    // land Day-2 (binding strike_price/expiry/pyth_feed/phoenix_market into
-    // strike_market and computing admin_override_eligible_at).
+    require!(strike_price > 0, BellMarketsError::InvalidStrikePrice);
+    let now = Clock::get()?.unix_timestamp;
+    require!(expiry_unix > now, BellMarketsError::ExpiryInPast);
+
     verify_phoenix_market(&ctx.accounts.phoenix_market.to_account_info())?;
+
+    let override_eligible_at = expiry_unix
+        .checked_add(ctx.accounts.config.admin_override_delay_secs)
+        .ok_or(BellMarketsError::MathOverflow)?;
+
+    let sm = &mut ctx.accounts.strike_market;
+    sm.config = ctx.accounts.config.key();
+    sm.underlying_pyth_feed = ctx.accounts.underlying_pyth_feed.key();
+    sm.strike_price = strike_price;
+    sm.expiry_unix = expiry_unix;
+    sm.yes_mint = ctx.accounts.yes_mint.key();
+    sm.no_mint = ctx.accounts.no_mint.key();
+    sm.usdc_vault = ctx.accounts.usdc_vault.key();
+    sm.phoenix_market = ctx.accounts.phoenix_market.key();
+    sm.settle_price = 0;
+    sm.settle_confidence = 0;
+    sm.settle_slot = 0;
+    sm.settled_at_unix = 0;
+    sm.outcome = Outcome::Unsettled;
+    sm.admin_override_eligible_at = override_eligible_at;
+    sm.bump = ctx.bumps.strike_market;
+    sm.yes_mint_bump = ctx.bumps.yes_mint;
+    sm.no_mint_bump = ctx.bumps.no_mint;
+    sm.vault_bump = ctx.bumps.usdc_vault;
     Ok(())
 }

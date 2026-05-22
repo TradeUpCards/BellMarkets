@@ -16,7 +16,7 @@ pub struct Pause<'info> {
     pub config: Box<Account<'info, MarketConfig>>,
 }
 
-pub fn handler(_ctx: Context<Pause>, _paused: bool) -> Result<()> {
-    // Day-2: ctx.accounts.config.paused = paused; emit PauseEvent
+pub fn handler(ctx: Context<Pause>, paused: bool) -> Result<()> {
+    ctx.accounts.config.paused = paused;
     Ok(())
 }

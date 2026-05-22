@@ -64,4 +64,16 @@ pub enum BellMarketsError {
 
     #[msg("Math overflow (checked).")]
     MathOverflow,
+
+    #[msg("InitializeConfig param out of allowed bounds (see instruction MAX_* constants).")]
+    InvalidConfigParam,
+
+    #[msg("Strike price must be > 0.")]
+    InvalidStrikePrice,
+
+    #[msg("Expiry timestamp is in the past.")]
+    ExpiryInPast,
+
+    #[msg("admin_settle forced_outcome must be Yes / No / Invalid (not Unsettled).")]
+    ForcedOutcomeUnsettled,
 }

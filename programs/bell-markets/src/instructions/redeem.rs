@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{Mint, Token, TokenAccount};
+use anchor_spl::token::{self, Burn, Mint, Token, TokenAccount, Transfer};
 use crate::state::*;
 use crate::errors::BellMarketsError;
 
@@ -47,13 +47,67 @@ pub struct Redeem<'info> {
     pub token_program: Program<'info, Token>,
 }
 
-pub fn handler(_ctx: Context<Redeem>, _amount: u64) -> Result<()> {
-    // Day-1: surface. Day-2:
-    //   - require amount > 0 (ZeroAmount)
-    //   - outcome must be Yes / No / Invalid (InvalidOutcomeForRedeem already filtered)
-    //   - if outcome == Invalid: user must burn equal amounts of yes+no for refund
-    //   - else: user burns `amount` of winning_mint, vault transfers `amount` USDC out
-    //   - CPI burn (authority = user); CPI transfer from vault (authority = strike_market PDA)
-    //   - emit RedeemedEvent
+pub fn handler(ctx: Context<Redeem>, amount: u64) -> Result<()> {
+    require!(amount > 0, BellMarketsError::ZeroAmount);
+
+    // Day-2 scope: Yes/No only. Invalid (oracle-down + admin-override path)
+    // refunds 1 USDC per (YES+NO) pair burned, so it needs a different
+    // Accounts struct (both mints + both user token accounts). That goes in
+    // a follow-up `redeem_invalid` instruction; for now reject the path here.
+    let outcome = ctx.accounts.strike_market.outcome;
+    require!(outcome != Outcome::Invalid, BellMarketsError::InvalidOutcomeForRedeem);
+    let expected_winning_mint = match outcome {
+        Outcome::Yes => ctx.accounts.strike_market.yes_mint,
+        Outcome::No => ctx.accounts.strike_market.no_mint,
+        // Unsettled is already filtered by the Accounts struct constraint
+        // (strike_market.outcome != Outcome::Unsettled). Invalid is rejected
+        // above. So we can only reach this match arm with Yes or No.
+        _ => unreachable!(),
+    };
+    require!(
+        ctx.accounts.winning_mint.key() == expected_winning_mint,
+        BellMarketsError::InvalidOutcomeForRedeem
+    );
+
+    // Burn `amount` of winning_mint from user (user authority).
+    token::burn(
+        CpiContext::new(
+            ctx.accounts.token_program.to_account_info(),
+            Burn {
+                mint: ctx.accounts.winning_mint.to_account_info(),
+                from: ctx.accounts.user_winning_token.to_account_info(),
+                authority: ctx.accounts.user.to_account_info(),
+            },
+        ),
+        amount,
+    )?;
+
+    // Transfer `amount` USDC vault → user. Vault authority is strike_market PDA.
+    let pyth_feed = ctx.accounts.strike_market.underlying_pyth_feed;
+    let expiry_le = ctx.accounts.strike_market.expiry_unix.to_le_bytes();
+    let strike_le = ctx.accounts.strike_market.strike_price.to_le_bytes();
+    let bump = [ctx.accounts.strike_market.bump];
+    let seeds: &[&[u8]] = &[
+        b"strike",
+        pyth_feed.as_ref(),
+        expiry_le.as_ref(),
+        strike_le.as_ref(),
+        bump.as_ref(),
+    ];
+    let signer_seeds: &[&[&[u8]]] = &[seeds];
+
+    token::transfer(
+        CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            Transfer {
+                from: ctx.accounts.usdc_vault.to_account_info(),
+                to: ctx.accounts.user_usdc.to_account_info(),
+                authority: ctx.accounts.strike_market.to_account_info(),
+            },
+            signer_seeds,
+        ),
+        amount,
+    )?;
+
     Ok(())
 }
