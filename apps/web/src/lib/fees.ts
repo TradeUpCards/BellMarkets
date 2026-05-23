@@ -120,13 +120,18 @@ export function projectMintFee(
   const tierFeeBps = feeBpsForTier(tier);
 
   if (configMintFeeBps === 0) {
+    // Fees globally disabled. The creator-rebate anti-gaming safeguard
+    // (DR-008 §"Critical safeguard") gates on whether the rebate FIRED —
+    // it can't fire when there's no fee to rebate. So tier-progression
+    // attribution stays on for everyone during the fee-disabled launch
+    // window. Per audit P1-B (2026-05-23).
     return {
       tier,
       tierFeeBps,
       effectiveFeeBps: 0,
       feeMicros: 0n,
       totalCostMicros: amountMicros,
-      countsTowardVolume: !creatorRebateApplies,
+      countsTowardVolume: true,
     };
   }
 

@@ -132,11 +132,25 @@ export async function buildSmartSolToUsdcSwap(
  * and convert via `Math.floor(lamports / Number(market.data.header.baseLotSize))`.
  * Day-5 task is structural; refine when wiring the live UI.
  */
+/**
+ * Sanity ceiling on the SOL → Phoenix-base-lots conversion. Without knowing
+ * the live `baseLotsPerBaseUnit` on Phoenix's devnet SOL/USDC market we cap
+ * the projected lot count at the equivalent of ~50 SOL (5e10 lamports). If
+ * a caller requests more, refuse — better to error than to ship a giant
+ * Phoenix order built from a wrong scaler. (See audit P2-C 2026-05-23.)
+ */
+const MAX_SAFE_PHOENIX_SOL_LOTS = 50_000_000_000;
+
 function lamportsToPhoenixSolBaseLots(lamports: bigint): number {
   const asNum = Number(lamports);
   if (!Number.isFinite(asNum)) {
     throw new Error(
       "buildSmartSolToUsdcSwap: amountLamports too large for safe Number conversion.",
+    );
+  }
+  if (asNum > MAX_SAFE_PHOENIX_SOL_LOTS) {
+    throw new Error(
+      `buildSmartSolToUsdcSwap: requested Phoenix swap of ${asNum} lamports exceeds safe lot cap (${MAX_SAFE_PHOENIX_SOL_LOTS}). Pass a loaded MarketState to use baseLotsPerBaseUnit for the real conversion.`,
     );
   }
   return asNum;
