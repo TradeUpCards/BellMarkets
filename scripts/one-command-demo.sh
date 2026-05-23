@@ -104,9 +104,15 @@ node scripts/simulate-trading-day.mjs --outcome=invalid >/dev/null && ok "invali
 echo ""
 
 # ── Step 5: Cron-failure / DR-002 evidence ─────────────────────────────
-step "[5/6] Cron-failure / DR-002 chain evidence"
+step "[5/6] Cron-failure / DR-002 evidence (HY-5)"
 note "Sim Phase 3 (above) settles via Carol (non-admin) — DR-002 modeled"
-note "Full demo: docs/demo/cron-failure-path.md (3-min live narrative)"
+note "Full narrative: docs/demo/cron-failure-path.md"
+
+# HY-5 evidence — kill the cron mid-settle in the offline sim. Matches Bram's
+# exhausted-state log shape from .project/bell-markets/coordination/cron-failure.md.
+node scripts/simulate-trading-day.mjs --kill-cron-at=phase3 >/dev/null && \
+  ok "cron-kill sim: market remains Unsettled; fresh keypair cranks settle; 5 invariants hold"
+
 if [[ "${LIVE_DEMO:-0}" == "1" ]]; then
   # live-program-call.test.ts test 4 simulates settle_market signed by Drew
   # (non-admin) against a real seeded StrikeMarket and asserts NotExpired (6003).
@@ -117,7 +123,7 @@ if [[ "${LIVE_DEMO:-0}" == "1" ]]; then
     warn "DR-002 chain proof: expected test name not found in output"
   fi
 else
-  ok "skipped (set LIVE_DEMO=1 to run live chain proof)"
+  ok "live chain proof skipped (set LIVE_DEMO=1 to run)"
 fi
 echo ""
 

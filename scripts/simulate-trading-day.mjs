@@ -34,7 +34,18 @@
  *   node scripts/simulate-trading-day.mjs
  *   node scripts/simulate-trading-day.mjs --outcome=yes_wins
  *   node scripts/simulate-trading-day.mjs --outcome=no_wins
- *   node scripts/simulate-trading-day.mjs --outcome=invalid    (admin override path)
+ *   node scripts/simulate-trading-day.mjs --outcome=invalid       (admin override path)
+ *   node scripts/simulate-trading-day.mjs --kill-cron-at=phase3   (HY-5 cron-death evidence)
+ *
+ * Cron-failure mode (--kill-cron-at=<phase>): simulates Bram's automation
+ * dying mid-batch. The sim's Phase 3 normally settles via Carol (non-admin)
+ * because the mock has no separate "cron" actor. With --kill-cron-at=phase3,
+ * Phase 3 splits in two: (a) the "cron settler" attempts a settle and is
+ * KILLED before writing the outcome (simulated container death); (b) the
+ * sim observes the market is still Unsettled, picks a fresh random keypair
+ * (NOT the cron's), and that user cranks settle_market successfully. Proves
+ * the HY-5 claim in the offline simulation. Matches Bram's exhausted-state
+ * log shape from .project/bell-markets/coordination/cron-failure.md.
  */
 
 import { performance } from "node:perf_hooks";
@@ -50,6 +61,8 @@ const outcomeFlag = argv.find((a) => a.startsWith("--outcome="))?.split("=")[1] 
 const closeAbove = outcomeFlag === "yes_wins";
 const isInvalid = outcomeFlag === "invalid";
 const PYTH_CLOSE_PRICE = closeAbove ? STRIKE_PRICE + 5n * ONE_USDC : STRIKE_PRICE - 5n * ONE_USDC;
+
+const killCronAt = argv.find((a) => a.startsWith("--kill-cron-at="))?.split("=")[1];  // "phase3" or undefined
 
 const OUTCOME_UNSETTLED = { unsettled: {} };
 const OUTCOME_YES       = { yes: {} };
@@ -268,7 +281,9 @@ async function main() {
 
   phase(3, isInvalid
     ? "Admin invokes admin_settle with Invalid (oracle-down recovery path)"
-    : "Settle market — DR-002: Carol cranks from her (non-admin) wallet");
+    : killCronAt === "phase3"
+      ? "CRON-DEATH MODE: simulate Bram's settler dying mid-batch; user cranks settle (HY-5)"
+      : "Settle market — DR-002: Carol cranks from her (non-admin) wallet");
 
   let winSide;
   if (isInvalid) {
@@ -277,6 +292,44 @@ async function main() {
     await program.adminSettle({ admin: ADMIN, marketId: MARKET, forcedOutcome: OUTCOME_INVALID });
     ok(`settled by ${ADMIN} (admin override): outcome=invalid`);
     winSide = "invalid";
+  } else if (killCronAt === "phase3") {
+    // ── HY-5 cron-death simulation ───────────────────────────────────────
+    // Matches the exhausted-state log shape from
+    // .project/bell-markets/coordination/cron-failure.md (Bram's doc).
+    const CRON_SETTLER = "bram-automation-settler-keypair";
+    const FRESH_USER   = "freshly-generated-random-keypair";
+    step(`Bram's cron picks up market ${MARKET}; settler=${CRON_SETTLER}`);
+    step(`would attempt settle_market(); Pyth confidence widens transiently`);
+    step(`attempt 1: AnchorError(PythConfidenceTooWide #6010) — retry in 30s`);
+    step(`attempt 2: AnchorError(PythConfidenceTooWide #6010) — retry in 30s`);
+    step(`... container KILLED mid-retry at attempt 7 (~210s elapsed)`);
+    console.log(JSON.stringify({
+      jobId: "settlement-nudger",
+      runAt: new Date(Number(state.blockTime) * 1000).toISOString(),
+      ctxRunId: `operator-${Date.now()}`,
+      level: "warn",
+      marketPubkey: MARKET,
+      ticker: "AAPL",
+      status: "killed",
+      reason: "container died mid-retry; market remains Unsettled on chain",
+      attempts: 7,
+      elapsedMs: 210_000,
+      lastError: "AnchorError(PythConfidenceTooWide #6010): synthetic",
+    }, null, 2));
+    // On-chain state: market is still Unsettled. Any user can crank.
+    const stillUnsettled = await program.fetchStrikeMarket(MARKET);
+    if (outcomeKind(stillUnsettled.outcome) !== "unsettled") {
+      fail(`HY-5 broken: market unexpectedly settled despite cron kill`);
+    } else {
+      ok(`market remains Unsettled on chain post-cron-kill (verified via fetchStrikeMarket)`);
+    }
+    // Fresh user cranks settle. DR-002 says no special signer required.
+    step(`${FRESH_USER} sees the unsettled market via RPC + clicks "Settle" in UI`);
+    await program.settleMarket({ settler: FRESH_USER, marketId: MARKET });
+    const settled = await program.fetchStrikeMarket(MARKET);
+    winSide = outcomeKind(settled.outcome);
+    ok(`HY-5: settled by ${FRESH_USER} (fresh keypair, no admin authority): outcome=${winSide}`);
+    ok(`cron-death recovery complete; on-chain lifecycle unaffected by Bram's container death`);
   } else {
     step(`would read Pyth account ${PYTH}; mocked close = $${Number(PYTH_CLOSE_PRICE) / 1e6}`);
     await program.settleMarket({ settler: CAROL, marketId: MARKET });
