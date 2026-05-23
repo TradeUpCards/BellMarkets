@@ -3071,13 +3071,20 @@
       card.classList.remove('sell-empty');
 
       if (side === 'buy') {
-        // BUY YES or BUY NO — Amount in USDC, fill at ask
+        // BUY YES or BUY NO — Amount = MAX total USDC user wants to spend.
+        // Derive INTEGER contracts that fit within budget after fees + slippage,
+        // so the displayed total never exceeds what the user entered.
         const ask = market[outcome].ask;
         const usdcAmt = parseFloat(inputAmt.value) || 0;
-        const fee = usdcAmt * feeBps / 10000;
-        const slip = usdcAmt * 0.012; // 1.2% est
-        const totalCost = usdcAmt + fee + slip;
-        const contracts = usdcAmt / ask;
+        const feeRatio = feeBps / 10000;
+        const slipRatio = 0.012; // 1.2% est slippage
+        // Solve: contracts * ask * (1 + feeRatio + slipRatio) ≤ usdcAmt
+        const maxAffordable = usdcAmt / (ask * (1 + feeRatio + slipRatio));
+        const contracts = Math.floor(maxAffordable);
+        const contractsCost = contracts * ask;
+        const fee = contractsCost * feeRatio;
+        const slip = contractsCost * slipRatio;
+        const totalCost = contractsCost + fee + slip;
         const maxPayout = contracts * 1.00;
         const netProfit = maxPayout - totalCost;
 
@@ -3094,8 +3101,8 @@
 
         rowLblPrice.textContent = 'Avg. price';
         rowValPrice.textContent = fmt(ask, 3);
-        rowLblCost.textContent = 'Cost';
-        rowValCost.textContent = fmt(usdcAmt);
+        rowLblCost.textContent = `Cost (${contracts} × ${fmt(ask, 3)})`;
+        rowValCost.textContent = fmt(contractsCost);
         rowValFee.textContent = fmtSigned(fee);
         // Restore fee row visibility (might have been hidden by SELL state)
         const feeRowBuy = rowValFee && rowValFee.closest('.summary-row');
