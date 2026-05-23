@@ -23,10 +23,45 @@
 
 import { topNLeaderboard, insertSnapshot, insertDistribution } from "../db/queries.js";
 import type { QueryDeps } from "../db/queries.js";
-import { buildLeaderboardMerkleTree } from "./merkle.js";
+import {
+  buildLeaderboardMerkleTree,
+  PERIOD_TYPE_WEEKLY,
+  PERIOD_TYPE_MONTHLY,
+  type PeriodTypeCode,
+} from "./merkle.js";
 import { uploadLeaderboardToArweave } from "./arweave.js";
 import type { LeaderboardEntry, LeaderboardSnapshot, PeriodKind } from "../db/types.js";
 import type { PeriodInfo } from "./periods.js";
+import type { BellMarketsAnchorClient } from "../clients/anchor.js";
+import {
+  WEEKLY_REWARDS_POOL_PDA,
+  MONTHLY_REWARDS_POOL_PDA,
+  USDC_DEVNET_MINT,
+  TOKEN_PROGRAM_ID,
+} from "../devnet-pubkeys.js";
+
+/** Map the off-chain string union to the on-chain u8 code in Aria's state.rs. */
+export function periodKindToTypeCode(kind: PeriodKind): PeriodTypeCode {
+  return kind === "weekly" ? PERIOD_TYPE_WEEKLY : PERIOD_TYPE_MONTHLY;
+}
+
+/** USDC base units = micro-USDC (6 decimals per Circle's mint). */
+const USDC_DECIMALS = 6;
+const USDC_BASE_UNIT_PER_DOLLAR = 10 ** USDC_DECIMALS; // 1_000_000
+
+/**
+ * Convert a decimal USDC string (e.g. "25.00") to base units (e.g. 25_000_000n).
+ * Used to align `distribute_*_rewards(amount: u64)` with Aria's pool transfers.
+ */
+export function usdcDollarsToBaseUnits(usdcDecimalString: string): bigint {
+  const n = Number(usdcDecimalString);
+  if (!Number.isFinite(n) || n < 0) {
+    throw new Error(`usdcDollarsToBaseUnits: invalid USDC string "${usdcDecimalString}"`);
+  }
+  // Use cent-precision to avoid float rounding at $0.01 step.
+  const cents = Math.round(n * 100);
+  return BigInt(cents) * BigInt(USDC_BASE_UNIT_PER_DOLLAR / 100);
+}
 
 // DR-010 §"Default smooth-decay distribution" — per-position bps of pool.
 export const DEFAULT_DISTRIBUTION_BPS: ReadonlyArray<number> = [
@@ -68,7 +103,10 @@ export type DistributeRewardsInput = {
   periodId: number;
   recipient: string;
   position: number;
+  /** Decimal USDC string for off-chain accounting (e.g. "25.00"). */
   amountUsdc: string;
+  /** Same amount in u64 base units (= micro-USDC). Passed as the on-chain `amount` arg. */
+  amountBaseUnits: bigint;
   merkleProofHex: ReadonlyArray<string>;
 };
 
@@ -88,9 +126,18 @@ export type DistributeForPeriodDeps = QueryDeps & {
    * `readPoolBalance`. Inject a fake in tests.
    */
   readPoolBalance: ReadPoolBalanceFn;
-  /** On-chain commit_leaderboard_root caller. Default returns stub. */
+  /**
+   * Optional Anchor client. When provided AND no `commitLeaderboardRoot` /
+   * `distributeRewards` fn is injected, the orchestrator uses the live
+   * default adapters (which call `program.methods.commitLeaderboardRoot()` /
+   * `program.methods.distributeWeeklyRewards()` against Aria's deployed
+   * program). When omitted, falls back to the "Awaiting Aria's deploy"
+   * stubs — useful for replay-after-deploy testing.
+   */
+  anchorClient?: BellMarketsAnchorClient;
+  /** On-chain commit_leaderboard_root caller. Default = live if anchorClient supplied, else stub. */
   commitLeaderboardRoot?: CommitLeaderboardRootFn;
-  /** On-chain distribute_weekly_rewards / distribute_monthly_rewards. Default returns stub. */
+  /** On-chain distribute_weekly_rewards / distribute_monthly_rewards. Default = live if anchorClient supplied, else stub. */
   distributeRewards?: DistributeRewardsFn;
   /** Override Arweave upload (tests use this to avoid live SDK). */
   uploadFn?: typeof uploadLeaderboardToArweave;
@@ -146,18 +193,31 @@ export async function runDistributeForPeriod(deps: DistributeForPeriodDeps): Pro
   log({ ...logBase, stage: "pool-balance", poolBalanceUsdc });
 
   // Compute per-position amounts: amount[i] = pool * bps[i] / 10000
-  const positionAmounts = DEFAULT_DISTRIBUTION_BPS.map((bps) => {
+  // Two parallel arrays — decimal-string for human/db, base-units for on-chain.
+  const positionAmounts: string[] = DEFAULT_DISTRIBUTION_BPS.map((bps) => {
     const cents = Math.floor(Number(poolBalanceUsdc) * bps);
-    // bps over 10000 — keep two decimals via cent math
     return (cents / 10000).toFixed(2);
   });
+  const positionAmountsBase: bigint[] = positionAmounts.map(usdcDollarsToBaseUnits);
 
   // 4. Snapshot — IF participants > 0, build Merkle. ELSE skip Merkle + upload zero-row snapshot.
+  //
+  // The Merkle leaf set covers ONLY positions with a real winner (sortedTop.length
+  // entries); rollover positions are not included. Aria's distribute_*_rewards
+  // verifies proof against the committed root for an (entry-position, recipient,
+  // amount) triple — empty positions never produce a distribute call.
+  const periodTypeCode = periodKindToTypeCode(deps.period.kind);
   let merkleRootHex: string | undefined;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let tree: any | undefined;
   if (sortedTop.length > 0) {
-    tree = buildLeaderboardMerkleTree(sortedTop, deps.period.id);
+    const winnerAmounts = positionAmountsBase.slice(0, sortedTop.length);
+    tree = buildLeaderboardMerkleTree({
+      entries: sortedTop,
+      periodId: deps.period.id,
+      periodType: periodTypeCode,
+      amounts: winnerAmounts,
+    });
     merkleRootHex = tree.root;
   }
 
@@ -194,7 +254,11 @@ export async function runDistributeForPeriod(deps: DistributeForPeriodDeps): Pro
   // 7. Commit root on-chain
   let commitTxSig: string | undefined;
   if (merkleRootHex) {
-    const commitFn = deps.commitLeaderboardRoot ?? stubCommitLeaderboardRoot;
+    const commitFn =
+      deps.commitLeaderboardRoot ??
+      (deps.anchorClient
+        ? makeCommitLeaderboardRoot(deps.anchorClient)
+        : stubCommitLeaderboardRoot);
     const commitResult = await commitFn({
       periodKind: deps.period.kind,
       periodId: deps.period.id,
@@ -225,12 +289,17 @@ export async function runDistributeForPeriod(deps: DistributeForPeriodDeps): Pro
   }
 
   // 8. Per-position distribute
-  const distributeFn = deps.distributeRewards ?? stubDistributeRewards;
+  const distributeFn =
+    deps.distributeRewards ??
+    (deps.anchorClient
+      ? makeDistributeRewards(deps.anchorClient)
+      : stubDistributeRewards);
   const perPosition: DistributeOutcome["perPosition"] = [];
   let rolledOverCents = 0;
   for (let i = 0; i < 10; i++) {
     const position = i + 1;
     const amountUsdc = positionAmounts[i] ?? "0.00";
+    const amountBaseUnits = positionAmountsBase[i] ?? 0n;
     const entry = sortedTop[i];
 
     if (!entry) {
@@ -251,6 +320,7 @@ export async function runDistributeForPeriod(deps: DistributeForPeriodDeps): Pro
       recipient: entry.userPubkey,
       position,
       amountUsdc,
+      amountBaseUnits,
       merkleProofHex: proof,
     });
 
@@ -353,3 +423,170 @@ const stubDistributeRewards: DistributeRewardsFn = async () => ({
   ok: false,
   error: "IDL is missing `distributeWeeklyRewards` / `distributeMonthlyRewards` instructions. Awaiting Aria's deploy of the DR-010 admin ixs.",
 });
+
+// ---------------------------------------------------------------------------
+// Live on-chain adapters (deploy #5)
+// ---------------------------------------------------------------------------
+//
+// Arg shapes match programs/bell-markets/src/instructions/{commit_leaderboard_root,distribute_*_rewards}.rs:
+//
+//   commit_leaderboard_root(period_id u64, period_type u8,
+//                           merkle_root [u8;32], arweave_tx_id [u8;48])
+//   distribute_weekly_rewards(period_id u64, position u8, amount u64,
+//                             merkle_proof Vec<[u8;32]>)
+//   distribute_monthly_rewards(... same shape ...)
+
+/** ARWEAVE_TX_ID_LEN per programs/bell-markets/src/state.rs — 43 base64url +
+ *  5 bytes zero-pad = 48. Off-chain we pad ASCII to 48 bytes via UTF-8. */
+const ARWEAVE_TX_ID_LEN = 48;
+
+function arweaveTxIdToBytes48(arweaveTxId: string): Buffer {
+  const buf = Buffer.alloc(ARWEAVE_TX_ID_LEN);
+  Buffer.from(arweaveTxId, "utf-8").copy(buf, 0, 0, Math.min(arweaveTxId.length, ARWEAVE_TX_ID_LEN));
+  // Remaining bytes already 0 from Buffer.alloc.
+  return buf;
+}
+
+export function makeCommitLeaderboardRoot(client: BellMarketsAnchorClient): CommitLeaderboardRootFn {
+  return async (input) => {
+    try {
+      const program = await client.getProgram();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const methods = program.methods as any;
+      if (typeof methods.commitLeaderboardRoot !== "function") {
+        return {
+          ok: false,
+          error:
+            "IDL is missing `commitLeaderboardRoot` instruction. Awaiting Aria's deploy of the DR-010 admin ix.",
+        };
+      }
+      const anchor = await import("@coral-xyz/anchor");
+      const web3 = await import("@solana/web3.js");
+      const programIdPk = new web3.PublicKey(client.opts.programId);
+      const [configPda] = web3.PublicKey.findProgramAddressSync(
+        [Buffer.from("config")],
+        programIdPk,
+      );
+      const [leaderboardCommitsPda] = web3.PublicKey.findProgramAddressSync(
+        [Buffer.from("leaderboard_commits")],
+        programIdPk,
+      );
+
+      const merkleRootBytes = Buffer.from(input.merkleRootHex, "hex");
+      if (merkleRootBytes.length !== 32) {
+        return { ok: false, error: `merkle_root must be 32 bytes (got ${merkleRootBytes.length})` };
+      }
+      const arweaveBytes = arweaveTxIdToBytes48(input.arweaveTxId);
+
+      const provider = program.provider as unknown as {
+        wallet: { publicKey: import("@solana/web3.js").PublicKey };
+      };
+      const adminPk = provider.wallet.publicKey;
+
+      const periodType = input.periodKind === "weekly" ? PERIOD_TYPE_WEEKLY : PERIOD_TYPE_MONTHLY;
+
+      const txSig: string = await methods
+        .commitLeaderboardRoot(
+          new anchor.BN(input.periodId),
+          periodType,
+          Array.from(merkleRootBytes), // Anchor 0.30 wants u8[32] as number array
+          Array.from(arweaveBytes), // u8[48]
+        )
+        .accounts({
+          admin: adminPk,
+          config: configPda,
+          leaderboardCommits: leaderboardCommitsPda,
+          clock: web3.SYSVAR_CLOCK_PUBKEY,
+        })
+        .rpc();
+      return { ok: true, txSig };
+    } catch (err) {
+      return { ok: false, error: serializeError(err) };
+    }
+  };
+}
+
+export function makeDistributeRewards(client: BellMarketsAnchorClient): DistributeRewardsFn {
+  return async (input) => {
+    try {
+      const program = await client.getProgram();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const methods = program.methods as any;
+      const methodName =
+        input.periodKind === "weekly" ? "distributeWeeklyRewards" : "distributeMonthlyRewards";
+      if (typeof methods[methodName] !== "function") {
+        return {
+          ok: false,
+          error: `IDL is missing \`${methodName}\` instruction. Awaiting Aria's deploy of the DR-010 admin ixs.`,
+        };
+      }
+      const anchor = await import("@coral-xyz/anchor");
+      const web3 = await import("@solana/web3.js");
+      const programIdPk = new web3.PublicKey(client.opts.programId);
+      const [configPda] = web3.PublicKey.findProgramAddressSync(
+        [Buffer.from("config")],
+        programIdPk,
+      );
+      const [leaderboardCommitsPda] = web3.PublicKey.findProgramAddressSync(
+        [Buffer.from("leaderboard_commits")],
+        programIdPk,
+      );
+      const poolPk = new web3.PublicKey(
+        input.periodKind === "weekly" ? WEEKLY_REWARDS_POOL_PDA : MONTHLY_REWARDS_POOL_PDA,
+      );
+      const recipientPk = new web3.PublicKey(input.recipient);
+      const usdcMintPk = new web3.PublicKey(USDC_DEVNET_MINT);
+      // Recipient's USDC ATA (deterministic from recipient + USDC mint).
+      const splToken = await import("@solana/spl-token");
+      const recipientToken = await splToken.getAssociatedTokenAddress(
+        usdcMintPk,
+        recipientPk,
+        true, // allowOwnerOffCurve
+      );
+
+      const provider = program.provider as unknown as {
+        wallet: { publicKey: import("@solana/web3.js").PublicKey };
+      };
+      const adminPk = provider.wallet.publicKey;
+
+      const proofBytes = input.merkleProofHex.map((p) => Array.from(Buffer.from(p, "hex")));
+
+      const txSig: string = await methods[methodName](
+        new anchor.BN(input.periodId),
+        input.position,
+        new anchor.BN(input.amountBaseUnits.toString()),
+        proofBytes,
+      )
+        .accounts({
+          admin: adminPk,
+          config: configPda,
+          leaderboardCommits: leaderboardCommitsPda,
+          weeklyPool: input.periodKind === "weekly" ? poolPk : undefined,
+          monthlyPool: input.periodKind === "monthly" ? poolPk : undefined,
+          recipient: recipientPk,
+          recipientToken,
+          tokenProgram: new web3.PublicKey(TOKEN_PROGRAM_ID),
+        })
+        .rpc();
+      return { ok: true, txSig };
+    } catch (err) {
+      return { ok: false, error: serializeError(err) };
+    }
+  };
+}
+
+function serializeError(err: unknown): string {
+  if (err instanceof Error) return `${err.name}: ${err.message}`;
+  if (typeof err === "object" && err !== null) {
+    const anchorErr = err as {
+      error?: { errorCode?: { code?: string; number?: number }; errorMessage?: string };
+    };
+    const code = anchorErr.error?.errorCode?.code;
+    if (code) {
+      const num = anchorErr.error?.errorCode?.number;
+      const msg = anchorErr.error?.errorMessage ? `: ${anchorErr.error.errorMessage}` : "";
+      return `AnchorError(${code}${num !== undefined ? ` #${num}` : ""})${msg}`;
+    }
+  }
+  return String(err);
+}

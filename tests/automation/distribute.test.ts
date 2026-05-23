@@ -7,6 +7,23 @@ import {
 import type { LeaderboardEntry } from "../../services/automation/src/db/types.js";
 import * as queries from "../../services/automation/src/db/queries.js";
 
+// Real-shape base58 pubkeys (32 raw bytes). Tests that exercise the Merkle
+// leaf path use these (since `decodePubkey()` rejects non-32-byte strings).
+// Tests that only exercise the tiebreaker sort use the plain `entry()`
+// helper with single-letter aliases.
+const REAL_PUBKEYS = [
+  "599h7VznYR4CxyrG5nQbhR13qtRuwPcbnNr5QqbkS7uV",
+  "4xMt4J2WuLFH77Jq3Yexxuv38Ge36fNnWNRmSKLCiT3c",
+  "2VWzrhmdNZN7Yxv2uknYBurJ2PDFzCqsyi5WVeVxJpCW",
+  "Eppjny6RMtVrGxZnjiKEyk41vwWYpXW4PMVKJHC4SAjh",
+  "FxohonFj6bTtbPxe4HNjwy736sqkyPfKj5GRektScF7C",
+  "6CYzWhTMzsndRrnRcHgWCUfVDvrRh3Cfoze6GSVev9gQ",
+  "7b17F2woUy9hgHcRjuLckBVAtNnKAJBRD769URvLprp5",
+  "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+  "CS2H8nbAVVEUHWPF5extCSymqheQdkd4d7thik6eet9N",
+  "J83w4HKfFqVghYYjAYTQTzAQ9QQbpDgN1qmcQxk8q1QH",
+];
+
 function entry(
   userPubkey: string,
   currentStreak: number,
@@ -19,6 +36,14 @@ function entry(
     totalMarketsTraded,
     totalMarketsWon: currentStreak,
   };
+}
+
+function realEntry(
+  index: number,
+  currentStreak: number,
+  totalMarketsTraded = 10,
+): LeaderboardEntry {
+  return entry(REAL_PUBKEYS[index % REAL_PUBKEYS.length]!, currentStreak, totalMarketsTraded);
 }
 
 describe("DEFAULT_DISTRIBUTION_BPS", () => {
@@ -79,9 +104,7 @@ describe("applyDeterministicTiebreaker", () => {
 
 describe("runDistributeForPeriod — orchestration with all-injected deps", () => {
   it("happy path: 10 winners → 10 distributions; commit + arweave + per-position invoked", async () => {
-    const winners: LeaderboardEntry[] = Array.from({ length: 10 }, (_, i) =>
-      entry(`user${i}`, 10 - i, 10),
-    );
+    const winners: LeaderboardEntry[] = Array.from({ length: 10 }, (_, i) => realEntry(i, 10 - i, 10));
 
     // Mock all DB queries to no-op + return synthetic ids.
     const spyTop = vi.spyOn(queries, "topNLeaderboard").mockResolvedValue(winners);
@@ -143,7 +166,7 @@ describe("runDistributeForPeriod — orchestration with all-injected deps", () =
   });
 
   it("fewer than 10 winners → empty positions recorded as rolled-over", async () => {
-    const winners: LeaderboardEntry[] = [entry("a", 5), entry("b", 4), entry("c", 3)];
+    const winners: LeaderboardEntry[] = [realEntry(0, 5), realEntry(1, 4), realEntry(2, 3)];
 
     vi.spyOn(queries, "topNLeaderboard").mockResolvedValue(winners);
     vi.spyOn(queries, "insertSnapshot").mockImplementation(async (input) => ({ id: 2, ...input, createdAt: new Date() }));
@@ -199,7 +222,7 @@ describe("runDistributeForPeriod — orchestration with all-injected deps", () =
   });
 
   it("stub on-chain calls (Aria's ixs missing) → persistence happens; per-position marked errored", async () => {
-    const winners: LeaderboardEntry[] = [entry("a", 5)];
+    const winners: LeaderboardEntry[] = [realEntry(0, 5)];
     vi.spyOn(queries, "topNLeaderboard").mockResolvedValue(winners);
     vi.spyOn(queries, "insertSnapshot").mockImplementation(async (input) => ({ id: 4, ...input, createdAt: new Date() }));
     vi.spyOn(queries, "insertDistribution").mockResolvedValue(1);

@@ -82,11 +82,18 @@ export type UpdateTickerConfigResult =
 
 export type UpdateTickerConfigFn = (input: UpdateTickerConfigInput) => Promise<UpdateTickerConfigResult>;
 
-/** Optional read of the current on-chain TickerConfig (Phase 2/3 only). */
+/** Optional read of the current on-chain TickerConfig (Phase 2/3 only).
+ *
+ * `expo` is the Pyth-feed exponent (e.g. -5 for META). On-chain TickerConfig
+ * stores cap_center / allowed_strikes / strike_tick_size as i64 in the
+ * Pyth-expo-scaled domain; the read function de-scales them to human-dollar
+ * `number` values for the caller's `driftBps(spot, capCenter)` comparison.
+ */
 export type ReadTickerConfigFn = (
   client: BellMarketsAnchorClient,
   ticker: Ticker,
   pythPriceAccount: string,
+  expo: number,
 ) => Promise<TickerConfigView | undefined>;
 
 export type GridPhaseDeps = {
@@ -292,9 +299,21 @@ export async function runWildSwingPhase(
       continue;
     }
 
+    // Read Pyth FIRST so we have `expo` to pass into readTickerConfig.
+    // TickerConfig stores cap_center as Pyth-expo-scaled i64; we need the
+    // expo to de-scale into human dollars for the drift comparison.
+    let priceRead: { price: number; expo: number };
+    try {
+      priceRead = await pythClient.getPreviousClose({ ticker, feedId: hermesFeedId });
+    } catch (err) {
+      const error = serializeError(err);
+      perTicker.push({ ticker, status: "errored", error });
+      continue;
+    }
+
     let current: TickerConfigView | undefined;
     try {
-      current = await readFn(anchorClient, ticker, pythPriceAccount);
+      current = await readFn(anchorClient, ticker, pythPriceAccount, priceRead.expo);
     } catch (err) {
       const error = serializeError(err);
       perTicker.push({ ticker, status: "errored", error });
@@ -303,15 +322,6 @@ export async function runWildSwingPhase(
     }
     if (!current) {
       perTicker.push({ ticker, status: "skipped", reason: "TickerConfig PDA does not exist yet (anchor not run)" });
-      continue;
-    }
-
-    let priceRead: { price: number; expo: number };
-    try {
-      priceRead = await pythClient.getPreviousClose({ ticker, feedId: hermesFeedId });
-    } catch (err) {
-      const error = serializeError(err);
-      perTicker.push({ ticker, status: "errored", error });
       continue;
     }
 
@@ -402,17 +412,29 @@ export function isRegularTradingDay(date: Date): boolean {
 // ---------------------------------------------------------------------------
 
 /**
- * Real-runtime send path for `update_ticker_config`. STUB FALLBACK:
- *   - If the IDL doesn't expose `updateTickerConfig` (Aria's ix not deployed),
- *     log + return ok=false with a clear reason. No throw — the cron continues.
- *   - When Aria lands the ix, this picks it up via IDL parsing automatically.
- *
- * Accounts shape (proposed; Aria's final design wins):
- *   { admin (signer), config, ticker_config, underlying_pyth_feed, system_program, rent }
- *
- * PDA seeds (proposed): [b"ticker_config", underlying_pyth_feed.key().as_ref()]
+ * Maximum slot count in TickerConfig.allowed_strikes — matches
+ * MAX_ALLOWED_STRIKES in programs/bell-markets/src/state.rs. Fixed-size
+ * array on chain; we pad to exactly 16 i64 entries.
  */
-async function defaultUpdateTickerConfigTx(
+export const MAX_ALLOWED_STRIKES = 16;
+
+/**
+ * Real-runtime send path for `update_ticker_config`. Matches Aria's deploy-5
+ * shape (programs/bell-markets/src/instructions/update_ticker_config.rs):
+ *
+ *   Seeds: [b"ticker", pyth_feed.key().as_ref()]
+ *   Args:  (cap_center: i64,
+ *           allowed_strikes: [i64; 16],   // PADDED with 0s past strike_count
+ *           strike_count: u8,
+ *           max_user_strike_deviation_bps: u16,
+ *           strike_tick_size: i64,
+ *           threshold_bps: u16)
+ *   Accounts: { admin, config, pyth_feed, ticker_config (init_if_needed), system_program }
+ *
+ * STUB FALLBACK: if IDL lacks `updateTickerConfig`, returns ok=false with a
+ * clear reason. No throw — the cron continues.
+ */
+export async function defaultUpdateTickerConfigTx(
   input: UpdateTickerConfigInput,
 ): Promise<UpdateTickerConfigResult> {
   try {
@@ -431,13 +453,14 @@ async function defaultUpdateTickerConfigTx(
     const web3 = await import("@solana/web3.js");
 
     const programIdPk = new web3.PublicKey(input.anchorClient.opts.programId);
-    const underlyingPythFeedPk = new web3.PublicKey(input.pythPriceAccount);
+    const pythFeedPk = new web3.PublicKey(input.pythPriceAccount);
     const [configPda] = web3.PublicKey.findProgramAddressSync(
       [Buffer.from("config")],
       programIdPk,
     );
+    // Aria's seed is b"ticker" (NOT b"ticker_config") per update_ticker_config.rs.
     const [tickerConfigPda] = web3.PublicKey.findProgramAddressSync(
-      [Buffer.from("ticker_config"), underlyingPythFeedPk.toBuffer()],
+      [Buffer.from("ticker"), pythFeedPk.toBuffer()],
       programIdPk,
     );
 
@@ -447,28 +470,48 @@ async function defaultUpdateTickerConfigTx(
     const adminPk = provider.wallet.publicKey;
 
     // Strikes + capCenter scaled to i64 using the live Pyth expo, matching
-    // on-chain settle comparisons (StrikeMarket.strike_price is i64 in same
-    // expo). Re-uses morning.ts `scaleStrikeToI64`.
+    // on-chain comparisons (StrikeMarket.strike_price is i64 in same expo).
     const capCenterI64 = scaleStrikeToI64(input.capCenter, input.expo);
-    const allowedStrikesI64 = input.allowedStrikes.map((s) => scaleStrikeToI64(s, input.expo));
+    const allowedStrikesI64Raw = input.allowedStrikes.map((s) => scaleStrikeToI64(s, input.expo));
+    if (allowedStrikesI64Raw.length === 0) {
+      return {
+        ok: false,
+        error:
+          "update_ticker_config: allowed_strikes must be non-empty (post-P1-audit footgun guard requires strike_count > 0).",
+      };
+    }
+    if (allowedStrikesI64Raw.length > MAX_ALLOWED_STRIKES) {
+      return {
+        ok: false,
+        error: `update_ticker_config: allowed_strikes too large (${allowedStrikesI64Raw.length} > ${MAX_ALLOWED_STRIKES} cap).`,
+      };
+    }
+    const strikeCount = allowedStrikesI64Raw.length;
+    // Pad to exactly MAX_ALLOWED_STRIKES with zeros (Anchor's [i64; 16] decode).
+    const padded: bigint[] = [...allowedStrikesI64Raw];
+    while (padded.length < MAX_ALLOWED_STRIKES) padded.push(0n);
+    const allowedStrikesBN = padded.map((v) => new anchor.BN(v.toString()));
+
+    // Convert tickSizeUsd (human dollars, e.g. 5 / 2 / 1) into the same scaled
+    // i64 units. Pyth expo is negative; tickSize is integer dollars; scale
+    // up via 10^(-expo). E.g. tickSize=5 with expo=-5 → 500_000.
+    const tickSizeI64 = scaleStrikeToI64(input.tickSizeUsd, input.expo);
 
     const txSig: string = await methods
       .updateTickerConfig(
         new anchor.BN(capCenterI64.toString()),
-        allowedStrikesI64.map((bn: bigint) => new anchor.BN(bn.toString())),
+        allowedStrikesBN,
+        strikeCount,
         input.deviationCapBps,
-        new anchor.BN(input.tickSizeUsd),
+        new anchor.BN(tickSizeI64.toString()),
         input.thresholdBps,
-        phaseLabelToOnChainCode(input.phase),
-        input.expiryUnix !== undefined ? new anchor.BN(input.expiryUnix) : new anchor.BN(0),
       )
       .accounts({
         admin: adminPk,
         config: configPda,
+        pythFeed: pythFeedPk,
         tickerConfig: tickerConfigPda,
-        underlyingPythFeed: underlyingPythFeedPk,
         systemProgram: web3.SystemProgram.programId,
-        rent: web3.SYSVAR_RENT_PUBKEY,
       })
       .rpc();
 
@@ -479,14 +522,32 @@ async function defaultUpdateTickerConfigTx(
 }
 
 /**
- * Default read of an on-chain TickerConfig PDA. STUB FALLBACK:
- *   - If the IDL doesn't expose the `tickerConfig` account type, return undefined.
- *     Phase 2/3 will skip the ticker with "TickerConfig PDA does not exist yet".
+ * Default read of an on-chain TickerConfig PDA per Aria's deploy-5 shape.
+ *
+ *   Seeds: [b"ticker", pyth_feed.key().as_ref()]
+ *   Account fields (programs/bell-markets/src/state.rs):
+ *     pyth_feed: Pubkey
+ *     cap_center: i64                       — Pyth-expo-scaled
+ *     allowed_strikes: [i64; 16]            — Pyth-expo-scaled; only [..strike_count] valid
+ *     strike_count: u8
+ *     max_user_strike_deviation_bps: u16
+ *     strike_tick_size: i64                 — Pyth-expo-scaled
+ *     threshold_bps: u16
+ *     last_updated_unix: i64
+ *
+ * Returns the values as Pyth-expo-SCALED i64 (NOT human dollars). The caller
+ * (`runWildSwingPhase`) currently compares against `priceRead.price` in
+ * human dollars — so we down-convert here using `input.expo` injected from
+ * the live Pyth read.
+ *
+ * STUB FALLBACK: if IDL lacks the account type or PDA doesn't exist on chain,
+ * return undefined. Phase 2/3 skips with "TickerConfig PDA does not exist yet".
  */
-async function defaultReadTickerConfig(
+export async function defaultReadTickerConfig(
   client: BellMarketsAnchorClient,
   ticker: Ticker,
   pythPriceAccount: string,
+  expo: number,
 ): Promise<TickerConfigView | undefined> {
   const program = await client.getProgram();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -496,48 +557,39 @@ async function defaultReadTickerConfig(
   }
   const web3 = await import("@solana/web3.js");
   const programIdPk = new web3.PublicKey(client.opts.programId);
-  const underlyingPythFeedPk = new web3.PublicKey(pythPriceAccount);
+  const pythFeedPk = new web3.PublicKey(pythPriceAccount);
   const [tickerConfigPda] = web3.PublicKey.findProgramAddressSync(
-    [Buffer.from("ticker_config"), underlyingPythFeedPk.toBuffer()],
+    [Buffer.from("ticker"), pythFeedPk.toBuffer()],
     programIdPk,
   );
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const raw: any = await accounts.tickerConfig.fetchNullable(tickerConfigPda);
   if (!raw) return undefined;
-  // Off-chain expects human-readable USD; on-chain stores i64 scaled by Pyth
-  // expo. Aria's read-helper returns the inverse scaling. For MVP we trust
-  // the on-chain values are already de-scaled by Aria's `Account.fetch` IDL
-  // wrapper. If divergence is observed, swap to manual scaling here.
-  const phaseLabel = (function (code: number): PhaseLabel {
-    switch (code) {
-      case 0:
-        return "anchor";
-      case 1:
-        return "ah";
-      case 2:
-        return "pm";
-      case 3:
-        return "earnings-pre";
-      case 4:
-        return "earnings-restore";
-      default:
-        return "anchor";
+
+  const descale = (scaled: number): number => scaled * Math.pow(10, expo);
+  const toNum = (v: unknown): number => {
+    if (typeof v === "number") return v;
+    if (typeof v === "bigint") return Number(v);
+    if (typeof (v as { toNumber?: () => number })?.toNumber === "function") {
+      return (v as { toNumber: () => number }).toNumber();
     }
-  })(typeof raw.updatedByPhase === "number" ? raw.updatedByPhase : 0);
+    return Number(v ?? 0);
+  };
+
+  const strikeCount = toNum(raw.strikeCount ?? raw.strike_count ?? 0);
+  const allowedRaw: unknown[] = Array.isArray(raw.allowedStrikes) ? raw.allowedStrikes : [];
+  const allowedStrikes = allowedRaw.slice(0, strikeCount).map((s) => descale(toNum(s)));
+
   return {
     ticker,
-    capCenter: typeof raw.capCenter?.toNumber === "function" ? raw.capCenter.toNumber() : Number(raw.capCenter ?? 0),
-    allowedStrikes: Array.isArray(raw.allowedStrikes)
-      ? raw.allowedStrikes.map((s: unknown) =>
-          typeof (s as { toNumber?: () => number })?.toNumber === "function"
-            ? (s as { toNumber: () => number }).toNumber()
-            : Number(s),
-        )
-      : [],
-    deviationCapBps: Number(raw.maxUserStrikeDeviationBps ?? raw.deviationCapBps ?? 0),
-    tickSizeUsd: typeof raw.strikeTickSize?.toNumber === "function" ? raw.strikeTickSize.toNumber() : Number(raw.strikeTickSize ?? raw.tickSize ?? 0),
-    thresholdBps: Number(raw.thresholdBps ?? 0),
-    updatedByPhase: phaseLabel,
+    capCenter: descale(toNum(raw.capCenter)),
+    allowedStrikes,
+    deviationCapBps: toNum(raw.maxUserStrikeDeviationBps ?? raw.max_user_strike_deviation_bps),
+    tickSizeUsd: descale(toNum(raw.strikeTickSize ?? raw.strike_tick_size)),
+    thresholdBps: toNum(raw.thresholdBps ?? raw.threshold_bps),
+    // Aria's deploy-5 TickerConfig has no `updated_by_phase` field; we default
+    // to "anchor" for the view (informational only — no on-chain semantics).
+    updatedByPhase: "anchor",
   };
 }
 

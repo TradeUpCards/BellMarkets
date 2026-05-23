@@ -301,7 +301,7 @@ describe("runWildSwingPhase — drift-detection logic with injected deps", () =>
     // META threshold = 800 bps (8%). Drift of 2% → no expansion.
     const cfg = makeConfig();
     const fakePyth = makeFakePyth({ META: 622, AAPL: 232 });
-    const fakeRead: ReadTickerConfigFn = async (_c, ticker) => ({
+    const fakeRead: ReadTickerConfigFn = async (_c, ticker, _pyth, _expo) => ({
       ticker,
       capCenter: ticker === "META" ? 610 : 230, // META drift = 197 bps; AAPL drift = 87 bps
       allowedStrikes: [555, 575, 590, 610, 630, 645, 665],
@@ -334,7 +334,7 @@ describe("runWildSwingPhase — drift-detection logic with injected deps", () =>
     const cfg = makeConfig();
     const fakePyth = makeFakePyth({ META: 700, AAPL: 230 });
     const existing = [555, 575, 590, 610, 630, 645, 665];
-    const fakeRead: ReadTickerConfigFn = async (_c, ticker) => ({
+    const fakeRead: ReadTickerConfigFn = async (_c, ticker, _pyth, _expo) => ({
       ticker,
       capCenter: ticker === "META" ? 610 : 230,
       allowedStrikes: ticker === "META" ? existing : [225, 230, 235],

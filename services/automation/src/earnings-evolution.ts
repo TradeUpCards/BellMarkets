@@ -35,6 +35,8 @@ import { BellMarketsAnchorClient } from "./clients/anchor.js";
 import {
   type UpdateTickerConfigFn,
   type ReadTickerConfigFn,
+  defaultUpdateTickerConfigTx,
+  defaultReadTickerConfig,
 } from "./grid-evolution.js";
 import type { Ticker } from "./types.js";
 import { PYTH_HERMES_FEED_IDS } from "./config.js";
@@ -197,9 +199,19 @@ async function runOne(
     return { ticker, action, status: "errored", error: "missing Hermes feed id" };
   }
 
+  // Read Pyth FIRST so we have expo for descaling the TickerConfig read.
+  let priceRead: { price: number; expo: number };
+  try {
+    priceRead = await ctx.pythClient.getPreviousClose({ ticker, feedId: hermesFeedId });
+  } catch (err) {
+    const error = serializeError(err);
+    ctx.log({ ...ctx.logBase, ticker, action, status: "errored", stage: "pyth-read", error });
+    return { ticker, action, status: "errored", error };
+  }
+
   let current: TickerConfigView | undefined;
   try {
-    current = await ctx.readFn(ctx.anchorClient, ticker, pythPriceAccount);
+    current = await ctx.readFn(ctx.anchorClient, ticker, pythPriceAccount, priceRead.expo);
   } catch (err) {
     const error = serializeError(err);
     ctx.log({ ...ctx.logBase, ticker, action, status: "errored", stage: "read", error });
@@ -220,15 +232,6 @@ async function runOne(
       oldDeviationCapBps: current.deviationCapBps,
       newDeviationCapBps,
     };
-  }
-
-  let priceRead: { price: number; expo: number };
-  try {
-    priceRead = await ctx.pythClient.getPreviousClose({ ticker, feedId: hermesFeedId });
-  } catch (err) {
-    const error = serializeError(err);
-    ctx.log({ ...ctx.logBase, ticker, action, status: "errored", stage: "pyth-read", error });
-    return { ticker, action, status: "errored", error };
   }
 
   const result = await ctx.updateFn({
@@ -277,21 +280,11 @@ async function runOne(
 }
 
 // ---------------------------------------------------------------------------
-// Defaults (deferred imports — same pattern as grid-evolution.ts)
+// Default fns delegate to grid-evolution.ts — single source of truth for the
+// `update_ticker_config` IDL shape + `ticker_config` PDA seeds.
 // ---------------------------------------------------------------------------
 
 async function loadDefaultUpdateFn(): Promise<UpdateTickerConfigFn> {
-  // Dynamic re-export so we share the exact same `defaultUpdateTickerConfigTx`
-  // adapter as grid-evolution. Keeps the IDL-shape coupling in one place.
-  const gridEvolution = await import("./grid-evolution.js");
-  // The default adapter is module-private in grid-evolution.ts; we expose
-  // the behavior through `runAnchorPhase` / `runWildSwingPhase`. For the
-  // earnings cron, we replicate the same fallback semantics via a thin
-  // wrapper that always returns ok=false until Aria deploys (matching the
-  // existing grid-evolution behavior).
-  // Using an injected fn is the test path; the live path uses an inline
-  // implementation here that defers imports.
-  void gridEvolution;
   return defaultUpdateTickerConfigTx;
 }
 
@@ -299,104 +292,9 @@ async function loadDefaultReadFn(): Promise<ReadTickerConfigFn> {
   return defaultReadTickerConfig;
 }
 
-const defaultUpdateTickerConfigTx: UpdateTickerConfigFn = async (input) => {
-  try {
-    const program = await input.anchorClient.getProgram();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const methods = program.methods as any;
-    if (typeof methods.updateTickerConfig !== "function") {
-      return {
-        ok: false,
-        error:
-          "IDL is missing `updateTickerConfig` instruction. Awaiting Aria's deploy of the DR-005/DR-006 admin ix.",
-      };
-    }
-    const anchor = await import("@coral-xyz/anchor");
-    const web3 = await import("@solana/web3.js");
-    const programIdPk = new web3.PublicKey(input.anchorClient.opts.programId);
-    const underlyingPythFeedPk = new web3.PublicKey(input.pythPriceAccount);
-    const [configPda] = web3.PublicKey.findProgramAddressSync(
-      [Buffer.from("config")],
-      programIdPk,
-    );
-    const [tickerConfigPda] = web3.PublicKey.findProgramAddressSync(
-      [Buffer.from("ticker_config"), underlyingPythFeedPk.toBuffer()],
-      programIdPk,
-    );
-    const provider = program.provider as unknown as {
-      wallet: { publicKey: import("@solana/web3.js").PublicKey };
-    };
-    const adminPk = provider.wallet.publicKey;
-
-    // Earnings-pre/restore updates carry capCenter + allowedStrikes verbatim
-    // from the previous on-chain TickerConfig (re-read upstream). We're only
-    // changing deviationCapBps + phase.
-    const { scaleStrikeToI64 } = await import("./jobs/morning.js");
-    const capCenterI64 = scaleStrikeToI64(input.capCenter, input.expo);
-    const allowedStrikesI64 = input.allowedStrikes.map((s) => scaleStrikeToI64(s, input.expo));
-    const { phaseLabelToOnChainCode } = await import("./ticker-config.js");
-
-    const txSig: string = await methods
-      .updateTickerConfig(
-        new anchor.BN(capCenterI64.toString()),
-        allowedStrikesI64.map((bn: bigint) => new anchor.BN(bn.toString())),
-        input.deviationCapBps,
-        new anchor.BN(input.tickSizeUsd),
-        input.thresholdBps,
-        phaseLabelToOnChainCode(input.phase),
-        input.expiryUnix !== undefined ? new anchor.BN(input.expiryUnix) : new anchor.BN(0),
-      )
-      .accounts({
-        admin: adminPk,
-        config: configPda,
-        tickerConfig: tickerConfigPda,
-        underlyingPythFeed: underlyingPythFeedPk,
-        systemProgram: web3.SystemProgram.programId,
-        rent: web3.SYSVAR_RENT_PUBKEY,
-      })
-      .rpc();
-    return { ok: true, txSig };
-  } catch (err) {
-    return { ok: false, error: serializeError(err) };
-  }
-};
-
-const defaultReadTickerConfig: ReadTickerConfigFn = async (client, ticker, pythPriceAccount) => {
-  const program = await client.getProgram();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const accounts = program.account as any;
-  if (!accounts.tickerConfig || typeof accounts.tickerConfig.fetchNullable !== "function") {
-    return undefined;
-  }
-  const web3 = await import("@solana/web3.js");
-  const programIdPk = new web3.PublicKey(client.opts.programId);
-  const underlyingPythFeedPk = new web3.PublicKey(pythPriceAccount);
-  const [tickerConfigPda] = web3.PublicKey.findProgramAddressSync(
-    [Buffer.from("ticker_config"), underlyingPythFeedPk.toBuffer()],
-    programIdPk,
-  );
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const raw: any = await accounts.tickerConfig.fetchNullable(tickerConfigPda);
-  if (!raw) return undefined;
-  return {
-    ticker,
-    capCenter: typeof raw.capCenter?.toNumber === "function" ? raw.capCenter.toNumber() : Number(raw.capCenter ?? 0),
-    allowedStrikes: Array.isArray(raw.allowedStrikes)
-      ? raw.allowedStrikes.map((s: unknown) =>
-          typeof (s as { toNumber?: () => number })?.toNumber === "function"
-            ? (s as { toNumber: () => number }).toNumber()
-            : Number(s),
-        )
-      : [],
-    deviationCapBps: Number(raw.maxUserStrikeDeviationBps ?? raw.deviationCapBps ?? 0),
-    tickSizeUsd:
-      typeof raw.strikeTickSize?.toNumber === "function"
-        ? raw.strikeTickSize.toNumber()
-        : Number(raw.strikeTickSize ?? raw.tickSize ?? 0),
-    thresholdBps: Number(raw.thresholdBps ?? 0),
-    updatedByPhase: "anchor",
-  };
-};
+// (Stale local duplicates of `defaultUpdateTickerConfigTx` /
+// `defaultReadTickerConfig` removed — both now delegate to grid-evolution.ts
+// to maintain a single source of truth for Aria's deploy-5 ix shape.)
 
 function defaultPythClientFactory(config: AutomationConfig): PythClient {
   if (!config.pythHttpBaseUrl) {
