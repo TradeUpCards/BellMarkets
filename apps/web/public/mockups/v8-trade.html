@@ -1238,13 +1238,83 @@
     color: var(--accent-fg);
   }
 
-  /* ===== Trade form compressions (Cory feedback: less vertical space) ===== */
+  /* ===== Trade form compressions + Buy/Sell × YES/NO state machine ===== */
   /* Order type tabs — match wallet-connect button style for active state */
   .order-type-btn.active {
     background: var(--accent-gradient);
     color: var(--accent-fg);
     box-shadow: 0 2px 8px var(--accent-glow);
   }
+
+  /* SELL mode: trade-card gets amber tint to distinguish from BUY's cyan */
+  .trade-card[data-side="sell"] .trade-tab.sell.active::after {
+    background: var(--amber);
+  }
+  .trade-card[data-side="sell"] .submit-btn.primary-cta {
+    background: linear-gradient(135deg, var(--amber) 0%, #f97316 100%);
+    box-shadow: 0 2px 12px rgba(251, 191, 36, 0.30);
+  }
+  .trade-card[data-side="sell"] .submit-btn.primary-cta:hover {
+    box-shadow: 0 6px 18px rgba(251, 191, 36, 0.40);
+  }
+  /* Make order-type tabs amber on sell side too */
+  .trade-card[data-side="sell"] .order-type-btn.active {
+    background: linear-gradient(135deg, var(--amber) 0%, #f97316 100%);
+    box-shadow: 0 2px 8px rgba(251, 191, 36, 0.30);
+  }
+
+  /* Sell empty-state (no contracts to sell on this outcome) */
+  .sell-empty-state {
+    padding: 24px 16px;
+    text-align: center;
+    background: var(--panel-2);
+    border: 1px dashed var(--border-strong);
+    border-radius: 6px;
+    margin-bottom: 12px;
+  }
+  .sell-empty-icon {
+    font-size: 28px;
+    color: var(--text-subtle);
+    margin-bottom: 8px;
+  }
+  .sell-empty-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-strong);
+    margin-bottom: 4px;
+  }
+  .sell-empty-sub {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+    line-height: 1.5;
+  }
+  .sell-empty-cta {
+    background: var(--panel-3);
+    border: 1px solid var(--border-strong);
+    color: var(--text);
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    transition: all 150ms;
+  }
+  .sell-empty-cta:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* When in sell-empty mode: hide active form + summary + submit */
+  .trade-card.sell-empty .trade-active-fields,
+  .trade-card.sell-empty .submit-btn,
+  .trade-card.sell-empty .trade-summary-wrap,
+  .trade-card.sell-empty .slip-row,
+  .trade-card.sell-empty .order-type-row,
+  .trade-card.sell-empty .limit-only,
+  .trade-card.sell-empty .limit-price-field { display: none; }
+  .trade-card.sell-empty .sell-empty-state { display: block; }
   /* Visibility based on order type */
   .trade-form[data-order-type="market"] .limit-only,
   .trade-form[data-order-type="market"] .limit-price-field { display: none; }
@@ -1658,6 +1728,7 @@
   .summary-row .v { color: var(--text-strong); font-weight: 600; }
   .summary-row.payout .v { color: var(--yes); font-size: 14px; }
   .summary-row.profit .v { color: var(--yes); }
+  .summary-row.profit.loss .v { color: var(--no); }
   .summary-row.fee .v { color: var(--amber); }
   .summary-divider { height: 1px; background: var(--border); margin: 6px 0; }
 
@@ -2552,20 +2623,20 @@
       <!-- RIGHT COLUMN -->
       <aside class="right-col">
 
-        <div class="trade-card">
+        <div class="trade-card" data-side="buy" data-outcome="yes">
           <div class="trade-tabs">
-            <button class="trade-tab buy active">Buy</button>
-            <button class="trade-tab sell">Sell</button>
+            <button class="trade-tab buy active" data-side="buy">Buy</button>
+            <button class="trade-tab sell" data-side="sell">Sell</button>
           </div>
           <div class="yes-no-toggle">
-            <button class="yn-tab yes active">
+            <button class="yn-tab yes active" data-outcome="yes">
               <span class="lbl">YES</span>
-              <span class="price">$0.52</span>
+              <span class="price" data-px-yes>$0.52</span>
               <span class="sub">52% implied <span class="tip" title="Contract price $0.52 implies 52% market probability that META closes ≥ $680 at 4 PM ET. Price = market-implied probability.">?</span></span>
             </button>
-            <button class="yn-tab no">
+            <button class="yn-tab no" data-outcome="no">
               <span class="lbl">NO</span>
-              <span class="price">$0.48</span>
+              <span class="price" data-px-no>$0.48</span>
               <span class="sub">48% implied <span class="tip" title="Contract price $0.48 implies 48% market probability that META closes &lt; $680 at 4 PM ET.">?</span></span>
             </button>
           </div>
@@ -2574,20 +2645,32 @@
               <button class="order-type-btn active" data-order="market">Market</button>
               <button class="order-type-btn" data-order="limit">Limit</button>
             </div>
-            <div class="field">
-              <div class="field-label">
-                <span>Amount</span>
-                <span class="available">$123.45 avail</span>
-              </div>
-              <div class="input-wrap">
-                <input value="200" placeholder="0">
-                <span class="suffix">USDC</span>
-              </div>
-              <div class="quick-amounts">
-                <button class="quick-amount">25%</button>
-                <button class="quick-amount">50%</button>
-                <button class="quick-amount">75%</button>
-                <button class="quick-amount">MAX</button>
+
+            <!-- EMPTY STATE: shown when SELL with no position on this outcome -->
+            <div class="sell-empty-state" hidden>
+              <div class="sell-empty-icon" aria-hidden="true">⊘</div>
+              <div class="sell-empty-title">No <span data-outcome-text>YES</span> contracts to sell</div>
+              <div class="sell-empty-sub">You don't hold any <span data-outcome-text>YES</span> on this market. Buy first or switch markets.</div>
+              <button class="sell-empty-cta">Switch to BUY</button>
+            </div>
+
+            <!-- ACTIVE form (hidden when sell-empty-state shows) -->
+            <div class="trade-active-fields">
+              <div class="field">
+                <div class="field-label">
+                  <span data-field-amount-lbl>Amount</span>
+                  <span class="available" data-field-available>$123.45 avail</span>
+                </div>
+                <div class="input-wrap">
+                  <input data-input-amount value="200" placeholder="0">
+                  <span class="suffix" data-input-suffix>USDC</span>
+                </div>
+                <div class="quick-amounts">
+                  <button class="quick-amount">25%</button>
+                  <button class="quick-amount">50%</button>
+                  <button class="quick-amount">75%</button>
+                  <button class="quick-amount">MAX</button>
+                </div>
               </div>
             </div>
 
@@ -2646,39 +2729,39 @@
               </div>
             </div>
 
-            <button class="submit-btn primary-cta">BUY 200 YES @ $0.520 · $107.28 TOTAL</button>
+            <button class="submit-btn primary-cta" data-submit-btn>BUY 200 YES @ $0.520 · $107.28 TOTAL</button>
 
             <!-- Trade summary — collapsible, default closed, sits BELOW button (Cory feedback) -->
             <details class="trade-summary-wrap">
               <summary class="trade-summary-toggle">
-                <span class="ts-toggle-text">Order details · Cost $107.28 · Max payout $200.00</span>
+                <span class="ts-toggle-text" data-summary-headline>Order details · Cost $107.28 · Max payout $200.00</span>
                 <span class="ts-chevron" aria-hidden="true">▾</span>
               </summary>
               <div class="trade-summary">
                 <div class="summary-row">
-                  <span>Avg. price</span>
-                  <span class="v">$0.520</span>
+                  <span data-row-lbl="price">Avg. price</span>
+                  <span class="v" data-row-val="price">$0.520</span>
                 </div>
                 <div class="summary-row">
-                  <span>Cost</span>
-                  <span class="v">$104.00</span>
+                  <span data-row-lbl="cost">Cost</span>
+                  <span class="v" data-row-val="cost">$104.00</span>
                 </div>
                 <div class="summary-row fee">
                   <span>Fee (Tier-1 · 2.00%)</span>
-                  <span class="v">+$2.08</span>
+                  <span class="v" data-row-val="fee">+$2.08</span>
                 </div>
-                <div class="summary-row">
+                <div class="summary-row" data-row-slippage>
                   <span>Slippage est.</span>
                   <span class="v">+$1.20</span>
                 </div>
                 <div class="summary-divider"></div>
                 <div class="summary-row payout">
-                  <span>Max payout if YES</span>
-                  <span class="v">$200.00</span>
+                  <span data-row-lbl="payout">Max payout if YES</span>
+                  <span class="v" data-row-val="payout">$200.00</span>
                 </div>
-                <div class="summary-row profit">
-                  <span>Net profit if won</span>
-                  <span class="v">+$92.72</span>
+                <div class="summary-row profit" data-row-profit>
+                  <span data-row-lbl="profit">Net profit if won</span>
+                  <span class="v" data-row-val="profit">+$92.72</span>
                 </div>
               </div>
             </details>
@@ -2821,6 +2904,167 @@
         form.dataset.orderType = btn.dataset.order;
       });
     });
+  })();
+
+  // Buy / Sell × YES / NO state machine — recomputes button text, summary, available
+  (function() {
+    const card = document.querySelector('.trade-card');
+    if (!card) return;
+
+    // Market state (would be live in prod)
+    const market = {
+      yes: { ask: 0.520, bid: 0.500 },
+      no: { ask: 0.480, bid: 0.460 },
+      yesQty: 200, // amount the user wants to buy
+      noQty: 200,
+    };
+    // User's current positions
+    const positions = {
+      yes: { contracts: 5, avgEntry: 0.62, costBasis: 3.10 },
+      no: { contracts: 0, avgEntry: 0, costBasis: 0 },
+    };
+    const usdcAvail = 123.45;
+    const feeBps = 200; // 2%
+
+    function fmt(n, decimals = 2) {
+      return '$' + n.toFixed(decimals);
+    }
+    function fmtSigned(n, decimals = 2) {
+      const sign = n >= 0 ? '+' : '−';
+      return sign + '$' + Math.abs(n).toFixed(decimals);
+    }
+
+    function recompute() {
+      const side = card.dataset.side;
+      const outcome = card.dataset.outcome;
+      const opp = outcome === 'yes' ? 'no' : 'yes';
+      const pos = positions[outcome];
+
+      const submitBtn = card.querySelector('[data-submit-btn]');
+      const fieldLbl = card.querySelector('[data-field-amount-lbl]');
+      const fieldAvail = card.querySelector('[data-field-available]');
+      const inputAmt = card.querySelector('[data-input-amount]');
+      const inputSuffix = card.querySelector('[data-input-suffix]');
+      const rowLblPrice = card.querySelector('[data-row-lbl="price"]');
+      const rowValPrice = card.querySelector('[data-row-val="price"]');
+      const rowLblCost = card.querySelector('[data-row-lbl="cost"]');
+      const rowValCost = card.querySelector('[data-row-val="cost"]');
+      const rowValFee = card.querySelector('[data-row-val="fee"]');
+      const rowSlippage = card.querySelector('[data-row-slippage]');
+      const rowLblPayout = card.querySelector('[data-row-lbl="payout"]');
+      const rowValPayout = card.querySelector('[data-row-val="payout"]');
+      const rowProfit = card.querySelector('[data-row-profit]');
+      const rowLblProfit = card.querySelector('[data-row-lbl="profit"]');
+      const rowValProfit = card.querySelector('[data-row-val="profit"]');
+      const summaryHeadline = card.querySelector('[data-summary-headline]');
+      const outcomeTexts = card.querySelectorAll('[data-outcome-text]');
+      outcomeTexts.forEach(t => t.textContent = outcome.toUpperCase());
+
+      // SELL with no position → empty state
+      if (side === 'sell' && pos.contracts === 0) {
+        card.classList.add('sell-empty');
+        return;
+      }
+      card.classList.remove('sell-empty');
+
+      if (side === 'buy') {
+        // BUY YES or BUY NO — Amount in USDC, fill at ask
+        const ask = market[outcome].ask;
+        const usdcAmt = parseFloat(inputAmt.value) || 0;
+        const fee = usdcAmt * feeBps / 10000;
+        const slip = usdcAmt * 0.012; // 1.2% est
+        const totalCost = usdcAmt + fee + slip;
+        const contracts = usdcAmt / ask;
+        const maxPayout = contracts * 1.00;
+        const netProfit = maxPayout - totalCost;
+
+        fieldLbl.textContent = 'Amount';
+        fieldAvail.textContent = fmt(usdcAvail) + ' avail';
+        inputSuffix.textContent = 'USDC';
+        submitBtn.textContent = `BUY ${contracts.toFixed(0)} ${outcome.toUpperCase()} @ ${fmt(ask, 3)} · ${fmt(totalCost)} TOTAL`;
+
+        rowLblPrice.textContent = 'Avg. price';
+        rowValPrice.textContent = fmt(ask, 3);
+        rowLblCost.textContent = 'Cost';
+        rowValCost.textContent = fmt(usdcAmt);
+        rowValFee.textContent = fmtSigned(fee);
+        if (rowSlippage) rowSlippage.style.display = '';
+        rowLblPayout.textContent = `Max payout if ${outcome.toUpperCase()} wins`;
+        rowValPayout.textContent = fmt(maxPayout);
+        rowLblProfit.textContent = 'Net profit if won';
+        rowValProfit.textContent = fmtSigned(netProfit);
+        if (rowProfit) rowProfit.style.display = '';
+        rowProfit.classList.remove('loss');
+
+        summaryHeadline.textContent = `Order details · Cost ${fmt(totalCost)} · Max payout ${fmt(maxPayout)}`;
+      } else {
+        // SELL YES or SELL NO — Amount in CONTRACTS (capped at position), fill at bid
+        const bid = market[outcome].bid;
+        // Cap input value to position size
+        let sellCount = Math.min(parseFloat(inputAmt.value) || 0, pos.contracts);
+        if (sellCount === 0) sellCount = pos.contracts;
+        // Update input if it was over
+        if (parseFloat(inputAmt.value) > pos.contracts) inputAmt.value = pos.contracts;
+
+        const grossProceeds = sellCount * bid;
+        const fee = grossProceeds * feeBps / 10000;
+        const netProceeds = grossProceeds - fee;
+        // Realized P&L vs cost basis (portion of position being sold)
+        const costPortion = pos.costBasis * (sellCount / pos.contracts);
+        const realizedPnl = netProceeds - costPortion;
+
+        fieldLbl.textContent = 'Contracts to sell';
+        fieldAvail.textContent = `${pos.contracts} owned · avg ${fmt(pos.avgEntry, 2)}`;
+        inputSuffix.textContent = outcome.toUpperCase();
+        submitBtn.textContent = `SELL ${sellCount} ${outcome.toUpperCase()} @ ${fmt(bid, 3)} · ${fmt(netProceeds)} RECEIVED`;
+
+        rowLblPrice.textContent = 'Sell price (bid)';
+        rowValPrice.textContent = fmt(bid, 3);
+        rowLblCost.textContent = 'Gross proceeds';
+        rowValCost.textContent = fmt(grossProceeds);
+        rowValFee.textContent = '−' + fmt(fee).substring(1);
+        if (rowSlippage) rowSlippage.style.display = 'none';
+        rowLblPayout.textContent = 'Net you receive';
+        rowValPayout.textContent = fmt(netProceeds);
+        rowLblProfit.textContent = realizedPnl >= 0 ? 'Realized profit' : 'Realized loss';
+        rowValProfit.textContent = fmtSigned(realizedPnl);
+        rowProfit.classList.toggle('loss', realizedPnl < 0);
+
+        summaryHeadline.textContent = `Order details · Receive ${fmt(netProceeds)} · ${realizedPnl >= 0 ? 'Profit' : 'Loss'} ${fmtSigned(realizedPnl)}`;
+      }
+    }
+
+    // Wire Buy / Sell tabs
+    card.querySelectorAll('.trade-tab').forEach(t => {
+      t.addEventListener('click', () => {
+        card.querySelectorAll('.trade-tab').forEach(x => x.classList.remove('active'));
+        t.classList.add('active');
+        card.dataset.side = t.dataset.side;
+        recompute();
+      });
+    });
+
+    // Wire YES / NO tabs
+    card.querySelectorAll('.yn-tab').forEach(t => {
+      t.addEventListener('click', () => {
+        card.querySelectorAll('.yn-tab').forEach(x => x.classList.remove('active'));
+        t.classList.add('active');
+        card.dataset.outcome = t.dataset.outcome;
+        recompute();
+      });
+    });
+
+    // Empty-state "Switch to BUY" CTA
+    const switchToBuy = card.querySelector('.sell-empty-cta');
+    if (switchToBuy) switchToBuy.addEventListener('click', () => {
+      card.querySelector('.trade-tab.buy').click();
+    });
+
+    // Recompute on input change
+    const inputAmt = card.querySelector('[data-input-amount]');
+    if (inputAmt) inputAmt.addEventListener('input', recompute);
+
+    recompute();
   })();
 
   // Orders / Trades tabs (in info-grid-2 right card)
