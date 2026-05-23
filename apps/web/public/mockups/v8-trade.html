@@ -945,6 +945,112 @@
   ::-webkit-scrollbar-thumb { background: var(--panel-3); border-radius: 4px; border: 1px solid var(--bg); }
   ::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
 
+  /* ===== CHERRY-PICKED FROM v8-alt (Cory 2026-05-23): top-right buttons ===== */
+  .icon-btn {
+    width: 40px; height: 40px;
+    background: var(--panel); border: 1px solid var(--border);
+    color: var(--text-muted); border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 150ms;
+  }
+  .icon-btn:hover { color: var(--text-strong); border-color: var(--accent); }
+  .session-module {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 12px;
+    display: flex; align-items: center; gap: 12px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 12px;
+    min-height: 40px; cursor: pointer;
+    transition: all 150ms;
+  }
+  .session-module:hover { border-color: var(--accent); }
+  .session-pulse {
+    width: 8px; height: 8px; background: var(--yes);
+    border-radius: 50%; box-shadow: 0 0 8px var(--yes);
+    animation: pulse 1.5s ease-in-out infinite;
+    flex-shrink: 0;
+  }
+  .session-status { color: var(--text-strong); font-weight: 600; }
+  .session-time { color: var(--text-muted); }
+  .session-expand { color: var(--text-subtle); margin-left: auto; }
+  .connect-btn {
+    background: var(--accent-gradient);
+    color: var(--accent-fg);
+    padding: 10px 16px;
+    border-radius: 6px;
+    font-weight: 600; font-size: 13px;
+    font-family: 'IBM Plex Mono', monospace;
+    letter-spacing: 0.5px;
+    min-height: 44px;
+    display: flex; align-items: center; gap: 8px;
+    transition: all 150ms;
+    border: none;
+  }
+  .connect-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 16px var(--accent-glow); }
+
+  /* ===== CHERRY-PICKED FROM v8-alt: Trade summary block ===== */
+  .trade-summary {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 12px;
+    margin: 10px 0;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+  }
+  .summary-row {
+    display: flex; justify-content: space-between;
+    padding: 4px 0;
+    color: var(--text-muted);
+  }
+  .summary-row .v { color: var(--text-strong); font-weight: 600; }
+  .summary-row.payout .v { color: var(--yes); font-size: 14px; }
+  .summary-row.profit .v { color: var(--yes); }
+  .summary-row.fee .v { color: var(--amber); }
+  .summary-divider { height: 1px; background: var(--border); margin: 6px 0; }
+
+  /* ===== CHERRY-PICKED FROM v8-alt: Open Orders panel ===== */
+  .open-orders-card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 4px; overflow: hidden;
+  }
+  .order-row-trade {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 10px; align-items: center;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+  }
+  .order-row-trade:last-child { border-bottom: none; }
+  .order-side-tag {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px; font-weight: 700;
+    padding: 3px 6px; border-radius: 3px;
+    letter-spacing: 0.5px;
+  }
+  .order-side-tag.yes { color: var(--yes); background: var(--yes-bg); }
+  .order-side-tag.no { color: var(--no); background: var(--no-bg); }
+  .order-detail-text {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px; color: var(--text);
+  }
+  .order-detail-text .px { color: var(--text-strong); font-weight: 600; }
+  .order-detail-text .fill-state { color: var(--text-muted); font-size: 10px; }
+  .cancel-btn {
+    background: var(--panel-3);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    padding: 5px 9px;
+    border-radius: 3px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    min-height: 30px;
+    transition: all 100ms;
+  }
+  .cancel-btn:hover { color: var(--no); border-color: var(--no); }
+
   /* ===== TOOLTIP — "84% implied" explainer ===== */
   .tip {
     display: inline-flex; align-items: center; justify-content: center;
@@ -1109,10 +1215,13 @@
 <header class="top">
   <div class="header-inner">
     <div class="brand">
-      <a href="v7-landing.html" class="logo" aria-label="BellMarkets home"><span class="logo-mark" aria-hidden="true"></span>BELL<span class="label">·</span>MARKETS</a>
+      <a href="v8-landing.html" class="logo" aria-label="BellMarkets home">
+        <span class="logo-mark" aria-hidden="true"></span>
+        <span>Bell<span class="label">.Markets</span></span>
+      </a>
       <span class="brand-divider" aria-hidden="true"></span>
       <nav class="nav" aria-label="Main">
-        <a href="v7-landing.html">Markets</a>
+        <a href="v8-landing.html">Markets</a>
         <a href="v8-trade.html" class="active" aria-current="page">Trade</a>
         <a href="#">Positions</a>
         <a href="#">Orders</a>
@@ -1125,11 +1234,21 @@
       <span class="searchbar-kbd">⌘K</span>
     </div>
     <div class="header-right">
-      <button class="theme-toggle" onclick="toggleTheme()">◐</button>
-      <div class="wallet">
-        <span class="bal">$123.45</span>
-        <span class="addr">4aPZ…G2iy</span>
-      </div>
+      <!-- Compressed session module — click to expand to full session info -->
+      <button class="session-module" aria-label="Session: market open, expand for details">
+        <span class="session-pulse" aria-hidden="true"></span>
+        <span>
+          <span class="session-status">OPEN</span>
+          <span class="session-time">· 14:46 ET</span>
+        </span>
+        <span class="session-expand" aria-hidden="true">⌃</span>
+      </button>
+      <button class="icon-btn" aria-label="Notifications" title="Notifications">🔔</button>
+      <button class="icon-btn" onclick="toggleTheme()" aria-label="Toggle theme" title="Toggle theme">◐</button>
+      <button class="connect-btn">
+        <span style="font-size: 14px;" aria-hidden="true">⬢</span>
+        <span>4aPZ…G2iy</span>
+      </button>
     </div>
   </div>
 </header>
@@ -1450,11 +1569,6 @@
                 <button class="quick-amount">MAX</button>
               </div>
             </div>
-            <div class="payoff-grid">
-              <div class="payoff-cell"><span class="lbl">Pay</span><span class="val">$104</span></div>
-              <div class="payoff-cell"><span class="lbl">Win</span><span class="val win">+$96</span></div>
-              <div class="payoff-cell"><span class="lbl">Lose</span><span class="val loss">−$104</span></div>
-            </div>
             <div class="slip-row">
               <div class="slip-head">
                 <span>Slippage tolerance</span>
@@ -1465,13 +1579,61 @@
                 <span>0%</span><span>1%</span><span>2.5%</span><span>5%</span>
               </div>
             </div>
-            <button class="submit-btn yes">BUY YES @ $0.520</button>
-            <div class="submit-meta">
-              <div><span class="lbl">contracts</span><span class="val">200 YES</span></div>
-              <div><span class="lbl">avg fill</span><span class="val">$0.520</span></div>
-              <div><span class="lbl">implied</span><span class="val">52%</span></div>
-              <div><span class="lbl">slippage</span><span class="val">+$0.012</span></div>
+
+            <!-- CHERRY-PICKED from v8-alt: row-by-row trade summary -->
+            <div class="trade-summary">
+              <div class="summary-row">
+                <span>Avg. price</span>
+                <span class="v">$0.520</span>
+              </div>
+              <div class="summary-row">
+                <span>Cost</span>
+                <span class="v">$104.00</span>
+              </div>
+              <div class="summary-row fee">
+                <span>Fee (Tier-1 · 2.00%)</span>
+                <span class="v">+$2.08</span>
+              </div>
+              <div class="summary-row">
+                <span>Slippage est.</span>
+                <span class="v">+$1.20</span>
+              </div>
+              <div class="summary-divider"></div>
+              <div class="summary-row payout">
+                <span>Max payout if YES</span>
+                <span class="v">$200.00</span>
+              </div>
+              <div class="summary-row profit">
+                <span>Net profit if won</span>
+                <span class="v">+$92.72</span>
+              </div>
             </div>
+
+            <button class="submit-btn yes">BUY 200 YES @ $0.520 · $107.28 TOTAL</button>
+          </div>
+        </div>
+
+        <!-- CHERRY-PICKED from v8-alt: Open Orders panel -->
+        <div class="open-orders-card">
+          <div class="ob-h" style="border-bottom: 1px solid var(--border);">
+            <h3>Open Orders (2)</h3>
+            <a href="#" style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--accent); text-transform: uppercase; letter-spacing: 0.5px;">VIEW ALL →</a>
+          </div>
+          <div class="order-row-trade">
+            <span class="order-side-tag yes">YES</span>
+            <span class="order-detail-text">
+              META.680 · 50 @ <span class="px">$0.55</span><br>
+              <span class="fill-state">30/50 filled · 4m ago</span>
+            </span>
+            <button class="cancel-btn">CANCEL</button>
+          </div>
+          <div class="order-row-trade">
+            <span class="order-side-tag no">NO</span>
+            <span class="order-detail-text">
+              AAPL.230 · 100 @ <span class="px">$0.20</span><br>
+              <span class="fill-state">pending · 12m ago</span>
+            </span>
+            <button class="cancel-btn">CANCEL</button>
           </div>
         </div>
 
