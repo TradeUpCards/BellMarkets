@@ -170,7 +170,7 @@
   }
   .round-2-section .section-row { --cols: 2; }
   .round-1-section .section-row { --cols: 5; }
-  .round-3-section .section-row { --cols: 1; }
+  .round-3-section .section-row { --cols: 2; }
 
   body[data-filter="all"] .round-section { display: block; }
   body[data-filter="r1"] .round-2-section,
@@ -263,7 +263,7 @@
     <button class="filter-tab active" data-filter="all">All <span class="count">8</span></button>
     <button class="filter-tab" data-filter="r1">Round 1 <span class="count">5</span></button>
     <button class="filter-tab round-2" data-filter="r2">Round 2 <span class="count">2</span></button>
-    <button class="filter-tab round-3" data-filter="r3">Round 3 <span class="count">1</span></button>
+    <button class="filter-tab round-3" data-filter="r3">Round 3 <span class="count">2</span></button>
   </div>
 
   <div class="scroll-controls">
@@ -272,10 +272,25 @@
       <button class="view-mode-btn" data-view="single">Single</button>
     </div>
     <button class="scroll-btn" data-action="prev" title="Previous (← arrow key)">◀</button>
-    <span class="scroll-position" id="scrollPos">1 / 8</span>
+    <span class="scroll-position" id="scrollPos">1 / 9</span>
     <button class="scroll-btn" data-action="next" title="Next (→ arrow key)">▶</button>
   </div>
 </div>
+
+<style>
+  .col.alt-ref .col-header {
+    border-color: #f97316;
+    background: linear-gradient(135deg, rgba(249, 115, 22, 0.12), #ffffff);
+  }
+  .col.alt-ref .col-name .num { color: #c2410c; font-weight: 800; }
+  .col.alt-ref .col-header::after {
+    content: "REJECTED · REFERENCE"; background: #f97316; color: #060810;
+    font-size: 9px; font-weight: 800; padding: 1px 6px;
+    border-radius: 3px; letter-spacing: 0.5px;
+    font-family: 'JetBrains Mono', monospace;
+    margin-left: 6px;
+  }
+</style>
 
 <div class="sections" id="sections">
 
@@ -285,7 +300,7 @@
         <span class="section-tag">Round 3</span>
         Terminal refined · 2026-05-23 feedback + mobile-first
       </h2>
-      <span class="section-meta">1 candidate so far · v9 / Linear / Gamified pending</span>
+      <span class="section-meta">v8 (active) + v8-alt (reference, rejected) · v9 / Linear / Gamified pending</span>
     </div>
     <div class="section-row-wrap">
       <div class="section-row">
@@ -297,6 +312,16 @@
           </div>
           <div class="frame-wrap scale">
             <iframe src="v8-trade.html"></iframe>
+          </div>
+        </div>
+
+        <div class="col alt-ref" data-round="3">
+          <div class="col-header">
+            <div class="col-name"><span class="num">v8-alt</span> Trade (rejected reference)</div>
+            <div class="col-actions"><a href="v8-alt-trade.html" target="_blank">↗ open</a></div>
+          </div>
+          <div class="frame-wrap scale">
+            <iframe src="v8-alt-trade.html"></iframe>
           </div>
         </div>
 
