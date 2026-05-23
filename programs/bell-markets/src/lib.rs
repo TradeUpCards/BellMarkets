@@ -21,9 +21,10 @@ pub mod errors;
 pub mod oracle;
 pub mod adapters;
 pub mod instructions;
+pub mod merkle;
 
 use instructions::*;
-use state::Outcome;
+use state::{Outcome, MAX_ALLOWED_STRIKES, ARWEAVE_TX_ID_LEN};
 
 // Program ID derived from keys/devnet-program-keypair.json (gitignored; also
 // mirrored at target/deploy/bell_markets-keypair.json where Anchor reads it
@@ -88,5 +89,141 @@ pub mod bell_markets {
 
     pub fn pause(ctx: Context<Pause>, paused: bool) -> Result<()> {
         instructions::pause::handler(ctx, paused)
+    }
+
+    pub fn update_ticker_config(
+        ctx: Context<UpdateTickerConfig>,
+        cap_center: i64,
+        allowed_strikes: [i64; MAX_ALLOWED_STRIKES],
+        strike_count: u8,
+        max_user_strike_deviation_bps: u16,
+        strike_tick_size: i64,
+        threshold_bps: u16,
+    ) -> Result<()> {
+        instructions::update_ticker_config::handler(
+            ctx,
+            cap_center,
+            allowed_strikes,
+            strike_count,
+            max_user_strike_deviation_bps,
+            strike_tick_size,
+            threshold_bps,
+        )
+    }
+
+    pub fn user_create_strike_market(
+        ctx: Context<UserCreateStrikeMarket>,
+        strike_price: i64,
+        expiry_unix: i64,
+    ) -> Result<()> {
+        instructions::user_create_strike_market::handler(ctx, strike_price, expiry_unix)
+    }
+
+    pub fn initialize_fee_config(
+        ctx: Context<InitializeFeeConfig>,
+        mint_fee_bps: u16,
+        platform_retain_bps: u16,
+        weekly_pool_bps: u16,
+        monthly_pool_bps: u16,
+        creator_rebate_bps: u16,
+        force_redeem_grace_secs: i64,
+        weekly_distribution_bps: [u16; 10],
+        monthly_distribution_bps: [u16; 10],
+    ) -> Result<()> {
+        instructions::initialize_fee_config::handler(
+            ctx,
+            mint_fee_bps,
+            platform_retain_bps,
+            weekly_pool_bps,
+            monthly_pool_bps,
+            creator_rebate_bps,
+            force_redeem_grace_secs,
+            weekly_distribution_bps,
+            monthly_distribution_bps,
+        )
+    }
+
+    pub fn update_fee_config(
+        ctx: Context<UpdateFeeConfig>,
+        mint_fee_bps: u16,
+        platform_retain_bps: u16,
+        weekly_pool_bps: u16,
+        monthly_pool_bps: u16,
+        creator_rebate_bps: u16,
+        force_redeem_grace_secs: i64,
+        weekly_distribution_bps: [u16; 10],
+        monthly_distribution_bps: [u16; 10],
+    ) -> Result<()> {
+        instructions::update_fee_config::handler(
+            ctx,
+            mint_fee_bps,
+            platform_retain_bps,
+            weekly_pool_bps,
+            monthly_pool_bps,
+            creator_rebate_bps,
+            force_redeem_grace_secs,
+            weekly_distribution_bps,
+            monthly_distribution_bps,
+        )
+    }
+
+    pub fn initialize_rewards_pools(ctx: Context<InitializeRewardsPools>) -> Result<()> {
+        instructions::initialize_rewards_pools::handler(ctx)
+    }
+
+    pub fn commit_leaderboard_root(
+        ctx: Context<CommitLeaderboardRoot>,
+        period_id: u64,
+        period_type: u8,
+        merkle_root: [u8; 32],
+        arweave_tx_id: [u8; ARWEAVE_TX_ID_LEN],
+    ) -> Result<()> {
+        instructions::commit_leaderboard_root::handler(
+            ctx,
+            period_id,
+            period_type,
+            merkle_root,
+            arweave_tx_id,
+        )
+    }
+
+    pub fn distribute_weekly_rewards(
+        ctx: Context<DistributeWeeklyRewards>,
+        period_id: u64,
+        position: u8,
+        amount: u64,
+        merkle_proof: Vec<[u8; 32]>,
+    ) -> Result<()> {
+        instructions::distribute_weekly_rewards::handler(
+            ctx,
+            period_id,
+            position,
+            amount,
+            merkle_proof,
+        )
+    }
+
+    pub fn distribute_monthly_rewards(
+        ctx: Context<DistributeMonthlyRewards>,
+        period_id: u64,
+        position: u8,
+        amount: u64,
+        merkle_proof: Vec<[u8; 32]>,
+    ) -> Result<()> {
+        instructions::distribute_monthly_rewards::handler(
+            ctx,
+            period_id,
+            position,
+            amount,
+            merkle_proof,
+        )
+    }
+
+    pub fn force_redeem(ctx: Context<ForceRedeem>, amount: u64) -> Result<()> {
+        instructions::force_redeem::handler(ctx, amount)
+    }
+
+    pub fn close_settled_market(ctx: Context<CloseSettledMarket>) -> Result<()> {
+        instructions::close_settled_market::handler(ctx)
     }
 }

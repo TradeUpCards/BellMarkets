@@ -1,130 +1,171 @@
 # Claude Session Handoff — BellMarkets
 
-**Date:** 2026-05-21 (Thu late evening — Day-1 wrap)
-**Session phase:** **Day 1 complete; Day 2 ready to dispatch.** All 4 lead branches merged to `main`. Toolchain upgraded in WSL2 Ubuntu-24.04 (Solana 3.1.14 / Anchor 0.31.1). DR-004 locks Anchor 0.31 CLI + 0.30 JS mismatch with Day-2 verification step.
-**Next hard gate:** **Sat 2026-05-23 6:00 PM ET — Aria's first devnet deploy** (critical path; unblocks Bram + Cleo + Drew live integration). Then Mon 2026-05-25 7:00 PM ET (final hard deadline). Informal MVP target: Fri 2026-05-22 9:00 PM ET.
-**Current branch / SHA:** main @ `1973336` (test-runner spec drift fix + DR-004 Anchor mismatch). 16 commits total since Day-0 init; all pushed to GitLab + GitHub.
+**Date:** 2026-05-23 (Fri night → Sat morning — post-architectural-lock session)
+**Session phase:** **Architecture phase COMPLETE. 11 Decision Records locked. All 4 lead dispatch prompts written + ready to paste. Mockup design lock + AI v2 plan deferred to Sat morning resume.**
+**Next hard gate:** Mon 2026-05-25 7:00 PM ET (final). MVP demo target sometime Sun/Mon.
+**Current branch / SHA:** `main` @ `2827292` (DR-008 creator rebate configurable). ~30 commits today; all pushed to GitLab + GitHub.
 
 ---
 
-## TATE — START HERE
+## TATE — START HERE ON RESUME
 
-**Day 1 is complete.** All 4 leads shipped their Day-1 scaffolds — Aria (Anchor program skeleton, 8 instructions, vendored Pyth parser, Phoenix UncheckedAccount stub), Bram (`services/automation` with 29 passing Vitest tests + Trigger.dev v4 config + strike-calc matching PRD), Cleo (Next.js 14.2.18 + React 18 + wallet adapter + 5 route shells + Tailwind/shadcn), Drew (compressed-time simulation runs in 11ms with 5 invariants verified + edge-case mocha stubs).
+This session ended after a long architectural strategy sweep. Four things to do FIRST when you resume:
 
-**Day-2 corrections shipped by Tate:**
-- All 4 lead branches merged into `main` (Cleo → Bram → Aria → Drew sequence; conflicts resolved on root `package.json` + `pnpm-workspace.yaml`)
-- Spec drift fix: `specs/architecture.md` §2.4 + `BRAINLIFT.md` §3 now reflect actual test-runner split (Vitest for service, Jest for frontend, mocha for Anchor + integration/eval)
-- DR-004 added: Anchor CLI 0.31 + JS 0.30 mismatch locked, with Day-2 verification step + one-line IDL patch fallback documented
-- Step-0 (`git fetch + merge origin/main`) added to all 4 lead kickoffs to prevent the stale-branch trap Aria fell into on Day 1
-
-**Operator state:**
-- WSL2 Ubuntu-24.04 has Solana 3.1.14 + Anchor 0.31.1 via AVM (LESSONS.md-pinned versions)
-- AVM auto-switch works for BellMarkets (0.31.1 active); shows 0.31.1 for w3Swap too — `avm install 0.32.1` if you want w3Swap host-CLI back (Docker unaffected either way)
-- Cursor Remote-WSL extension recommended for Aria's worktree (best Anchor build speed)
-
-**On next session start, your first action sequence:**
-
-1. Run `git fetch origin main` (sync any pushes from lead sessions)
-2. Read `.project/bell-markets/in-flight.md` In-Flight table for active status
-3. Read fresh lead handoffs at `.project/bell-markets/handoffs/{aria,bram,cleo,drew}-handoff.md`
-4. Surface the 4-line morning report (days to gate, build state, lead status, recommendation for today)
-5. Run `/daily-sync` to refresh + synthesize all 4 lead states into a single coordinated status
-
-The build timeline is in `docs/TIMELINE.md`. **Critical gate: Sat 5/23 6pm ET — Aria's first devnet deploy** unblocks live integration for Bram + Cleo + Drew.
+1. **Check if Cory dispatched the 4 leads tonight.** Look at recent commits on `main` and each lead branch (`crt/aria-init`, `crt/bram-init`, `crt/cleo-init`, `crt/drew-init`). If leads have committed work, merge to main.
+2. **Read the 4 lead handoffs** at `.project/bell-markets/handoffs/{aria,bram,cleo,drew}-handoff.md` for their latest state.
+3. **Mockup design lock** is the highest-leverage pending decision. Cleo's visual work blocks on it. v6 (Pulse / orange) and v7 (Terminal / cyan) are the front-runners — see `apps/web/public/mockups/` + `.project/bell-markets/coordination/design-feedback-cory.md`. Cory wanted more rounds before locking.
+4. **AI v2 plan is OUTSTANDING.** Cory's last question before stopping: "as v2 feature, how might we implement an AI agent into this platform?" — research on MAG7, user trading analytics, winning strategies, etc. Also asked about freemium pricing model. **One research agent was launched and may still be running** — see "Background work" section below. Resume with a comprehensive AI v2 plan as the first synthesis.
 
 ---
 
-## Current Objective
+## What got locked in this session (11 Decision Records)
 
-Ship the Gauntlet "Meridian" submission: non-custodial Solana dApp for binary outcome contracts on daily MAG7 stock prices, $1 USDC invariant payouts, on-chain Pyth settlement at 4:05 PM ET, Phoenix CLOB. Final deadline: Mon 2026-05-25 7:00 PM ET.
+DR-001 through DR-004 were already locked before this session. DR-005 through DR-011 + Tier-1 work were locked in this session. Total new scope: ~32-38 hr cross-lead work.
 
-**Day-by-day plan:**
-- **Day 0 (Thu 5/21, DONE):** Brainlift + SDD + presearch + Drew roster + LESSONS.md recalibrations. 6 commits pushed.
-- **Day 1 (Fri 5/22):** All 4 leads scaffold their workstream packages in parallel — see `docs/TIMELINE.md` for per-lead deliverables. Target by 9pm ET: 4 worktree branches with passing scaffold-level work.
-- **Day 2 (Sat 5/23):** Aria deploys first devnet program (CRITICAL gate at 6pm ET); Cleo wires trade buttons to live program; Bram wires jobs to deployed program; Drew runs compressed-time simulation against real chain.
-- **Day 3 (Sun 5/24):** Bug-fix iteration; cron-failure demo path scripted; demo video recorded; defense narrative written.
-- **Day 4 (Mon 5/25):** Demo dry-runs; final commits + grader-handoff verification before 7pm ET hard final.
+| DR | Title | Owner |
+|---|---|---|
+| DR-005 | User-funded strike PDA creation (Meteora DLMM pattern) | Aria |
+| DR-006 | Strike-grid evolution schedule (post-close anchor + AH/PM wild-swing checks) | Bram |
+| DR-007 | Trading calendar (weekends/full holidays/half-days at 1 PM ET) | Bram + light Aria |
+| DR-008 | Mint-side 2% fee + creator rebate (configurable, 100% default) + 30-day volume tier | Aria/Drew/Cleo |
+| DR-009 | Phoenix v1 CLOB strategy + Model D venue-fee investigation | Bram (research) |
+| DR-010 | Win-streak rewards: 50/25/25 fee split, top-10 distribution, Merkle commitment + Arweave pinning + Neon Postgres | Cross-lead |
+| DR-011 | Earnings-calendar pre-expansion (hardcoded MAG7 2026 dates) | Bram |
 
----
+Plus Tier-1 ad-hoc work:
+- Open orders + cancellation UI (Cleo, ~2 hr post-design-lock)
+- Slippage slider + computed-price display (Cleo, ~30 min)
+- Devnet faucet CTAs USDC + SOL (Cleo, ~20 min)
+- `force_redeem` + `close_settled_market` instructions + ATA hygiene (Aria + Drew, ~1.75 hr)
+- Jupiter+Phoenix-fallback SOL→USDC swap (Cleo, ~2.5 hr)
 
-## Decisions Made
-
-| # | Decision | Chosen | Rationale |
-|---|---|---|---|
-| 1 | Package manager | pnpm (always — never npm/yarn) | User preference; pnpm workspaces fit the multi-package monorepo (apps/web, services/automation) |
-| 2 | Lead setup | Option C named leads (Aria/Bram/Cleo/Drew) | 4 distinct workstreams: onchain, automation, frontend, and cross-cutting quality+integration+demo. Drew was promoted from generic quality-lead to a named 4th lead on Day 0 |
-| 3 | Worktree mode | Mode 2 (per-lead worktrees, sibling `BellMarkets-<lead>`) | Sustained multi-day parallel work between contract + service + frontend |
-| 4 | Doc weight | Both Brain Lift + SDD from day one | User explicitly chose both — not the migration path; want the constitution scaffolding live before any code |
-| 5 | License | Apache 2.0 | Explicit patent grant is helpful for crypto/DeFi |
-
-_(Append decisions as they accumulate. Promote significant ones to `constitution/decisions.md`.)_
-
----
-
-## Files Touched (this session)
-
-This Day-0 setup session via `/use-template`:
-- Created `LICENSE` (Apache 2.0), `.gitignore` (Node + excludes `/.project/`, `/.claude/`)
-- Filled placeholders in `BRAINLIFT.md`, `constitution/**`, `specs/**`, `.claude/agents/{aria,bram,cleo}.md`, `.claude/skills/{aria,bram,cleo,tate}/SKILL.md`, `.project/bell-markets/**`
-- Renamed `.project/PROJECT/` → `.project/bell-markets/`, `specs/PROJECT-spec.md` → `specs/bell-markets-spec.md`
-- Generated `scripts/setup-worktrees.sh` (Mode 2 helper)
-- Made first commit
+Plus supporting doc:
+- `specs/clob-strategy.md` (CLOB build-vs-fork-vs-Phoenix analysis at scale)
+- `.project/bell-markets/coordination/cory_questions_1_answers.md` (strategic Q&A — full cost analysis of stranded balances, fee model justification, etc.)
 
 ---
 
-## Tests / Evals Status
+## Dispatch prompts (ready to fire)
 
-N/A on Day 0. No code yet.
+I wrote 4 paste-ready dispatch prompts before stopping. They're in this conversation but if you need to recreate them, they cover:
+
+**Aria** (~9-12 hr): DR-005 + StrikeMarket.creator field (Priority 1), DR-008 fee+UserConfig (P2), DR-010 on-chain win-streak pieces (P3), Tier-1 force_redeem + close_settled (P4), redeploy + audit log (P5).
+
+**Bram** (~8-10 hr): DR-009 Model D investigation (~30-45 min discovery FIRST), DR-007 trading calendar, DR-006 19-fires/day cron refactor, DR-010 off-chain (Helius webhooks + Neon Postgres + Merkle tree + Arweave pinning + period crons), DR-011 earnings calendar.
+
+**Drew** (~3-4 hr): Continue HY-5 cron-failure-path doc, reconcile mock against Aria's IDL refresh, property tests for new ixs, live program rewire with new flows + earnings-day scenario.
+
+**Cleo** (~3-4 hr DESIGN-AGNOSTIC ONLY): New tx builders (user_create_strike, sellNo, cancelOrder, smart SOL→USDC swap), updated mint_pair builder with ATA hygiene, new hooks (TickerConfig, UserConfig, OpenOrders, RewardsPool), view-model types. **Critical directive: NO visual work — design not locked. No Trade panel layout, no color/typography, no page composition.**
+
+Cory ran sync commands on all 4 worktrees before stopping. State at session end:
+- Aria + Bram: 22-23 unpushed commits (the docs commits from main merged in; nothing lost)
+- Cleo: 25 unpushed (her Day-2/3 work + docs)
+- Drew: 0 unpushed (Day-4 work already pushed)
+
+All committed work is preserved. Sync command was safe.
 
 ---
 
-## Risks + Blockers
+## Background work (may still be running)
 
-### P0 (blocks shipping)
-_(none on Day 0)_
+Before stopping, I launched 2 research agents for the AI v2 plan:
 
-### P1 (significant)
-- PRD has tight scope across 3 disciplines (Solana / TS service / Next.js). Risk: any one slice slipping kills the lifecycle demo. Mitigation: 4-lead split with quality-lead owning the create→mint→trade→settle→redeem integration.
+1. **Trading platforms AI features research** (agent ID `ae7e3317e4304ea92`) — **COMPLETED** while writing this handoff. Full output preserved at `.project/bell-markets/coordination/ai-v2-research-notes.md`. Covers: TradFi (Robinhood Cortex, Webull Vega, TradeStation MCP+Claude, Schwab, eToro Tori, Tastytrade), institutional (Bloomberg ASKB, TradingView Copilot), DeFi (Hyperliquid agent ecosystem, Polymarket Rust CLI, ElizaOS / Virtuals, Predictool/JogoJogo on Solana), feature-by-feature what-works analysis, full regulatory landscape (SEC IAA-1940, FINRA Notice 24-09, CFTC Feb 2026 prediction-market guidance), and a 6-item recommended v2 feature priority ranking. **Read that file first when synthesizing the v2 plan.**
 
-### P2 (track but not blocking)
-- Node-only `.gitignore` ships without Rust/Anchor patterns — append `target/`, `.anchor/`, `test-ledger/` once Anchor scaffolding starts.
+2. **Solana AI agent infrastructure research** (agent ID `a8bad160aee31a891`) — **DID NOT RUN**. Hit API rate limit at 0 tokens. Needs to be re-launched on resume to fill the gap on: Anthropic Claude API stack details (Tool Use, Agent SDK), Solana AI frameworks (ElizaOS / SendAI / Senpi Skills technical details), orchestration patterns, on-chain ZK-ML for verifiable signals, cost projections by tier.
+
+**On resume:**
+- Read `.project/bell-markets/coordination/ai-v2-research-notes.md` for the trading-platform landscape
+- Re-launch the Solana agent infrastructure research to complete the picture
+- Synthesize both into the comprehensive v2 plan + freemium pricing model
 
 ---
 
-## Recommended Next PM Prompt
+## Cory's specific AI v2 ask (PENDING — synthesize on resume)
 
-For Day 0:
+> "as v2 feature, how might we implement an AI agent into this platform? Research on MAG7 companies, upcoming events, trend analysis, etc? User stats and analysis on their trading behavior? Tips for winning strategies? Give me a list of things we could implement and a plan for doing so. I want this to be comprehensive, so deploy research agents if you need to. Impress me."
+
+> "also think about pricing models. I'm thinking some kind of freemium model"
+
+What I owe Cory on resume (comprehensive synthesis):
+1. **Feature catalog** organized by category — market intelligence (research, news, sentiment, earnings analysis), user behavior analytics, trade signal generation, educational/conversational, autonomous agents
+2. **Technical architecture** — Anthropic Claude API stack (Tool Use, Agent SDK), Helius event triggers, Neon for analytics state, integration with existing Pyth + Phoenix data
+3. **Implementation roadmap** — phased rollout (read-only intelligence → strategy recommendations → limited automation → autonomous agents)
+4. **Compliance considerations** — SEC robo-advisor rules, "informational not advice" framing, geo-fencing implications
+5. **Freemium pricing model** — free tier features vs paid tier features vs SOL-token-gated tier; per-month subscription? Per-feature unlocks? Token-utility model? Compare to similar platforms
+6. **Specific stack recommendations** — Anthropic Claude Opus 4.7 / Sonnet 4.6 / Haiku 4.5 by use case, with cost estimates
+7. **Differentiation moat** — why this matters for BellMarkets vs Polymarket/Kalshi
+8. **Demo value** — could AI features be partially demoed even before MVP?
+
+The plan should be impressive but practical. Cory wants "comprehensive" but also "v2" — so distinguish "must build first" from "nice to have later."
+
+---
+
+## Operator state at handoff
+
+| | State |
+|---|---|
+| **Toolchain** | WSL2 Ubuntu-24.04 with Solana 3.1.14 + Anchor 0.31.1 (per LESSONS.md). Unchanged this session. |
+| **Worktrees** | All 4 lead worktrees synced to `origin/main` (Cory ran sync commands). Local commits ahead of origin/main visible per `git log` per worktree. |
+| **Devnet program** | `599h7VznYR4CxyrG5nQbhR13qtRuwPcbnNr5QqbkS7uV` (unchanged this session; Aria will redeploy after DR-005-011 work) |
+| **MarketConfig PDA** | `6CYzWhTMzsndRrnRcHgWCUfVDvrRh3Cfoze6GSVev9gQ` (initialized 2026-05-22; admin verified) |
+| **Keypairs** | Spread across all 5 worktree `keys/` dirs + OneDrive backup at `~/OneDrive/Documents/GauntletAI/BellMarkets/keys-backup/`. Drew's admin keypair funded 0.5 SOL by Aria earlier. |
+| **Mockups** | 7 candidates at `apps/web/public/mockups/` (v1-v5 round 1 + v6-v7 round 2 feedback-driven). Compare hub at `mockups/index.html` + side-by-side at `compare-{landing,trade}.html`. |
+| **Design feedback** | Cory's notes at `.project/bell-markets/coordination/design-feedback-cory.md`. Lean: Linear orange (#1), Bloomberg cyan (#2). Asked for "wow, modern, beautiful, functional" + degen-trader narrative. |
+| **In-flight notes** | `.project/bell-markets/in-flight.md` has cross-workstream notes through 2026-05-22 mid-day. Doesn't have the architectural decisions from this session — those are in `constitution/decisions.md`. |
+
+---
+
+## Recommended sequence on next session start
+
+1. `git status` + `git log --oneline -10` to see what's landed overnight from lead dispatches (if Cory dispatched)
+2. Read lead handoffs to assess overnight progress
+3. Check agent `ae7e3317e4304ea92` status (research agent for trading platforms)
+4. Synthesize AI v2 plan (Cory's pending ask) — incorporate research agent output + freemium pricing model
+5. Surface the AI v2 plan + recommend whether to lock + add as DR-012 or keep as v2 roadmap
+6. Discuss mockup direction with Cory (if he's ready) and finalize design lock
+7. If design is locked, write Cleo's visual-layer dispatch prompt
+
+---
+
+## Files modified this session (mostly docs)
+
 ```
-Read CLAUDE_SESSION_HANDOFF.md, the PRD at .project/bell-markets/docs/prd/project_1771969779565.pdf, and the skeletal BRAINLIFT.md + constitution/ + specs/.
-Restate the BellMarkets mission, the 3-workstream split, and the highest-leverage first move.
-Recommend: do we run /brainlift first, /sdd-init first, or skip both and start scaffolding the monorepo?
-Wait for my confirmation before any work.
+constitution/decisions.md                      (added DR-005 through DR-011 — 7 new DRs + DR-008 amendments)
+specs/clob-strategy.md                         (new — full Phoenix vs fork vs build analysis)
+.project/bell-markets/coordination/cory_questions_1_answers.md  (extensive strategic Q&A doc)
+.project/bell-markets/coordination/design-feedback-cory.md       (Cory's mockup feedback)
 ```
 
 ---
 
-## Recommended Next Agent-Team Formation
+## Hard rules respected
 
-For Day 0 / first session: Solo Tate. No leads dispatched yet — first job is to fill the constitution scaffolding, then dispatch Aria for Anchor skeleton.
-
----
-
-## Hard Rules (do not violate)
-
-- No secrets / API keys / OAuth tokens / HMAC secrets in any committed file. Use `.env` (in `.gitignore`).
-- No private keys / mnemonics / wallet seed phrases in any committed file. **Never use mainnet or real funds for the core submission** (per PRD).
-- No log dumps (>20 lines of raw output) in handoffs or session recaps.
-- No `git push --force` to `main` without explicit user request.
-- **Always use pnpm** — never `npm` or `yarn`. Lockfile is `pnpm-lock.yaml`. If a tool's docs say `npm install`, translate to `pnpm install`.
-- `/.project/` and `/.claude/` are local-only / OneDrive-mirrored — never commit them to git.
-- Block session exit if `CLAUDE_SESSION_HANDOFF.md` hasn't been refreshed since the last meaningful state change.
-
-_(Add project-specific hard rules here as they emerge — and promote them into `constitution/hard-rules.md`.)_
+- No secrets / API keys / mnemonics in any committed file
+- No mainnet program IDs (`599h7V...` is devnet only)
+- No live stock prices in tests (mocked Pyth feeds only per Hard NO #12)
+- All admin actions still flow through `7b17F...Lprp5` platform admin keypair
+- No backwards-compatibility shims added to existing instructions
+- All 11 new DRs reference existing DRs they compose with
 
 ---
 
-## Session Handoff Discipline
+## Aria's queued work depends on this sequence
 
-Before `/clear` or session exit, run `/session-handoff` to refresh this file. The skill at `.claude/skills/session-handoff/SKILL.md` walks the steps.
+Aria's first action: Priority 1 in her dispatch prompt — `user_create_strike_market` + TickerConfig PDA + StrikeMarket.creator field + IDL refresh push. Other 3 leads block on her IDL push.
 
-If you're a named lead (Aria/Bram/Cleo), write to your lead-specific handoff at `.project/bell-markets/handoffs/<name>-handoff.md` instead of this global file. Tate owns this global file.
+Bram can start Priority 1 (Model D investigation) and Priority 2 (trading calendar) without waiting on Aria.
+
+Drew can start her HY-5 demo doc work without waiting.
+
+Cleo's most work is non-IDL plumbing; she can start the new tx builders + new hooks (logic only, no UI).
+
+Once Aria pushes IDL refresh → Drew updates mock + Cleo copies IDL → full implementation parallelism unlocks.
+
+---
+
+## Session ended on Cory's request for clear
+
+Cory said "stop what you're doing. do handoff update so we can clear and then start this." This handoff captures everything needed to resume cleanly. The AI v2 plan is the load-bearing next deliverable. After that: mockup design lock + dispatch Cleo for visual layer.
+
+**Total decision velocity this session: 11 DRs locked, 1 supporting spec doc, ~32-38 hr scope queued for team. Substantial.**

@@ -1,0 +1,20 @@
+# Standalone sub-workspace for the P5 one-shot bootstraps. Same rationale as
+# `migrations/bootstrap-config/Cargo.toml` — keep host-side deps (solana-client
+# / tokio / reqwest) out of the BPF program's compile path.
+
+[workspace]
+
+[package]
+name = "bootstrap-p5"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "bootstrap-p5"
+path = "src/main.rs"
+
+[dependencies]
+solana-client = "2.3"
+solana-sdk = "2.3"
+borsh = "1"
