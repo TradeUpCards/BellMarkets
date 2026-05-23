@@ -945,25 +945,62 @@
   ::-webkit-scrollbar-thumb { background: var(--panel-3); border-radius: 4px; border: 1px solid var(--bg); }
   ::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
 
-  /* ===== Pro CTA chip in top header (compact link) ===== */
-  .pro-chip {
-    display: inline-flex; align-items: center; gap: 6px;
-    background: linear-gradient(135deg, rgba(34, 211, 238, 0.10), rgba(244, 114, 182, 0.08));
-    border: 1px solid rgba(34, 211, 238, 0.40);
-    color: var(--accent);
-    padding: 7px 12px;
+  /* ===== Pro CTA inline card — lives in market header next to ★ Watch ===== */
+  .pro-card-inline {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    background: linear-gradient(135deg, rgba(34, 211, 238, 0.10) 0%, rgba(244, 114, 182, 0.06) 100%);
+    border: 1px solid rgba(34, 211, 238, 0.35);
     border-radius: 6px;
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 11px; font-weight: 700;
-    letter-spacing: 0.8px; text-transform: uppercase;
+    padding: 6px 12px;
     text-decoration: none;
-    min-height: 36px;
+    position: relative;
+    overflow: hidden;
+    min-height: 38px;
     transition: all 150ms;
   }
-  .pro-chip:hover {
+  .pro-card-inline:hover {
     border-color: var(--accent);
-    background: linear-gradient(135deg, rgba(34, 211, 238, 0.18), rgba(244, 114, 182, 0.12));
+    background: linear-gradient(135deg, rgba(34, 211, 238, 0.18) 0%, rgba(244, 114, 182, 0.10) 100%);
     transform: translateY(-1px);
+  }
+  .pro-card-glow {
+    position: absolute; top: -30px; right: -30px;
+    width: 90px; height: 90px;
+    background: radial-gradient(circle, rgba(34, 211, 238, 0.20), transparent 60%);
+    pointer-events: none;
+  }
+  .pro-card-inline .pro-card-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: var(--accent-bg-strong);
+    color: var(--accent);
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px; font-weight: 700;
+    letter-spacing: 1px; text-transform: uppercase;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .pro-card-inline .pro-card-text {
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 11px;
+    color: var(--text);
+    position: relative;
+    white-space: nowrap;
+  }
+  .pro-card-inline .pro-card-cta {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--accent);
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    position: relative;
+    flex-shrink: 0;
+    padding-left: 10px;
+    border-left: 1px solid rgba(34, 211, 238, 0.30);
   }
 
   /* ===== Pro CTA card in left rail (recreated v8-alt sidebar style) ===== */
@@ -1306,7 +1343,7 @@
   }
   .tip:hover { color: var(--accent); border-color: var(--accent); }
 
-  /* ===== SLIPPAGE SLIDER (DR-008) ===== */
+  /* ===== SLIPPAGE TOLERANCE (DR-008) — preset buttons + custom input ===== */
   .slip-row {
     margin: 10px 0;
     padding: 10px;
@@ -1318,36 +1355,100 @@
     display: flex; justify-content: space-between; align-items: baseline;
     font-family: 'IBM Plex Mono', monospace; font-size: 10px;
     color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px;
-    font-weight: 700; margin-bottom: 6px;
+    font-weight: 700; margin-bottom: 8px;
   }
   .slip-head .computed {
     color: var(--accent); text-transform: none; letter-spacing: 0;
     font-weight: 700; font-size: 11px;
   }
-  .slip-slider {
-    width: 100%; height: 6px;
-    background: var(--panel-3); border-radius: 3px;
-    appearance: none; -webkit-appearance: none;
-    cursor: pointer;
+  .slip-presets {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1.6fr;
+    gap: 6px;
   }
-  .slip-slider::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 18px; height: 18px;
-    background: var(--accent); border-radius: 50%;
-    box-shadow: 0 0 10px var(--accent-glow);
+  .slip-preset {
+    background: var(--panel-3);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    padding: 8px 4px;
+    border-radius: 4px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    min-height: 36px;
     cursor: pointer;
+    transition: all 100ms;
   }
-  .slip-slider::-moz-range-thumb {
-    width: 18px; height: 18px;
-    background: var(--accent); border-radius: 50%;
+  .slip-preset:hover {
+    color: var(--text-strong);
+    border-color: var(--border-strong);
+  }
+  .slip-preset.active {
+    background: var(--accent-bg-strong);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .slip-custom-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    background: var(--panel-3);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0 8px;
+    transition: border-color 150ms;
+  }
+  .slip-custom-wrap:focus-within { border-color: var(--accent); }
+  .slip-custom {
+    flex: 1;
+    width: 100%;
+    background: transparent;
     border: none;
+    color: var(--text-strong);
+    padding: 8px 4px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    outline: none;
+    appearance: textfield;
+    -moz-appearance: textfield;
+    min-width: 0;
   }
-  .slip-ticks {
-    display: flex; justify-content: space-between;
-    margin-top: 4px;
-    font-family: 'IBM Plex Mono', monospace; font-size: 9px;
-    color: var(--text-subtle);
+  .slip-custom::-webkit-outer-spin-button,
+  .slip-custom::-webkit-inner-spin-button {
+    -webkit-appearance: none; margin: 0;
   }
+  .slip-custom::placeholder { color: var(--text-subtle); }
+  .slip-custom-suffix {
+    color: var(--text-muted);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  /* Warning shown when slippage > 2% — amber soft warn; >5% is harder warn (red) */
+  .slip-warning {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-top: 8px;
+    padding: 8px 10px;
+    background: rgba(251, 191, 36, 0.10);
+    border: 1px solid rgba(251, 191, 36, 0.40);
+    border-radius: 4px;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 11px;
+    color: var(--amber);
+    line-height: 1.4;
+  }
+  .slip-warning[hidden] { display: none; }
+  .slip-warning strong { color: var(--text-strong); }
+  .slip-warning .slip-overpay { color: var(--amber); font-weight: 700; }
+  .slip-warning.severe {
+    background: rgba(248, 113, 113, 0.12);
+    border-color: var(--no);
+    color: var(--no);
+  }
+  .slip-warning.severe .slip-overpay { color: var(--no); }
 
   /* ===== MOBILE-FIRST RESPONSIVE (§7.1) ===== */
   /* Bottom tab bar — hidden on desktop, shown on mobile */
@@ -1436,6 +1537,10 @@
     /* Strike pills inline — hide on mobile; strike dropdown shows instead */
     .strike-pills-inline { display: none; }
     .strike-dropdown { display: block; width: 100%; margin-top: 6px; }
+    /* Inline Pro card — hide text on mobile, show compact badge+price only */
+    .pro-card-inline .pro-card-text { display: none; }
+    .pro-card-inline { padding: 6px 8px; gap: 8px; min-height: 34px; }
+    .pro-card-inline .pro-card-cta { padding-left: 6px; font-size: 9px; }
     /* Old separate strike-row no longer exists, but keep CSS in case any HTML still references */
     .strike-row { padding: 8px 14px; gap: 6px; }
     .strike-pill { min-width: 60px; padding: 6px 8px; min-height: 44px; }
@@ -1575,11 +1680,6 @@
       </button>
       <button class="icon-btn" aria-label="Notifications" title="Notifications">🔔</button>
       <button class="icon-btn" onclick="toggleTheme()" aria-label="Toggle theme" title="Toggle theme">◐</button>
-      <!-- Pro CTA chip in header (compact; full card in left rail for details) -->
-      <a href="#pro" class="pro-chip" title="Bell Pro · AI briefings + analytics">
-        <span aria-hidden="true">✦</span>
-        <span>Bell Pro</span>
-      </a>
       <button class="connect-btn">
         <span style="font-size: 14px;" aria-hidden="true">⬢</span>
         <span>4aPZ…G2iy</span>
@@ -1623,6 +1723,13 @@
     </select>
     <!-- Star/Watch only — browse buttons removed (redundant with ⌘K search) -->
     <button class="ctrl-btn" aria-label="Watch this market">★ Watch</button>
+    <!-- Bell Pro CTA card — compact horizontal version sits in market header (Cory feedback) -->
+    <a href="#pro" class="pro-card-inline">
+      <span class="pro-card-glow" aria-hidden="true"></span>
+      <span class="pro-card-badge"><span aria-hidden="true">✦</span> BELL PRO</span>
+      <span class="pro-card-text">AI briefings · PNL digests · earnings analysis</span>
+      <span class="pro-card-cta">9 USDC/mo →</span>
+    </a>
   </div>
 </div>
 
@@ -1630,19 +1737,6 @@
 
   <!-- Compact left rail -->
   <aside class="left-rail">
-
-    <!-- Bell Pro card at top of rail (Cory feedback: card style, moved up high) -->
-    <div class="pro-rail-card" id="pro">
-      <span class="pro-rail-badge"><span aria-hidden="true">✦</span> BELL PRO</span>
-      <div class="pro-rail-title">Today's META briefing</div>
-      <div class="pro-rail-sub">
-        AI analysis of earnings proximity, sector beta, and 5-day momentum
-        for the −6% strike. Daily briefings on all 7 MAG7 tickers.
-      </div>
-      <button class="pro-rail-cta">
-        UNLOCK · 9 USDC/mo <span aria-hidden="true">→</span>
-      </button>
-    </div>
 
     <div class="rail-section">
       <div class="rail-section-h">Tickers</div>
@@ -1994,9 +2088,19 @@
                 <span>Slippage tolerance</span>
                 <span class="computed">0.50% · max $0.523</span>
               </div>
-              <input type="range" class="slip-slider" min="0" max="500" value="50" aria-label="Slippage tolerance percent">
-              <div class="slip-ticks">
-                <span>0%</span><span>1%</span><span>2.5%</span><span>5%</span>
+              <div class="slip-presets">
+                <button class="slip-preset" data-slip="0.1">0.1%</button>
+                <button class="slip-preset active" data-slip="0.5">0.5%</button>
+                <button class="slip-preset" data-slip="1">1.0%</button>
+                <div class="slip-custom-wrap">
+                  <input type="number" class="slip-custom" placeholder="Custom" min="0" max="100" step="0.1" aria-label="Custom slippage %">
+                  <span class="slip-custom-suffix">%</span>
+                </div>
+              </div>
+              <!-- Warning shown when slippage > 2% (active example) -->
+              <div class="slip-warning" hidden>
+                <span aria-hidden="true">⚠</span>
+                <span><strong>High slippage tolerance</strong> — you may overpay by up to <span class="slip-overpay">$5.20</span>. Front-running risk increases above 5%.</span>
               </div>
             </div>
 
@@ -2125,6 +2229,41 @@
   }
   (function() {
     try { const s = localStorage.getItem('bm-theme'); if (s === 'light') document.documentElement.setAttribute('data-theme', 'light'); } catch (e) {}
+  })();
+
+  // Slippage tolerance — preset toggles + custom input + warning thresholds
+  (function() {
+    const presets = document.querySelectorAll('.slip-preset');
+    const custom = document.querySelector('.slip-custom');
+    const warn = document.querySelector('.slip-warning');
+    const overpay = document.querySelector('.slip-overpay');
+    const computed = document.querySelector('.slip-head .computed');
+    // Cost basis used for the warning overpay calculation
+    const TRADE_COST = 104;
+    function updateForValue(pct) {
+      if (computed) computed.textContent = `${pct.toFixed(2)}% · max $${(0.520 * (1 + pct/100)).toFixed(3)}`;
+      if (!warn || !overpay) return;
+      const overpayAmt = (TRADE_COST * pct / 100).toFixed(2);
+      overpay.textContent = `$${overpayAmt}`;
+      if (pct > 5) { warn.hidden = false; warn.classList.add('severe'); }
+      else if (pct > 2) { warn.hidden = false; warn.classList.remove('severe'); }
+      else { warn.hidden = true; warn.classList.remove('severe'); }
+    }
+    presets.forEach(btn => {
+      btn.addEventListener('click', () => {
+        presets.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        if (custom) custom.value = '';
+        updateForValue(parseFloat(btn.dataset.slip));
+      });
+    });
+    if (custom) {
+      custom.addEventListener('input', () => {
+        presets.forEach(b => b.classList.remove('active'));
+        const v = parseFloat(custom.value) || 0;
+        updateForValue(v);
+      });
+    }
   })();
 </script>
 
