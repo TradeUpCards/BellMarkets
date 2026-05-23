@@ -897,13 +897,12 @@
   .tm-chg.down { color: var(--no); font-weight: 600; }
   .tm-div { color: var(--text-subtle); }
 
-  /* ========== CAROUSEL (replaces static hero CTAs) ========== */
+  /* ========== CAROUSEL (replaces static hero CTAs, lives in hero-grid 2fr) ========== */
   .carousel {
     background: var(--panel);
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: 4px;
     overflow: hidden;
-    margin-bottom: 20px;
     position: relative;
     min-height: 280px;
   }
@@ -914,10 +913,11 @@
   }
   .carousel-slide {
     flex: 0 0 100%;
-    padding: 32px 36px;
+    padding: 24px 28px;
     position: relative;
     overflow: hidden;
-    display: flex; align-items: center; gap: 32px;
+    display: flex; align-items: center; gap: 20px;
+    min-height: 280px;
   }
   .carousel-slide::before {
     content: ""; position: absolute; top: -80px; right: -80px;
@@ -939,26 +939,35 @@
   }
   .slide-title {
     font-family: 'IBM Plex Mono', monospace;
-    font-size: 30px; font-weight: 700;
+    font-size: 26px; font-weight: 700;
     color: var(--text-strong);
     letter-spacing: -0.03em; line-height: 1.1;
     margin-bottom: 10px;
   }
   .slide-title .accent { color: var(--accent); }
   .slide-body p {
-    color: var(--text-muted); font-size: 14px; line-height: 1.6;
-    max-width: 560px; margin-bottom: 18px;
+    color: var(--text-muted); font-size: 13px; line-height: 1.55;
+    max-width: 460px; margin-bottom: 14px;
   }
-  .slide-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+  .slide-actions { display: flex; gap: 8px; flex-wrap: wrap; }
   .slide-art {
-    flex: 0 0 320px;
-    height: 200px;
+    flex: 0 0 200px;
+    height: 180px;
     background: var(--panel-2);
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: 4px;
     position: relative;
     overflow: hidden;
     display: flex; align-items: center; justify-content: center;
+  }
+  /* If carousel is in narrow grid, slide-art collapses */
+  @media (max-width: 1200px) {
+    .slide-art { flex: 0 0 160px; height: 140px; }
+    .slide-title { font-size: 22px; }
+  }
+  @media (max-width: 900px) {
+    .carousel-slide { flex-direction: column; gap: 12px; padding: 20px 22px; }
+    .slide-art { width: 100%; height: 90px; flex: 0 0 auto; }
   }
   /* Slide-specific accents */
   .carousel-slide[data-slide="leaderboard"] { --slide-glow: rgba(251, 191, 36, 0.30); }
@@ -1515,7 +1524,8 @@
       </div>
     </div>
 
-    <!-- CAROUSEL (replaces static hero + session block per Cory: rotates markets ↔ leaderboard ↔ contests ↔ AI) -->
+    <!-- HERO-GRID — carousel sized like v7 hero card + session block on the right -->
+    <div class="hero-grid">
     <div class="carousel" id="carousel" aria-label="Featured highlights">
       <div class="carousel-slides" id="slides">
 
@@ -1638,6 +1648,20 @@
         <button class="carousel-dot" data-dot="3" aria-label="Bell Pro"></button>
       </div>
     </div>
+
+    <!-- Session block (v7 style, sits beside carousel) -->
+    <div class="session-block">
+      <div class="session-block-h">Session · 2026-05-23 EDT</div>
+      <div class="session-row"><span class="lbl">Markets active</span><span class="val cyan">49</span></div>
+      <div class="session-row"><span class="lbl">Volume 24h</span><span class="val">$184,723</span></div>
+      <div class="session-row"><span class="lbl">Trades 24h</span><span class="val">2,847</span></div>
+      <div class="session-row"><span class="lbl">Active wallets</span><span class="val">127</span></div>
+      <div class="session-row"><span class="lbl">Open interest</span><span class="val">38,420</span></div>
+      <div class="session-row"><span class="lbl">Settle in</span><span class="val amber">02:13:47</span></div>
+      <div class="session-row"><span class="lbl">Next settle</span><span class="val">META · NVDA · AAPL · MSFT</span></div>
+    </div>
+
+    </div><!-- /hero-grid -->
 
     <!-- TICKER STRIP (old static, hidden) -->
     <div class="ticker-strip" style="display: none;">
