@@ -44,7 +44,7 @@ pub enum BellMarketsError {
     #[msg("Phoenix market account is too small to be a valid market header.")]
     PhoenixAccountTooSmall,
 
-    #[msg("Outcome cannot be Unsettled at redemption time.")]
+    #[msg("Outcome is incompatible with this redemption path (Unsettled, or Invalid where Invalid requires redeem_invalid). force_redeem currently has no Invalid-market path — see TODO in force_redeem.rs.")]
     InvalidOutcomeForRedeem,
 
     #[msg("Burn amount must be > 0.")]

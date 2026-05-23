@@ -68,11 +68,17 @@ pub struct CloseSettledMarket<'info> {
     pub usdc_vault: Box<Account<'info, TokenAccount>>,
 
     /// CHECK: rent recipient — pubkey-binding check below enforces
-    /// fee_collector.key() == config.treasury. fee_collector receives the
-    /// vault's rent lamports + any residual USDC dust (typically zero;
-    /// pairs_outstanding == 0 implies vault balance == 0 because of the
-    /// $1-per-pair invariant, but a stray Token::transfer attacker could
-    /// in principle send dust into the vault).
+    /// fee_collector.key() == config.treasury. fee_collector receives ONLY
+    /// the vault's rent lamports. SPL Token's CloseAccount rejects close if
+    /// `usdc_vault.amount > 0` — the explicit pre-check below surfaces this
+    /// with our `MarketNotEmpty` error instead of the raw SPL Token error.
+    ///
+    /// Dust-attack griefing: anyone can `Token::Transfer` USDC into the
+    /// vault address (it's a public token account). With `pairs_outstanding
+    /// == 0` (our gate) but `vault.amount > 0` (the dust), close_settled
+    /// reverts cleanly via our pre-check. The dust remains stranded in
+    /// the vault PDA. No protocol funds at risk; rent stays unrecovered
+    /// for that specific market until a future sweep ix is added.
     #[account(
         mut,
         constraint = fee_collector.key() == config.treasury @ BellMarketsError::ConfigMismatch,
@@ -84,8 +90,20 @@ pub struct CloseSettledMarket<'info> {
 }
 
 pub fn handler(ctx: Context<CloseSettledMarket>) -> Result<()> {
-    // Close usdc_vault → rent (and any residual dust USDC) flows to
-    // fee_collector. Vault authority is the strike_market PDA (self-authority).
+    // Pre-check: SPL Token's CloseAccount requires `account.amount == 0`.
+    // Surfacing this with our MarketNotEmpty error gives operators a clear
+    // signal vs. the raw `TokenError::NonNativeHasBalance` from the CPI.
+    // The pairs_outstanding == 0 Accounts constraint should imply this for
+    // markets that only saw mint_pair/redeem cycles (per $1 invariant), but
+    // an attacker can dust-transfer USDC directly into the vault PDA — the
+    // explicit check catches that grief.
+    require!(
+        ctx.accounts.usdc_vault.amount == 0,
+        BellMarketsError::MarketNotEmpty
+    );
+
+    // Close usdc_vault → rent lamports flow to fee_collector. Vault authority
+    // is the strike_market PDA (self-authority).
     let pyth_feed = ctx.accounts.strike_market.underlying_pyth_feed;
     let expiry_le = ctx.accounts.strike_market.expiry_unix.to_le_bytes();
     let strike_le = ctx.accounts.strike_market.strike_price.to_le_bytes();

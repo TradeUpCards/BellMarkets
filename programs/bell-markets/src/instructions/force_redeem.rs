@@ -108,8 +108,13 @@ pub fn handler(ctx: Context<ForceRedeem>, amount: u64) -> Result<()> {
     let expected_winning_mint = match outcome {
         Outcome::Yes => ctx.accounts.strike_market.yes_mint,
         Outcome::No => ctx.accounts.strike_market.no_mint,
-        // Invalid markets use redeem_invalid (or its admin force-redeem
-        // equivalent if/when added). Not in this ix's scope.
+        // TODO(v2.5): no admin force-sweep path for Invalid markets. Users
+        // who abandon Invalid positions cannot be swept by admin via this
+        // ix. The fix is a dedicated `force_redeem_invalid` ix (burns equal
+        // YES + NO via delegate + refunds USDC + decrements pairs_outstanding,
+        // mirroring `redeem_invalid` but with admin signer + strike_market
+        // PDA as burn delegate). Not blocking MVP since Invalid markets are
+        // admin-override-only (rare). Tracked in cory_questions_1_answers.md.
         Outcome::Invalid => return Err(BellMarketsError::InvalidOutcomeForRedeem.into()),
         Outcome::Unsettled => unreachable!(), // filtered by Accounts constraint
     };
