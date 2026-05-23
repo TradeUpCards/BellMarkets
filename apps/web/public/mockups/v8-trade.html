@@ -1321,6 +1321,71 @@
   .trade-form[data-order-type="market"] .limit-order-section { display: none; }
   .trade-form[data-order-type="limit"] .market-only { display: none; }
 
+  /* Unit toggle (USDC ↔ Contracts) */
+  .unit-toggle {
+    display: flex;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px;
+    margin-bottom: 6px;
+    gap: 2px;
+  }
+  .unit-btn {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 0.8px; text-transform: uppercase;
+    padding: 5px 8px;
+    border-radius: 3px;
+    cursor: pointer;
+    min-height: 28px;
+    transition: all 100ms;
+  }
+  .unit-btn:hover { color: var(--text); }
+  .unit-btn.active {
+    background: var(--accent-bg-strong);
+    color: var(--accent);
+  }
+  .trade-card[data-side="sell"] .unit-btn.active {
+    background: rgba(251, 191, 36, 0.20);
+    color: var(--amber);
+  }
+
+  /* Insufficient-funds warning */
+  .funds-warning {
+    display: flex; align-items: flex-start;
+    gap: 8px;
+    margin-top: 8px;
+    padding: 8px 10px;
+    background: rgba(248, 113, 113, 0.10);
+    border: 1px solid rgba(248, 113, 113, 0.40);
+    border-radius: 4px;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 11px;
+    color: var(--no);
+    line-height: 1.4;
+  }
+  .funds-warning[hidden] { display: none; }
+  .funds-warning strong { color: var(--text-strong); }
+
+  /* Disabled submit button */
+  .submit-btn.primary-cta:disabled,
+  .submit-btn.primary-cta[disabled] {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+    box-shadow: none;
+    background: var(--panel-3);
+    color: var(--text-muted);
+  }
+  .submit-btn.primary-cta:disabled .sb-outcome {
+    opacity: 0.7;
+  }
+
   /* Limit price meta line */
   .limit-meta {
     font-size: 10px;
@@ -2701,15 +2766,25 @@
                   <span data-field-amount-lbl>Amount</span>
                   <span class="available" data-field-available>$123.45 avail</span>
                 </div>
+                <!-- Unit toggle: USDC ↔ Contracts -->
+                <div class="unit-toggle" role="tablist" aria-label="Amount unit">
+                  <button class="unit-btn active" data-unit="usdc" role="tab" aria-selected="true">USDC</button>
+                  <button class="unit-btn" data-unit="contracts" role="tab" aria-selected="false">Contracts</button>
+                </div>
                 <div class="input-wrap">
                   <input data-input-amount value="200" placeholder="0">
                   <span class="suffix" data-input-suffix>USDC</span>
                 </div>
                 <div class="quick-amounts">
-                  <button class="quick-amount">25%</button>
-                  <button class="quick-amount">50%</button>
-                  <button class="quick-amount">75%</button>
-                  <button class="quick-amount">MAX</button>
+                  <button class="quick-amount" data-quick="25">25%</button>
+                  <button class="quick-amount" data-quick="50">50%</button>
+                  <button class="quick-amount" data-quick="75">75%</button>
+                  <button class="quick-amount" data-quick="max">MAX</button>
+                </div>
+                <!-- Insufficient-funds warning (shows when total > avail) -->
+                <div class="funds-warning" hidden data-funds-warning>
+                  <span aria-hidden="true">⚠</span>
+                  <span><strong>Insufficient funds.</strong> <span data-funds-msg></span></span>
                 </div>
               </div>
             </div>
@@ -3070,27 +3145,54 @@
       }
       card.classList.remove('sell-empty');
 
+      const unit = card.dataset.unit || 'usdc';
+      const fundsWarn = card.querySelector('[data-funds-warning]');
+      const fundsMsg = card.querySelector('[data-funds-msg]');
+      function setInsufficient(msg) {
+        if (fundsWarn) { fundsWarn.hidden = false; fundsMsg.textContent = msg; }
+        if (submitBtn) submitBtn.disabled = true;
+      }
+      function clearInsufficient() {
+        if (fundsWarn) fundsWarn.hidden = true;
+        if (submitBtn) submitBtn.disabled = false;
+      }
+      clearInsufficient();
+
       if (side === 'buy') {
-        // BUY YES or BUY NO — Amount = MAX total USDC user wants to spend.
-        // Derive INTEGER contracts that fit within budget after fees + slippage,
-        // so the displayed total never exceeds what the user entered.
+        // BUY YES or BUY NO — derive integer contracts from the input + selected unit.
         const ask = market[outcome].ask;
-        const usdcAmt = parseFloat(inputAmt.value) || 0;
         const feeRatio = feeBps / 10000;
-        const slipRatio = 0.012; // 1.2% est slippage
-        // Solve: contracts * ask * (1 + feeRatio + slipRatio) ≤ usdcAmt
-        const maxAffordable = usdcAmt / (ask * (1 + feeRatio + slipRatio));
-        const contracts = Math.floor(maxAffordable);
-        const contractsCost = contracts * ask;
-        const fee = contractsCost * feeRatio;
-        const slip = contractsCost * slipRatio;
-        const totalCost = contractsCost + fee + slip;
+        const slipRatio = 0.012;
+        const rawInput = parseFloat(inputAmt.value) || 0;
+        let contracts, contractsCost, fee, slip, totalCost;
+        if (unit === 'usdc') {
+          // Input = max total USDC user wants to spend
+          const maxAffordable = rawInput / (ask * (1 + feeRatio + slipRatio));
+          contracts = Math.floor(maxAffordable);
+          contractsCost = contracts * ask;
+          fee = contractsCost * feeRatio;
+          slip = contractsCost * slipRatio;
+          totalCost = contractsCost + fee + slip;
+        } else {
+          // Input = number of contracts
+          contracts = Math.floor(rawInput);
+          contractsCost = contracts * ask;
+          fee = contractsCost * feeRatio;
+          slip = contractsCost * slipRatio;
+          totalCost = contractsCost + fee + slip;
+        }
         const maxPayout = contracts * 1.00;
         const netProfit = maxPayout - totalCost;
+        // Validation: total > avail OR contracts == 0
+        if (contracts === 0) {
+          setInsufficient(`Amount too small to buy 1 contract at ${fmt(ask, 3)}.`);
+        } else if (totalCost > usdcAvail) {
+          setInsufficient(`Order total ${fmt(totalCost)} exceeds your ${fmt(usdcAvail)} available USDC.`);
+        }
 
         fieldLbl.textContent = 'Amount';
         fieldAvail.textContent = fmt(usdcAvail) + ' avail';
-        inputSuffix.textContent = 'USDC';
+        inputSuffix.textContent = unit === 'usdc' ? 'USDC' : outcome.toUpperCase();
         if (sbAction) sbAction.textContent = 'BUY';
         if (sbOutcome) {
           sbOutcome.textContent = outcome.toUpperCase();
@@ -3174,6 +3276,63 @@
         card.querySelectorAll('.trade-tab').forEach(x => x.classList.remove('active'));
         t.classList.add('active');
         card.dataset.side = t.dataset.side;
+        recompute();
+      });
+    });
+
+    // Unit toggle (USDC ↔ Contracts) — converts the input value on toggle
+    card.querySelectorAll('.unit-btn').forEach(b => {
+      b.addEventListener('click', () => {
+        const newUnit = b.dataset.unit;
+        const oldUnit = card.dataset.unit || 'usdc';
+        if (newUnit === oldUnit) return;
+        const outcome = card.dataset.outcome;
+        const ask = market[outcome].ask;
+        const cur = parseFloat(inputAmt.value) || 0;
+        // Convert value to keep approx equivalence
+        const inputAmtEl = card.querySelector('[data-input-amount]');
+        if (newUnit === 'contracts' && oldUnit === 'usdc') {
+          // USDC → contracts: roughly contracts that fit budget
+          inputAmtEl.value = Math.max(1, Math.floor(cur / ask));
+        } else if (newUnit === 'usdc' && oldUnit === 'contracts') {
+          // Contracts → USDC: cost of those contracts + ~3% buffer for fee+slip
+          inputAmtEl.value = (cur * ask * 1.032).toFixed(2);
+        }
+        card.querySelectorAll('.unit-btn').forEach(x => { x.classList.remove('active'); x.setAttribute('aria-selected', 'false'); });
+        b.classList.add('active');
+        b.setAttribute('aria-selected', 'true');
+        card.dataset.unit = newUnit;
+        recompute();
+      });
+    });
+
+    // Quick-amount chips — % of available USDC (BUY USDC mode) OR
+    // % of available position (SELL contracts mode)
+    card.querySelectorAll('.quick-amount[data-quick]').forEach(b => {
+      b.addEventListener('click', () => {
+        const v = b.dataset.quick;
+        const side = card.dataset.side;
+        const outcome = card.dataset.outcome;
+        const unit = card.dataset.unit || 'usdc';
+        const ask = market[outcome].ask;
+        const inputAmtEl = card.querySelector('[data-input-amount]');
+        let target;
+        if (side === 'buy') {
+          if (unit === 'usdc') {
+            target = v === 'max' ? usdcAvail : (usdcAvail * parseFloat(v) / 100);
+            inputAmtEl.value = target.toFixed(2);
+          } else {
+            const maxContracts = Math.floor(usdcAvail / (ask * 1.032));
+            target = v === 'max' ? maxContracts : Math.floor(maxContracts * parseFloat(v) / 100);
+            inputAmtEl.value = target;
+          }
+        } else {
+          // SELL — % of position
+          const pos = positions[outcome];
+          if (pos.contracts === 0) return;
+          target = v === 'max' ? pos.contracts : Math.floor(pos.contracts * parseFloat(v) / 100);
+          inputAmtEl.value = Math.max(1, target);
+        }
         recompute();
       });
     });
