@@ -16,29 +16,31 @@ This page documents how we prove that claim under demo conditions.
 
 A reviewer's natural follow-up: "OK, settle still works — but doesn't the rest of the system break?" The Day-5 architectural revisions tighten this story. Every system component is independent of Bram's cron:
 
-| Component | Depends on Bram's cron? | What happens if cron dies |
-|---|---|---|
-| `settle_market` (DR-002) | No — permissionless | Any user keypair cranks it; on-chain rules unchanged |
-| Strike creation (DR-005) | **No** — user-funded | New strikes spawn when users pay rent; no cron involvement |
-| Strike-grid evolution (DR-006) | Yes, but reactive — next 30-min interval | Cron dying mid-cycle means stale `TickerConfig` until next fire; users can still trade existing strikes; no loss of funds |
-| Trading calendar (DR-007) | Only for cron entry-point gating | Calendar lookup is local code; doesn't need network/cron health |
-| Fee model (DR-008) | No — on-chain in `mint_pair` | Fee math + split happens inside the Anchor program; treasury + pool transfers atomic with mint |
-| Phoenix v1 CLOB (DR-009) | No — independent Solana program | Order book accepts orders regardless of our service health |
-| Pyth oracle (DR-003) | No — independent Pyth Network publishers | Price feed updates continue; `settle_market` can read freshly |
-| Win-streak indexer (DR-010) | **No** — Helius webhook + Neon Postgres | Helius pushes settle events to Neon; leaderboard updates regardless of our service health |
-| Merkle distribution (DR-010) | Admin-signed; cron is convenience | Admin can sign distributions from anywhere with the keypair |
-| Earnings pre-expansion (DR-011) | Yes, but additive to DR-006 | If pre-expansion misses, DR-006 reactive widening catches it within 30 min |
+| Component | Depends on Bram's cron? | What happens if cron dies | Implementation state |
+|---|---|---|---|
+| `settle_market` (DR-002) | No — permissionless | Any user keypair cranks it; on-chain rules unchanged | **SHIPPED** — `settle_market.rs` |
+| Strike creation (DR-005) | Indirect — depends on `TickerConfig` having been written at least once for that ticker | New strikes spawn when users pay rent IF `TickerConfig` exists for ticker; brand-new tickers blocked until cron has fired at least once | **PLANNED** — `user_create_strike_market` queued; current `create_strike_market` is admin-only |
+| Strike-grid evolution (DR-006) | Yes, but reactive — next 30-min interval | Cron dying mid-cycle means stale `TickerConfig` until next fire; **existing strikes** still tradeable; new strikes blocked until next update | **PLANNED** for the 30-min reactive cadence |
+| Trading calendar (DR-007) | Only for cron entry-point gating | Calendar logic is off-chain helper; if cron is dead nothing fires regardless | **PLANNED** for off-chain helper module |
+| Fee model (DR-008) | No — fee logic queued for on-chain `mint_pair` | When shipped, fee math + split will be atomic with mint inside the Anchor program; current `mint_pair` has **zero fee logic** (no rounding, no fee, no scaling per source comment) | **NOT SHIPPED** — `mint_pair.rs` currently has no fee transfer; this row describes intended architecture once DR-008 lands |
+| Phoenix v1 CLOB (DR-009) | No — independent Solana program | Order book accepts orders regardless of our service health | **SHIPPED** (external program) |
+| Pyth oracle (DR-003) | No — independent Pyth Network publishers | Price feed updates continue; `settle_market` reads freshly. **Failure mode: if Pyth itself is down or stale, `settle_market` reverts with PythStale/PythNotTrading; recovery requires `admin_settle` AFTER `admin_override_eligible_at` (expiry + 1hr default per DR-003 + admin_settle.rs). So a Pyth outage during settle window creates a 1+ hour window before any settle is possible, even with admin action.** | **SHIPPED** (oracle parser); admin_settle time-delay path SHIPPED |
+| Win-streak indexer (DR-010) | **Partially** — Helius pushes to Bram's webhook endpoint, which is part of our service surface | If Bram's indexer service is down, Helius retries with exponential backoff for ~72h then drops events. Settle events persist on-chain forever, so a separate re-index pass can rebuild streak state from chain. **Streak state is eventually-consistent, not cron-gated; bounded by Helius retry window.** | **NOT SHIPPED** — Helius webhook + Neon indexer queued for Bram |
+| Merkle distribution (DR-010) | Admin-signed; cron is convenience | Admin can sign distributions from anywhere with the keypair. Note: requires committed Merkle root, which depends on the indexer being live at period-end. | **NOT SHIPPED** — `commit_leaderboard_root` + `distribute_*` ixs queued |
+| Earnings pre-expansion (DR-011) | Yes, but additive to DR-006 | If pre-expansion misses, DR-006 reactive widening catches it within 30 min | **NOT SHIPPED** — earnings-calendar.ts queued |
+| `config.paused` (admin pause) | No — but admin can halt the system | If `config.paused == true`, both `settle_market` and `mint_pair` revert with `Paused`. Permissionless settle is blocked regardless of cron health. Admin must explicitly unpause. | **SHIPPED** — `pause.rs` |
 
-The single non-redundant dependency is **Bram's morning cron writing `TickerConfig` updates** — and even that's not load-bearing for the demo (existing markets are tradeable regardless of whether new strike caps are expanded for the next day). The protocol's working state is fully owned by the on-chain program + Pyth + Helius + Phoenix, none of which we operate.
+**Honest scope of the cron-death claim:** the **settlement and redemption path is fully on-chain** (Pyth oracle + Anchor program); a settle initiated by ANY wallet after expiry completes the lifecycle independent of our service. The **leaderboard indexing path** (Helius webhook + Bram's service + Neon Postgres) is an off-chain service we operate; its failure is scoped to win-streak tracking and does NOT affect settlement or redemption. The **Pyth failure path** has a 1-hour time-delay recovery via admin override, and the **paused state** can block everything if admin chooses — neither is "the cron died" but both are real failure modes worth knowing about.
 
 ### Sequence diagram — happy path (cron alive, normal day)
+
+Note: the diagram annotates which steps are SHIPPED vs PLANNED. Some steps reflect the post-DR-008/010 target state; today's `mint_pair` has no fee logic and the Helius+Neon indexer is queued.
 
 ```mermaid
 sequenceDiagram
     participant U as User wallet
     participant W as Web frontend (Cleo)
     participant P as Anchor program
-    participant Ph as Phoenix v1 CLOB
     participant Py as Pyth Hermes
     participant C as Bram cron
     participant He as Helius webhook
@@ -47,17 +49,15 @@ sequenceDiagram
     U->>W: Open Trade page
     W->>P: getMarketConfig + getStrikeMarket (RPC read)
     U->>W: Mint pair $100
-    W->>P: mint_pair(100 USDC + 2 fee)
-    P->>P: split fee 50/25/25 (DR-010)
+    W->>P: mint_pair(100)
+    Note over P: SHIPPED today: mint USDC→YES+NO 1:1<br/>PLANNED (DR-008): +2% fee, 50/25/25 split
     P-->>U: +100 YES + 100 NO tokens
 
-    Note over C: 4:05 PM ET tick
-    C->>P: settle_market (admin signer)
-    P->>Py: read SOL/USD price
-    P-->>P: write outcome immutable
-    P-->>He: settle_market event
-    He->>N: webhook (settle event)
-    N->>N: update user_streaks
+    Note over C: 4:05 PM ET tick<br/>(SHIPPED: settle nudger;<br/> PLANNED: TickerConfig anchor)
+    C->>P: settle_market (any signer; cron uses platform admin by convention only)
+    P->>Py: read price via vendored parser
+    P-->>P: write outcome immutable (SHIPPED)
+    Note over He,N: PLANNED (DR-010): Helius webhook to Bram's<br/>indexer service; Neon Postgres streak state
 
     U->>W: Redeem $100 YES
     W->>P: redeem(100)
@@ -73,8 +73,6 @@ sequenceDiagram
     participant P as Anchor program
     participant Py as Pyth Hermes
     participant C as Bram cron
-    participant He as Helius webhook
-    participant N as Neon indexer
 
     Note over C: 4:05 PM ET tick<br/>SERVICE DIED
 
@@ -84,26 +82,26 @@ sequenceDiagram
     W->>P: settle_market(settler=USER)
     P->>P: check NotAdmin? NO — settler is fee payer only
     P->>P: check NotExpired? PASS — block_time > expiry
-    P->>Py: read SOL/USD price
+    P->>P: check !config.paused? PASS
+    P->>Py: read price via vendored parser
     Py-->>P: fresh price + confidence
     P->>P: check PythStale? PASS
     P->>P: check PythConfidenceTooWide? PASS
-    P-->>P: write outcome immutable (settle_price=$285, outcome=Yes)
-    P-->>He: settle_market event (Helius indexes EVERY event,<br/>not just admin-signed ones)
-    He->>N: webhook (settle event)
-    N->>N: update user_streaks for ALL holders
+    P-->>P: write outcome immutable (SHIPPED: settle_market.rs)
 
     U->>W: Redeem $100 YES
     W->>P: redeem(100)
     P-->>U: +100 USDC
 
-    Note over C: 5:00 PM ET<br/>Service restarts
+    Note over C: 5:00 PM ET — Service restarts
     C->>P: settle_market (admin re-tries)
     P-->>C: AlreadySettled (6002) — idempotent reject
     C->>C: log + move on
 ```
 
-Key visual: the cron-death path has **fewer participants but the same outcome**. The program + Pyth + Helius + Neon path is fully intact. The user redeems on the same timeline.
+**Leaderboard indexing (DR-010) intentionally NOT in this diagram** — that's a separate dependency (Helius webhook + Bram's indexer service + Neon Postgres) with its own failure profile (Helius retry window ~72h, after which events drop unless a re-index pass is run against historical chain state). It is **not gated on the settlement cron**, but it IS gated on the indexer service being reachable to receive the webhook. Settle events persist on-chain forever, so streak state is rebuildable from chain history by any indexer — it's eventually-consistent, not load-bearing for the settlement / redemption demo.
+
+Key visual: the cron-death path has the same SETTLEMENT AND REDEMPTION outcome as happy path. The program + Pyth path is fully intact. The user redeems on the same timeline. The leaderboard path (not shown) is a separate concern.
 
 ---
 
@@ -255,9 +253,9 @@ The point is the architectural argument doesn't depend on devnet's mood. Three l
 - `constitution/decisions.md` DR-002 — the decision being defended (permissionless settle)
 - `constitution/decisions.md` DR-005 — user-funded strike creation (proves protocol is non-custodial top to bottom; cron has no privileged role in strike spawning)
 - `constitution/decisions.md` DR-006 — reactive 30-min wild-swing detection (the cron *does* something useful, but missing one cycle doesn't break anyone's existing position)
-- `constitution/decisions.md` DR-008 — fee model lives in `mint_pair` on chain (cron never touches money flow)
+- `constitution/decisions.md` DR-008 — fee model planned for `mint_pair` on chain (cron will never touch money flow); **status: NOT yet implemented — `mint_pair.rs` currently has no fee logic. This DR is queued architecture, not shipped state.**
 - `constitution/decisions.md` DR-009 — Phoenix v1 CLOB integration (independent program, our cron health is irrelevant to order matching)
-- `constitution/decisions.md` DR-010 — Helius webhook + Neon Postgres indexer + Merkle-committed leaderboard (the leaderboard updates from on-chain events that Helius pushes regardless of our service health; distributions are admin-signed via cryptographically verifiable Merkle proofs)
+- `constitution/decisions.md` DR-010 — Helius webhook + Neon Postgres indexer + Merkle-committed leaderboard. **Status: not yet implemented; `commit_leaderboard_root` + `distribute_*` ixs queued for Aria, indexer queued for Bram.** When shipped: leaderboard updates from on-chain events Helius pushes to Bram's endpoint (which IS part of our service surface); distributions are admin-signed via cryptographically verifiable Merkle proofs. Failure mode: if Bram's indexer endpoint is down >72h, Helius retries exhaust and events drop — but settle events are permanent on chain, so a re-index pass against historical state can always rebuild streak state.
 - `BRAINLIFT.md` §4 Hard YES #5 — the requirement being satisfied
 - `tests/integration/live-deploy-verify.test.ts` — IDL structural proof (signer count + docs string check)
 - `tests/integration/live-program-call.test.ts` — chain-level handler-reached proof (NotExpired evidence)
@@ -268,6 +266,8 @@ The point is the architectural argument doesn't depend on devnet's mood. Three l
 
 ## Strongest reviewer-defense line
 
-> "If you want to be really mean, kill our cron right now and watch the demo continue."
+> "Kill our cron right now and the settlement and redemption path continues."
 
-The architecture supports this. The doc above is the evidence. The tests above are the proof.
+The architecture supports this for the **settle → redeem** lifecycle. The doc above is the evidence; the tests are the proof. Scope: this defense applies to the on-chain settlement and redemption path. The **leaderboard indexing path** (Helius webhook + Bram's service + Neon Postgres) is an off-chain service we operate — a Helius outage or extended Bram-service downtime is a distinct failure mode, scoped to win-streak tracking, not settlement. The **Pyth oracle** is independent of our service but has its own failure mode (1-hour `admin_settle` time-delay if Pyth goes stale). And the **`config.paused`** admin pause can block everything regardless of cron state, by design.
+
+If a reviewer asks "what if EVERYTHING goes down?" the honest answer is: settlement and redemption survive any combination of Bram's cron failure + our indexer service failure + Phoenix activity stop, because the on-chain program is the source of truth. They do NOT survive Pyth oracle outage (1hr admin-override window) or admin pause (intentional kill-switch).

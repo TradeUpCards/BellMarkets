@@ -97,7 +97,11 @@ describe("BellMarkets live program call (Drew, integration via Anchor JS)", func
     expect(program).to.exist;
     expect(program.programId.toBase58()).to.equal(PROGRAM_ID);
     expect((program.idl as { address: string }).address).to.equal(PROGRAM_ID);
-    expect(program.idl.instructions.length).to.equal(9);
+    // Forward-compatible across Aria's IDL evolution. Day-3: 9 ix. Day-4
+    // post-merge: 10 ix (redeem_pair). Day-5+: may grow further as Aria
+    // adds user_create_strike_market / force_redeem / etc per DR-005-011.
+    // The structural assertion is "at least the 9 core ix were emitted."
+    expect(program.idl.instructions.length).to.be.at.least(9);
   });
 
   it("Program.account.marketConfig.fetch() decodes the live MarketConfig", async function () {
