@@ -329,6 +329,55 @@ Phase 1 of DR-006 uses `nextTradingDay(today)` + `getCloseTime(nextTradingDay)` 
 
 ---
 
+### DR-008 — Fee model: mint-side 2% with creator rebate + 30-day mint-volume tier discount
+
+**Date:** 2026-05-22 (Fri evening — composes with DR-005)
+**Status:** Active — implementation queued for Aria + Drew + Cleo
+**Made by:** Cory (Tate-routed)
+
+**Context:** With DR-005 locking user-funded strike creation, the protocol needs a revenue model. Three candidates were evaluated:
+- **Model A — redeem-only** (Polymarket-style 2% on winning redemptions): user-friendly but systematically misses revenue from Phoenix-only traders who mint and exit via Phoenix without ever calling redeem. Also requires consistent fee on `force_redeem` (and arguably `redeem_pair`), creating accounting branches.
+- **Model B — mint-only** (2% on `mint_pair`): captures every protocol interaction (winners + losers + Phoenix-only churners). Single accounting point. No branching for force_redeem or redeem_pair. Slightly worse "no fees on losing" branding.
+- **Model C — symmetric hybrid** (small fee on both mint and redeem): more moving parts; rejected as over-engineered.
+
+Per-market revenue at $10K mint volume / 95% redemption rate: A ~$190, B ~$200, C ~$200-250 depending on activity. Comparable headline numbers; the difference is which user behaviors get captured.
+
+**Decision:** **Mint-only fee model.** 2% (200 bps) charged on `mint_pair` to the user, paid in USDC, transferred to `MarketConfig.treasury` (fee_collector). No fee on `redeem`, `redeem_pair`, `redeem_invalid`, or `force_redeem` — fee already captured at mint time.
+
+**Three layered discounts:**
+1. **Creator rebate (per DR-005 alignment):** First-trader-of-strike (the user who paid SOL rent to create the StrikeMarket PDA via `user_create_strike_market`) pays 0% fee on their first mint into that strike. Tracked via `StrikeMarket.creator: Pubkey` + `StrikeMarket.creator_rebate_claimed: bool`. Refunds their ~$0.40-equivalent strike-creation cost out of trading revenue. Strong DR-005 narrative loop ("pioneer recoups their venue cost").
+2. **30-day mint-volume tier discount:** Per-user `UserConfig` PDA tracks `mint_volume_30d` with linear decay. Three tiers:
+   - $0-$1,000: 200 bps (2%)
+   - $1,000-$10,000: 150 bps (1.5%)
+   - $10,000+: 100 bps (1%)
+   Updated in every `mint_pair` call. ~$0.16 user-paid rent per UserConfig PDA (one-time, first mint).
+3. **Phoenix venue fee (Model D, IN INVESTIGATION):** Bram investigates whether Phoenix v1 exposes a per-market `fee_receiver` configuration that flows taker fees to our `fee_collector` PDA. If feasible, layer 5-10 bps on Phoenix trades to capture Phoenix-only users (those who mint + churn + walk away without redeeming). Discovery first; ~30-45 min Bram research. If validated, additional ~1-2 hr to wire fee_receiver into `create_strike_market` Phoenix CPI.
+
+**Fee config defaults:**
+- `MarketConfig.mint_fee_bps`: 0 (default) — fee mechanism present but disabled. Admin flips to 200 (2%) via signed config update when ready.
+- This ships as INFRASTRUCTURE so demo can run with or without fees active. Strong flexibility for interview narrative ("we shipped the mechanism; turning it on is a flag").
+
+**Trade-off:** We pay slightly worse "no fees on losing" branding (vs Model A) in exchange for: single fee touchpoint (cleaner accounting); captures Phoenix-only users (the gap Model A leaves); predictable revenue per mint; no force_redeem fee branching; deterministic treasury accumulation; UI simplicity ("Cost to open: $1.02 = $1 pair + $0.02 protocol fee").
+
+**Consequences:**
+- **Aria's program:** modify `mint_pair` to add tier-based fee calc + creator-rebate check + USDC transfer to treasury. Add `mint_fee_bps` to MarketConfig. Add `UserConfig` PDA (init_if_needed in mint_pair). Add `creator` + `creator_rebate_claimed` fields to StrikeMarket (already specced in DR-005). Estimated 2-2.5 hr.
+- **Drew's tests:** add fee math + tier transition + creator rebate + decay logic tests. ~30 min.
+- **Cleo's frontend:** show user's volume tier + projected fee in mint UI ("Cost: $1.02 USDC = $1 pair + $0.02 fee (tier 2, 2%)"). Show creator-rebate ("you opened this market: -100% fee"). ~20-30 min.
+- **Bram's investigation:** validate Model D feasibility on Phoenix v1 ~30-45 min discovery; if green, additional ~1-2 hr Aria + Bram to wire fee_receiver into Phoenix market creation.
+- **Fee accumulation:** USDC flows to `fee_collector` ATA. Initially passive; v2 withdrawal instruction by admin if needed.
+- **`mint_pair` math** (clean $1 invariant): user pays `amount + fee` total USDC; `amount` goes to vault (maintains $1-per-pair invariant); `fee` goes to treasury. User receives `amount` YES + `amount` NO. The vault's USDC balance always equals `pairs_outstanding × $1`.
+- **Mint-volume gaming:** users can't easily game tier via wash-trading (Phoenix is outside our program; minting takes real capital). Possible attack: mint + redeem_pair + mint + redeem_pair to inflate mint_volume_30d. Cost: each cycle pays the fee at mint and recovers $1 minus the fee, so the user pays $0.02 to add $1 of "volume" — strongly bounded by their fee paid. Not worth gaming for a 50 bps tier discount.
+
+**Alternatives considered:**
+- **Model A (redeem-only):** rejected. Misses Phoenix-only revenue; force_redeem fee branching adds complexity; redeem_pair fee decision needs separate adjudication.
+- **Model C (symmetric hybrid mint + redeem):** rejected. More moving parts; UX explanation harder; revenue comparable to A or B alone.
+- **No tier discount (flat 2%):** rejected by user. Tier discount is standard CEX retention mechanic and aligns with rewarding commitment.
+- **Total-traded volume (mint + Phoenix activity)** for tier definition: rejected. Requires off-chain Phoenix-event indexer (centralized trust assumption + ~6-8 hr extra work). Mint-volume captures what matters (capital committed); ~3 hr trustless on-chain implementation.
+- **Token-holder discount layer:** deferred (no token yet).
+- **Maker-taker rebate within Phoenix:** deferred. Couples with Model D investigation; if Phoenix venue fees work, exploring rebate structure is v2 polish.
+
+---
+
 > Aim for 5–15 active DRs over a project's life. Fewer and you're not
 > locking enough; more and the file becomes unscannable (rotate stable
 > ones into `specs/architecture.md` if they've become "just how the
