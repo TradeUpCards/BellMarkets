@@ -29,10 +29,178 @@
   }
   .nav-link.primary { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
 
-  .grid {
-    display: grid; grid-template-columns: repeat(5, 1fr);
-    gap: 12px; padding: 16px;
-    min-width: 2500px;
+  /* Controls bar */
+  .controls {
+    background: #ffffff; border-bottom: 1px solid #e0e0dd;
+    padding: 10px 24px;
+    display: flex; justify-content: space-between; align-items: center;
+    position: sticky; top: 53px; z-index: 99;
+    gap: 16px;
+  }
+  .filter-tabs {
+    display: flex; gap: 4px; background: #f0f0ed; padding: 4px;
+    border-radius: 8px; border: 1px solid #e0e0dd;
+  }
+  .filter-tab {
+    padding: 7px 16px; background: transparent; border: none;
+    color: #6a6a6a; font-size: 12px; font-weight: 600;
+    border-radius: 5px; transition: all 150ms;
+    font-family: 'Inter', sans-serif; cursor: pointer;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .filter-tab:hover { color: #1a1a1a; background: #fff; }
+  .filter-tab.active {
+    background: #1a1a1a; color: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+  }
+  .filter-tab .count {
+    background: rgba(0,0,0,0.12); padding: 1px 6px;
+    border-radius: 999px; font-size: 10px; font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .filter-tab.active .count { background: rgba(255,255,255,0.2); }
+  .filter-tab.round-2.active { background: #fb923c; color: #fff; }
+
+  .scroll-controls { display: flex; gap: 6px; align-items: center; }
+  .scroll-btn {
+    width: 36px; height: 36px;
+    background: #ffffff; border: 1px solid #c0c0bd;
+    color: #1a1a1a; border-radius: 8px;
+    font-size: 18px; transition: all 150ms;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+  .scroll-btn:hover {
+    border-color: #1a1a1a;
+    background: #f5f5f2;
+    transform: scale(1.05);
+  }
+  .view-mode-toggle {
+    display: flex; background: #f0f0ed; padding: 3px;
+    border-radius: 6px; border: 1px solid #e0e0dd;
+  }
+  .view-mode-btn {
+    padding: 6px 12px; background: transparent; border: none;
+    color: #6a6a6a; font-size: 12px; font-weight: 600;
+    border-radius: 4px; cursor: pointer;
+    font-family: 'Inter', sans-serif; transition: all 150ms;
+  }
+  .view-mode-btn:hover { color: #1a1a1a; }
+  .view-mode-btn.active { background: #1a1a1a; color: #fff; }
+
+  .scroll-position {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    color: #6a6a6a; min-width: 60px; text-align: center;
+    background: #f0f0ed; padding: 6px 12px; border-radius: 6px;
+    border: 1px solid #e0e0dd;
+  }
+
+  /* Sections — Round 2 first, Round 1 below */
+  .sections {
+    padding: 16px;
+    display: flex; flex-direction: column;
+    gap: 24px;
+  }
+  .round-section {
+    background: #ffffff;
+    border: 1px solid #e0e0dd;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .round-section.round-2-section {
+    border-color: #fb923c;
+    box-shadow: 0 4px 16px rgba(251, 146, 60, 0.10);
+  }
+  .section-h {
+    padding: 14px 20px;
+    background: #f5f5f2;
+    border-bottom: 1px solid #e0e0dd;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .round-2-section .section-h {
+    background: linear-gradient(135deg, rgba(251, 146, 60, 0.12), #ffffff);
+    border-bottom-color: rgba(251, 146, 60, 0.3);
+  }
+  .section-h h2 {
+    font-size: 14px; font-weight: 700;
+    color: #1a1a1a; letter-spacing: -0.01em;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .section-h .section-tag {
+    background: #f0f0ed; color: #6a6a6a;
+    padding: 2px 10px; border-radius: 999px;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.5px;
+    text-transform: uppercase;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .round-2-section .section-h .section-tag {
+    background: #fb923c; color: #fff;
+  }
+  .section-h .section-meta {
+    font-size: 11px; color: #6a6a6a;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .section-row-wrap {
+    overflow-x: auto;
+    scroll-behavior: smooth;
+    padding: 16px;
+    background: #fafaf7;
+  }
+  .section-row-wrap::-webkit-scrollbar { height: 8px; }
+  .section-row-wrap::-webkit-scrollbar-track { background: #f0f0ed; border-radius: 4px; }
+  .section-row-wrap::-webkit-scrollbar-thumb { background: #c0c0bd; border-radius: 4px; }
+  .section-row-wrap::-webkit-scrollbar-thumb:hover { background: #1a1a1a; }
+  .section-row {
+    display: grid;
+    grid-template-columns: repeat(var(--cols, 5), 500px);
+    gap: 12px;
+    width: max-content;
+  }
+  .round-2-section .section-row { --cols: 2; }
+  .round-1-section .section-row { --cols: 5; }
+
+  body[data-filter="all"] .round-section { display: block; }
+  body[data-filter="r1"] .round-2-section { display: none; }
+  body[data-filter="r2"] .round-1-section { display: none; }
+
+  body[data-view="single"] .sections { padding: 0; }
+  body[data-view="single"] .round-section {
+    border: none; border-radius: 0; box-shadow: none;
+  }
+  body[data-view="single"] .section-h { display: none; }
+  body[data-view="single"] .section-row-wrap {
+    padding: 16px; overflow: hidden; background: transparent;
+  }
+  body[data-view="single"] .section-row {
+    grid-template-columns: 1fr !important;
+    width: 100%;
+  }
+  body[data-view="single"] .col { display: none !important; }
+  body[data-view="single"] .col.single-active {
+    display: flex !important;
+    max-width: 100%;
+  }
+  body[data-view="single"] .frame-wrap.scale iframe {
+    width: 100%; height: 100%;
+    transform: none;
+  }
+
+  .col.new-iter .col-header {
+    border-color: #fb923c;
+    background: linear-gradient(135deg, rgba(251, 146, 60, 0.10), #ffffff);
+  }
+  .col.new-iter .col-name .num { color: #ea580c; font-weight: 800; }
+  .col.new-iter .col-header::after {
+    content: "NEW"; background: #fb923c; color: #fff;
+    font-size: 9px; font-weight: 800; padding: 1px 6px;
+    border-radius: 3px; letter-spacing: 0.5px;
+    font-family: 'JetBrains Mono', monospace;
+    margin-left: 6px;
+  }
+  .col-header { position: relative; }
+  body[data-view="single"] .col.single-active .col-header {
+    border-color: #1a1a1a;
+    box-shadow: 0 0 0 1px #1a1a1a;
   }
   .col { display: flex; flex-direction: column; }
   .col-header {
@@ -66,66 +234,248 @@
 <body>
 
 <div class="topbar">
-  <h1>BellMarkets · Compare Trade Pages <span class="meta">— the load-bearing UX surface · scroll horizontally</span></h1>
+  <h1>BellMarkets · Compare Trade Pages <span class="meta">— 7 candidates · load-bearing UX surface</span></h1>
   <div class="nav-links">
     <a href="index.html" class="nav-link">← All candidates</a>
     <a href="compare-landing.html" class="nav-link primary">Compare landings →</a>
   </div>
 </div>
 
-<div class="grid">
-
-  <div class="col">
-    <div class="col-header">
-      <div class="col-name"><span class="num">v1</span> Hyperliquid</div>
-      <div class="col-actions"><a href="v1-trade.html" target="_blank">↗ open</a></div>
-    </div>
-    <div class="frame-wrap scale">
-      <iframe src="v1-trade.html"></iframe>
-    </div>
+<div class="controls">
+  <div class="filter-tabs">
+    <button class="filter-tab active" data-filter="all">All <span class="count">7</span></button>
+    <button class="filter-tab" data-filter="r1">Round 1 <span class="count">5</span></button>
+    <button class="filter-tab round-2" data-filter="r2">Round 2 <span class="count">2</span></button>
   </div>
 
-  <div class="col">
-    <div class="col-header">
-      <div class="col-name"><span class="num">v2</span> Polymarket</div>
-      <div class="col-actions"><a href="v2-trade.html" target="_blank">↗ open</a></div>
+  <div class="scroll-controls">
+    <div class="view-mode-toggle">
+      <button class="view-mode-btn active" data-view="grid">Grid</button>
+      <button class="view-mode-btn" data-view="single">Single</button>
     </div>
-    <div class="frame-wrap scale">
-      <iframe src="v2-trade.html"></iframe>
-    </div>
+    <button class="scroll-btn" data-action="prev" title="Previous (← arrow key)">◀</button>
+    <span class="scroll-position" id="scrollPos">1 / 7</span>
+    <button class="scroll-btn" data-action="next" title="Next (→ arrow key)">▶</button>
   </div>
+</div>
 
-  <div class="col">
-    <div class="col-header">
-      <div class="col-name"><span class="num">v3</span> Drift</div>
-      <div class="col-actions"><a href="v3-trade.html" target="_blank">↗ open</a></div>
-    </div>
-    <div class="frame-wrap scale">
-      <iframe src="v3-trade.html"></iframe>
-    </div>
-  </div>
+<div class="sections" id="sections">
 
-  <div class="col">
-    <div class="col-header">
-      <div class="col-name"><span class="num">v4</span> Bloomberg</div>
-      <div class="col-actions"><a href="v4-trade.html" target="_blank">↗ open</a></div>
+  <section class="round-section round-2-section" data-round-section="2">
+    <div class="section-h">
+      <h2>
+        <span class="section-tag">Round 2</span>
+        Feedback-driven · designed for "wow"
+      </h2>
+      <span class="section-meta">2 candidates · Linear-orange + Bloomberg-cyan</span>
     </div>
-    <div class="frame-wrap scale">
-      <iframe src="v4-trade.html"></iframe>
-    </div>
-  </div>
+    <div class="section-row-wrap">
+      <div class="section-row">
 
-  <div class="col">
-    <div class="col-header">
-      <div class="col-name"><span class="num">v5</span> Linear</div>
-      <div class="col-actions"><a href="v5-trade.html" target="_blank">↗ open</a></div>
+        <div class="col new-iter" data-round="2">
+          <div class="col-header">
+            <div class="col-name"><span class="num">v6</span> Pulse</div>
+            <div class="col-actions"><a href="v6-trade.html" target="_blank">↗ open</a></div>
+          </div>
+          <div class="frame-wrap scale">
+            <iframe src="v6-trade.html"></iframe>
+          </div>
+        </div>
+
+        <div class="col new-iter" data-round="2">
+          <div class="col-header">
+            <div class="col-name"><span class="num">v7</span> Terminal</div>
+            <div class="col-actions"><a href="v7-trade.html" target="_blank">↗ open</a></div>
+          </div>
+          <div class="frame-wrap scale">
+            <iframe src="v7-trade.html"></iframe>
+          </div>
+        </div>
+
+      </div>
     </div>
-    <div class="frame-wrap scale">
-      <iframe src="v5-trade.html"></iframe>
+  </section>
+
+  <section class="round-section round-1-section" data-round-section="1">
+    <div class="section-h">
+      <h2>
+        <span class="section-tag">Round 1</span>
+        Initial exploration · for element cherry-picking
+      </h2>
+      <span class="section-meta">5 candidates · scroll horizontally</span>
     </div>
-  </div>
+    <div class="section-row-wrap">
+      <div class="section-row">
+
+        <div class="col" data-round="1">
+          <div class="col-header">
+            <div class="col-name"><span class="num">v1</span> Hyperliquid</div>
+            <div class="col-actions"><a href="v1-trade.html" target="_blank">↗ open</a></div>
+          </div>
+          <div class="frame-wrap scale">
+            <iframe src="v1-trade.html"></iframe>
+          </div>
+        </div>
+
+        <div class="col" data-round="1">
+          <div class="col-header">
+            <div class="col-name"><span class="num">v2</span> Polymarket</div>
+            <div class="col-actions"><a href="v2-trade.html" target="_blank">↗ open</a></div>
+          </div>
+          <div class="frame-wrap scale">
+            <iframe src="v2-trade.html"></iframe>
+          </div>
+        </div>
+
+        <div class="col" data-round="1">
+          <div class="col-header">
+            <div class="col-name"><span class="num">v3</span> Drift</div>
+            <div class="col-actions"><a href="v3-trade.html" target="_blank">↗ open</a></div>
+          </div>
+          <div class="frame-wrap scale">
+            <iframe src="v3-trade.html"></iframe>
+          </div>
+        </div>
+
+        <div class="col" data-round="1">
+          <div class="col-header">
+            <div class="col-name"><span class="num">v4</span> Bloomberg</div>
+            <div class="col-actions"><a href="v4-trade.html" target="_blank">↗ open</a></div>
+          </div>
+          <div class="frame-wrap scale">
+            <iframe src="v4-trade.html"></iframe>
+          </div>
+        </div>
+
+        <div class="col" data-round="1">
+          <div class="col-header">
+            <div class="col-name"><span class="num">v5</span> Linear</div>
+            <div class="col-actions"><a href="v5-trade.html" target="_blank">↗ open</a></div>
+          </div>
+          <div class="frame-wrap scale">
+            <iframe src="v5-trade.html"></iframe>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
 
 </div>
+
+<script>
+  (function() {
+    const body = document.body;
+    const sectionWraps = Array.from(document.querySelectorAll('.section-row-wrap'));
+    const filterTabs = document.querySelectorAll('.filter-tab');
+    const viewBtns = document.querySelectorAll('.view-mode-btn');
+    const scrollBtns = document.querySelectorAll('.scroll-btn');
+    const scrollPos = document.getElementById('scrollPos');
+    const cols = Array.from(document.querySelectorAll('.col'));
+
+    let currentSingleIndex = 0;
+
+    function visibleCols() {
+      return cols.filter(c => getComputedStyle(c).display !== 'none' &&
+                              getComputedStyle(c.closest('.round-section')).display !== 'none');
+    }
+
+    function activeWrap() {
+      const overflowing = sectionWraps.filter(w =>
+        getComputedStyle(w.closest('.round-section')).display !== 'none' &&
+        w.scrollWidth > w.clientWidth + 4
+      );
+      if (overflowing.length) return overflowing[0];
+      return sectionWraps.find(w =>
+        getComputedStyle(w.closest('.round-section')).display !== 'none'
+      );
+    }
+
+    function updateScrollPos() {
+      const vis = visibleCols();
+      if (body.dataset.view === 'single') {
+        scrollPos.textContent = `${currentSingleIndex + 1} / ${vis.length}`;
+        return;
+      }
+      scrollPos.textContent = `${vis.length} cards`;
+    }
+
+    function applySingleView() {
+      const vis = visibleCols();
+      cols.forEach(c => c.classList.remove('single-active'));
+      if (vis[currentSingleIndex]) vis[currentSingleIndex].classList.add('single-active');
+      updateScrollPos();
+    }
+
+    filterTabs.forEach(btn => {
+      btn.addEventListener('click', () => {
+        filterTabs.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        body.dataset.filter = btn.dataset.filter;
+        currentSingleIndex = 0;
+        if (body.dataset.view === 'single') applySingleView();
+        else {
+          sectionWraps.forEach(w => w.scrollLeft = 0);
+          updateScrollPos();
+        }
+      });
+    });
+
+    viewBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        viewBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        body.dataset.view = btn.dataset.view;
+        if (btn.dataset.view === 'single') {
+          currentSingleIndex = 0;
+          applySingleView();
+        } else {
+          cols.forEach(c => c.classList.remove('single-active'));
+          updateScrollPos();
+        }
+      });
+    });
+
+    scrollBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const dir = btn.dataset.action === 'next' ? 1 : -1;
+        if (body.dataset.view === 'single') {
+          const vis = visibleCols();
+          currentSingleIndex = Math.max(0, Math.min(vis.length - 1, currentSingleIndex + dir));
+          applySingleView();
+        } else {
+          const wrap = activeWrap();
+          if (wrap) wrap.scrollBy({ left: dir * 510, behavior: 'smooth' });
+        }
+      });
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        document.querySelector('.scroll-btn[data-action="prev"]').click();
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        document.querySelector('.scroll-btn[data-action="next"]').click();
+      } else if (e.key === '1') {
+        document.querySelector('.filter-tab[data-filter="all"]').click();
+      } else if (e.key === '2') {
+        document.querySelector('.filter-tab[data-filter="r1"]').click();
+      } else if (e.key === '3') {
+        document.querySelector('.filter-tab[data-filter="r2"]').click();
+      } else if (e.key === 'g') {
+        document.querySelector('.view-mode-btn[data-view="grid"]').click();
+      } else if (e.key === 's') {
+        document.querySelector('.view-mode-btn[data-view="single"]').click();
+      }
+    });
+
+    body.dataset.filter = 'all';
+    body.dataset.view = 'grid';
+    updateScrollPos();
+  })();
+</script>
 
 </body>
 </html>
