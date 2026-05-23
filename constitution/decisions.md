@@ -245,33 +245,50 @@ Same logic as Phase 2. Catches Asia/Europe overnight news + early-morning announ
 
 ---
 
-### DR-007 — Trading calendar (weekends + US equity holidays)
+### DR-007 — Trading calendar (weekends + US full-holidays; half-days settle at 1 PM ET)
 
 **Date:** 2026-05-22 (Fri evening — composes with DR-005 + DR-006)
 **Status:** Active — implementation queued for Bram (off-chain) + light Aria validation (on-chain)
 **Made by:** Cory (Tate-routed)
 
-**Context:** Underlying stocks don't trade on weekends or US equity holidays (~9-10 full closures + 2-3 half-days per year). A market created at Friday's close that "expires Saturday" would have no Pyth close-price to settle against — Saturday's Pyth feed reflects no real trading. Settlement would either fail (oracle stale) or use the stale Friday close (incorrect — gives users an arbitrage window).
+**Context:** Underlying stocks don't trade on weekends or US equity full-holidays (~9-10 full closures per year). A market created at Friday's close that "expires Saturday" would have no Pyth close-price to settle against — Saturday's Pyth feed reflects no real trading. Settlement would either fail (oracle stale) or use the stale Friday close (incorrect — gives users an arbitrage window).
 
 User's correct intuition: "The strikes we open should not resolve until the next trading day."
 
-**Decision:** All strike expiries are anchored to the **next US equity trading day's 4:00 PM ET close**, where "next trading day" skips weekends + US equity holidays. Implementation owns:
+**Half-days are NOT skipped.** Per-year ~3 half-day sessions (day after Thanksgiving, Christmas Eve when appropriate, July 3 in certain years) have **early close at 1:00 PM ET**. Real trading happens, real close prices are produced, Pyth has data. We settle normally — just at 1:00 PM ET instead of 4:00 PM ET.
+
+**Decision:** Each US equity trading day has an associated **close time**:
+- Full trading days (weekdays, not a full holiday): close 4:00 PM ET
+- Half-days (per-year list): close 1:00 PM ET
+- Weekends + full holidays: NOT trading days; cron no-ops
+
+All strike expiries anchor to the next US equity trading day's **close time** (4 PM ET on regular days, 1 PM ET on half-days). Implementation owns:
 
 **Off-chain (Bram):**
-- Hardcoded US 2026 trading-day calendar in `services/automation/src/calendar.ts`:
-  - 9 full holidays: New Year's Day, MLK Day, Presidents Day, Good Friday, Memorial Day, Juneteenth, Independence Day, Labor Day, Thanksgiving, Christmas
-  - 3 early closes (1 PM ET): day after Thanksgiving, Christmas Eve, July 3 (if Wed)
-- Two helpers:
-  - `isTradingDay(date): boolean` — weekday AND not in holidays set
-  - `nextTradingDay(from: Date): Date` — skips weekends + holidays
-- Every cron entry-point gates with `if (!isTradingDay(today)) return;` — prevents Trigger.dev runs on Saturday/Sunday/holidays from doing anything
-- Phase 1 of DR-006 uses `nextTradingDay(today)` for `TickerConfig.expiry_unix` — never anchors to a non-trading day
+Hardcoded US 2026 trading calendar in `services/automation/src/calendar.ts`:
+- 9 full holidays: New Year's Day, MLK Day, Presidents Day, Good Friday, Memorial Day, Juneteenth, Independence Day, Labor Day, Thanksgiving, Christmas (closes shift if holiday falls on weekend per NYSE rules)
+- Half-days (1:00 PM ET close): day after Thanksgiving, Christmas Eve (when appropriate), July 3 (in years where July 4 is a weekday but markets close early the day before)
+
+Three helpers:
+- `isTradingDay(date): boolean` — weekday AND not in full-holidays set (half-days return TRUE)
+- `getCloseTime(date): Date` — returns date at 4:00 PM ET, or 1:00 PM ET if date is a half-day
+- `nextTradingDay(from: Date): Date` — skips weekends + full holidays only; half-days are kept
+
+Every cron entry-point gates with `if (!isTradingDay(today)) return;` — prevents Trigger.dev runs on Saturday/Sunday/full-holidays from doing anything. Half-days run normally.
+
+Settle cron is split into two trigger fires:
+- "5 18 * * 1-5" (1:05 PM ET) → checks `if (isHalfDay(today)) settle();` else no-op
+- "5 21 * * 1-5" (4:05 PM ET) → checks `if (!isHalfDay(today)) settle();` else no-op
+
+Phase 1 of DR-006 uses `nextTradingDay(today)` + `getCloseTime(nextTradingDay)` for `TickerConfig.expiry_unix` — anchors to the correct close time for whatever the next trading day is.
 
 **On-chain (Aria — minimal):**
-- `create_strike_market` + `user_create_strike_market` validate `expiry_unix` is at exactly 4:00 PM ET (16:00 UTC adjusted for EST/EDT; on devnet assume EDT) AND is at most 7 calendar days in the future (catches typos but doesn't enforce holiday logic — that's Bram's responsibility)
+- `create_strike_market` + `user_create_strike_market` validate `expiry_unix` is at exactly **1:00 PM ET OR 4:00 PM ET** (16:00 or 13:00 UTC adjusted for EST/EDT; on devnet assume EDT) AND is at most 7 calendar days in the future (catches typos but doesn't enforce full-holiday logic — that's Bram's responsibility off-chain)
 - No on-chain holiday calendar — calendars change yearly; on-chain config maintenance is heavier than worth
 
-**Cross-day timing example (Friday Memorial Day weekend):**
+**Cross-day timing examples:**
+
+*Friday Memorial Day weekend (Memorial Day is full-holiday):*
 
 | Time | Action |
 |---|---|
@@ -282,18 +299,31 @@ User's correct intuition: "The strikes we open should not resolve until the next
 | Tuesday 9:30 AM ET | Market opens; Tuesday markets live for trading until 4 PM ET |
 | Tuesday 4:05 PM ET | Settle Tuesday's markets; anchor Wednesday's TickerConfig |
 
-**Trade-off:** We pay the maintenance cost of yearly holiday-calendar updates (Bram's hardcoded set needs annual refresh) in exchange for: correct settlement timing (settle against a real close, not a no-trade Sunday); cleaner UX (no "expired Saturday" markets that confuse users); compliance with how US equity markets actually work.
+*Day-before half-day (e.g., Christmas Eve as half-day):*
+
+| Time | Action |
+|---|---|
+| Dec 23 (full day) 4:05 PM ET | Settle Dec 23's markets. Anchor **Dec 24 (half-day)** TickerConfig — `expiry_unix` = Dec 24 **1:00 PM ET** (not 4 PM ET) |
+| Dec 23 4:30 PM - 8:00 PM ET | AH wild-swing checks normal |
+| Dec 24 4:00 AM - 9:00 AM ET | PM wild-swing checks normal |
+| Dec 24 9:30 AM - 1:00 PM ET | Half-day trading; ~3.5 hr regular session |
+| Dec 24 1:05 PM ET | **Settle Dec 24's markets** (early settle cron fires); anchor Dec 26 (or next trading day) TickerConfig |
+| Dec 25 | Full holiday — no cron |
+| Dec 26 cycle resumes | Normal schedule for Dec 26 4 PM ET close |
+
+**Trade-off:** We pay the maintenance cost of yearly calendar updates (Bram's hardcoded sets need annual refresh) + a slightly more complex cron schedule (two settle-cron entries, only one fires per day) in exchange for: correct settlement timing on half-days (settle against real 1 PM close, not skip the day entirely); compliance with how US equity markets actually work; users get the additional trading day on half-days instead of losing it.
 
 **Consequences:**
-- **Bram's automation needs an annual calendar update.** For MVP: hardcode 2026 calendar (one-time, ~30 min). For v2: use `nyse-holidays` npm package or pull from Polygon.io free tier (~1 hr setup).
+- **Bram's automation needs an annual calendar update.** For MVP: hardcode 2026 full-holiday + half-day calendars (one-time, ~30 min). For v2: use `nyse-holidays` npm package or pull from Polygon.io free tier (~1 hr setup).
 - **The Phase 3 "PM check" window (4-9 AM) operates on the NEXT trading day's morning, not "tomorrow" calendar morning.** For a Friday → Tuesday market, PM checks fire 4-9 AM Tuesday, not Saturday/Sunday/Monday.
-- **Users see "expiry: Tuesday 4 PM ET" in the UI on Friday after-hours.** Cleo's frontend reads `TickerConfig.expiry_unix` and displays the human-readable date. Holiday awareness is automatic.
-- **Half-days (early-close 1 PM ET):** expire markets at 1 PM ET on those days. Bram's calendar tracks them; expiry is set accordingly.
+- **Users see expiry time in their wallet display.** Cleo's frontend reads `TickerConfig.expiry_unix` and displays human-readable date+time ("Dec 24, 1:00 PM ET" on half-day; "Tuesday, 4:00 PM ET" on regular). Half-day awareness is automatic.
+- **Two settle-cron triggers, only one fires per day:** 1:05 PM ET cron checks `isHalfDay(today)`; 4:05 PM ET cron checks `!isHalfDay(today)`. Other days both no-op via the `isTradingDay()` guard. Trigger.dev usage barely increases (~22 extra fires/year for the half-day cron, vs ~2900 for the existing daily one).
 - **Edge case: late-Friday earnings announcement** (e.g., 5 PM ET) → AH check at 5:30 PM catches it → updates Tuesday's TickerConfig deviation cap → users can spawn appropriate strikes for the new spot. Works automatically.
 - **Edge case: weekend geopolitical event** (e.g., Sunday news) → no cron fires until Tuesday 4 AM PM check → by Tuesday 9 AM, Pyth pre-market spot reflects the news → cap_center updates → users spawn appropriate strikes before market open.
 
 **Alternatives considered:**
-- **No holiday handling (let markets create with `today + 1` expiry blindly):** rejected. Saturday/Sunday/holiday "expiries" have no real close to settle against; would either fail settlement or use stale Friday close (arbitrage exploit).
+- **No holiday handling (let markets create with `today + 1` expiry blindly):** rejected. Saturday/Sunday/full-holiday "expiries" have no real close to settle against; would either fail settlement or use stale Friday close (arbitrage exploit).
+- **Skip half-days too (treat as non-trading):** rejected. Half-days are real trading days with real closes. Users would lose ~3.5 hours of trading opportunity AND we'd lose one settlement cycle per half-day. No upside to skipping them.
 - **On-chain holiday calendar in MarketConfig:** rejected. ~96 bytes of storage; admin maintenance (signed config updates yearly); on-chain logic complexity. Off-chain calendar is simpler and accurate.
 - **External calendar API at create-time (Polygon.io / Yahoo):** deferred to v2. Hardcoded list is fine for MVP and the year ahead.
 
