@@ -684,6 +684,73 @@ Pre-expansion magnitudes (per-ticker, configurable):
 
 ---
 
+### DR-015 — Multi-metric leaderboard: single Merkle tree per period (extends DR-010)
+
+**Date:** 2026-05-23
+**Status:** Active — pre-mainnet, before next on-chain deploy
+**Made by:** Cory (Tate-routed)
+
+**Context:** DR-010 locked a Merkle-commitment + Arweave-pinned leaderboard structure with one root committed per `(period_id, period_type)` and distribution to top-10. Aria's P3 deploy implemented this for a single ranking metric (interpreted as absolute profit). Cory raised the product question: leaderboards should track *multiple* metrics simultaneously (profit, win streak, win rate, etc.) because different metrics surface different kinds of skill — absolute profit favors capital deployed, win rate favors accuracy, win streak favors discipline. Two implementation paths surfaced:
+
+- **(a)** Extend `period_type` enum to one variant per metric (`WeeklyProfit / WeeklyStreak / WeeklyWinRate / ...`). Each metric gets its own Merkle commitment + distribution cron. Familiar pattern, simpler verifier, but every new metric requires a program redeploy + audit pass.
+- **(b)** Single Merkle commitment per `(period_id, period_type)` with multi-metric leaves: `(user, metric_id, value, ...)`. Verifier branches on `metric_id` for distribution authorization. Atomic, extensible without redeploy.
+
+**Decision:** Lock **(b)** — single Merkle tree per period, multi-metric leaves. Specific structure:
+
+```
+leaf_hash = sha256(user_pubkey || metric_id || rank || amount || period_id || period_type)
+                  32 bytes    || 1 byte  || 1 byte || 8 bytes (u64) || 4 bytes || 1 byte
+```
+
+`metric_id` is a `u8` enum on-chain (256 possible metrics, easily extended). Verifier in `distribute_*_rewards` checks the proof + branches on `metric_id` to select the correct pool sub-balance or claimed_bitmap segment.
+
+**Initial metric set (v1 launch):**
+
+| `metric_id` | Metric | Source | Free / Pro |
+|---|---|---|---|
+| `0x00` | Absolute profit (USDC) | Settled-trade history in Neon | Free |
+| `0x01` | Win streak (current period) | `UserConfig.win_streak` per Aria P3 | Free |
+| `0x02` | Win rate % | Settled trades in Neon; min 20 trades to qualify | Free |
+| `0x03` | ROI % (profit ÷ capital deployed) | Computed off-chain from mint events | Bell Pro tier (DR-014) |
+
+Adding `0x04 EarningsAccuracy` or `0x05 StreakBreaker` post-launch requires **only** off-chain leaf encoding + Bram's indexer recognizing the new ID. No on-chain redeploy.
+
+**Trade-off:** We pay ~30-50 lines of additional Rust + audit surface (verifier branches on `metric_id`) **in exchange for** (1) atomic period commits — no partial-update windows where some metrics are stale; (2) future metric additions require zero on-chain changes; (3) cross-metric proofs in a single RPC for user-rank UX; (4) simpler indexer fan-out (one cron per period, not N per metric).
+
+**Consequences:**
+
+- **Aria's P3 work stays.** `LeaderboardCommitments` PDA structure unchanged (24-entry ring buffer of period commitments). `commit_leaderboard_root` ix unchanged in signature — only the underlying off-chain Merkle tree includes more leaf types. The on-chain entry already stores `(period_id, period_type, merkle_root, arweave_tx_id)` — fits unchanged.
+- **`distribute_weekly_rewards` + `distribute_monthly_rewards` evolve:** verifier reads `metric_id` from the proven leaf and routes the USDC transfer through a per-metric `claimed_bitmap` segment (so claiming Profit doesn't mark Streak as claimed). 32-bit bitmap supports up to 32 entries per metric per period — across 4 metrics that's 128 total claimable positions per period. Plenty for top-10 distributions across each metric.
+- **Pool split:** the 50/25/25 fee split (per DR-010) funds the weekly+monthly pools. Each pool's USDC balance subdivides by metric weight. Default v1: 60% profit / 20% streak / 15% win-rate / 5% ROI (Pro). Configurable via `update_fee_config`.
+- **Frontend** queries Neon for the leaf set + Arweave for the manifest, then constructs a Merkle proof for the user's claim. Same UX flow as DR-010, just with a `metric_id` parameter on the claim button.
+- **Transaction size (~721 bytes at top-50 × 4 metrics)** fits comfortably under the 900-byte practical limit after wallet overhead. See size math below.
+- **Defensive recommendation: Address Lookup Tables (ALTs).** Aria sets up a single ALT during deployment containing the standard accounts (`token_program`, `system_program`, `rent`, `weekly_pool`, `monthly_pool`, `usdc_mint`, `fee_collector`, `leaderboard_commitments`). Each `distribute_*` tx references those accounts by 1-byte index instead of 32-byte pubkey — saves ~200 bytes per tx. Not required for v1 launch (we have headroom), but kept on the shelf for when account count grows (adding metric-specific pool sub-balances, audit-log accounts, etc.). ~1 hr Aria implementation when triggered.
+
+**Transaction size math (per DR-015 verifier path):**
+
+| Component | Bytes |
+|---|---|
+| 1 signature | 64 |
+| Message header | 3 |
+| Blockhash | 32 |
+| Program ID | 32 |
+| ~8 account keys | ~256 |
+| Ix discriminator + args (recipient, amount, period_id, period_type, metric_id, leaf_idx) | ~48 |
+| Merkle proof (depth 8, top-50 × 4 metrics) | 256 |
+| Compact-array overheads | ~30 |
+| **Total** | **~721 B** ✓ under 900 |
+
+Worst-case (depth 10, top-200 × 4 metrics): proof grows to 320 B, total ~785 B. Still safe.
+
+**Alternatives considered:**
+
+- **(a) — per-metric Merkle tree:** rejected. Atomicity gap (one metric can lag another during cron flakes), every new metric requires program redeploy + audit, fan-out complexity, cross-metric rank lookups require N RPCs. The only win was a slightly simpler verifier — outweighed by future-flexibility cost.
+- **Single ranking metric (profit only), defer multi-metric to v2:** rejected. Win streak is already tracked on-chain via `UserConfig.win_streak` and is the strongest behavioral-discipline signal for a $1-payout product. Surfacing only profit misses the retention story Webull Vega / Louis Limited proved (per AI v2 research).
+- **Composite scoring (single weighted metric blending profit + streak + win-rate):** rejected. Black-box scoring is unauditable and a regulatory smell — "we ranked you with our secret formula." Multiple transparent metrics each ranked independently is defensible.
+- **Off-chain-only leaderboard (no Merkle commitment):** rejected. DR-010 already established verifiable leaderboards as a moat vs Polymarket/Kalshi. Backing off would erase the differentiation.
+
+---
+
 > Aim for 5–15 active DRs over a project's life. Fewer and you're not
 > locking enough; more and the file becomes unscannable (rotate stable
 > ones into `specs/architecture.md` if they've become "just how the
