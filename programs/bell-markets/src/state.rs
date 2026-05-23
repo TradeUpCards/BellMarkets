@@ -188,8 +188,117 @@ impl TickerConfig {
         + 32; // _reserved
 }
 
-// UserConfig (DR-008) and FeeConfig (DR-008 / DR-010) are introduced in P2.
-//
+// ─── DR-008 — fee model + UserConfig + FeeConfig ────────────────────────────
+
+/// Linear decay window for `UserConfig.mint_volume_30d`. 30 days in seconds.
+/// Decay is applied lazily on each `mint_pair` entry, not via cron.
+pub const MINT_VOLUME_DECAY_WINDOW_SECS: u64 = 30 * 24 * 60 * 60;
+
+/// Tier breakpoints for the 30-day mint-volume discount, in USDC base units
+/// (6-decimal Circle USDC).
+pub const TIER_BREAK_1K_USDC: u64 = 1_000 * 1_000_000;
+pub const TIER_BREAK_10K_USDC: u64 = 10_000 * 1_000_000;
+
+/// Per-tier fee in bps (matches DR-008 table):
+///   $0-1K mint volume     → 200 bps (2%)
+///   $1K-10K mint volume   → 150 bps (1.5%)
+///   $10K+ mint volume     → 100 bps (1%)
+pub const TIER_FEE_BPS_TIER1: u16 = 200;
+pub const TIER_FEE_BPS_TIER2: u16 = 150;
+pub const TIER_FEE_BPS_TIER3: u16 = 100;
+
+/// Default `force_redeem_grace_secs` — 30 days post-settle.
+pub const DEFAULT_FORCE_REDEEM_GRACE_SECS: i64 = 30 * 24 * 60 * 60;
+
+/// Per-user mint-volume tracker. PDA seed = [b"user", config, user].
+///
+/// `mint_volume_30d` is in USDC base units (6 decimals). Linear decay applied
+/// on each `mint_pair` entry — see `mint_pair::apply_linear_decay`. Decay is
+/// lazy (no cron); each entry recomputes the surviving volume before adding
+/// the new contribution.
+///
+/// `mint_volume_lifetime` is informational (never decays).
+///
+/// Anti-tier-gaming safeguard (DR-008): mints that fire the creator rebate
+/// (full OR partial) do NOT update `mint_volume_30d`. `mint_volume_lifetime`
+/// IS still incremented (informational only — not used for tier lookup).
+///
+/// init_if_needed at mint_pair time — first mint pays the ~$0.16 rent.
+#[account]
+pub struct UserConfig {
+    pub user: Pubkey,
+    pub mint_volume_30d: u64,
+    pub mint_volume_lifetime: u64,
+    pub last_decay_unix: i64,
+    pub bump: u8,
+    pub _reserved: [u8; 32],
+}
+
+impl UserConfig {
+    pub const LEN: usize = 8
+        + 32 // user
+        + 8  // mint_volume_30d
+        + 8  // mint_volume_lifetime
+        + 8  // last_decay_unix
+        + 1  // bump
+        + 32; // _reserved
+}
+
+/// Separate global singleton (sidesteps a destructive realloc on the existing
+/// devnet `MarketConfig` PDA at `6CYzWhTM...`). Seed = [b"fee_config"].
+///
+/// All bps fields are u16 (max 10000 = 100%). Enforced on `initialize_fee_config`
+/// + `update_fee_config`:
+///   - platform_retain_bps + weekly_pool_bps + monthly_pool_bps == 10000
+///   - weekly_distribution_bps.iter().sum() == 10000
+///   - monthly_distribution_bps.iter().sum() == 10000
+///   - mint_fee_bps ≤ 10000
+///   - creator_rebate_bps ≤ 10000
+///   - force_redeem_grace_secs > 0
+///
+/// Default values (per DR-008 + DR-010):
+///   - mint_fee_bps = 0           (mechanism present but disabled; admin flips
+///                                  to 200 = 2% via signed update_fee_config)
+///   - platform_retain_bps = 5000 (50%)
+///   - weekly_pool_bps = 2500     (25%)
+///   - monthly_pool_bps = 2500    (25%)
+///   - creator_rebate_bps = 10000 (100% rebate = creator pays 0% on all mints
+///                                  into their strike until settle)
+///   - force_redeem_grace_secs = DEFAULT_FORCE_REDEEM_GRACE_SECS (30 days)
+///   - weekly_distribution_bps   = [2500, 1800, 1200, 1000, 800, 700, 600, 500, 500, 400]
+///   - monthly_distribution_bps  = same default
+#[account]
+pub struct FeeConfig {
+    /// Back-pointer to MarketConfig PDA (binding — fee_config.config ==
+    /// market_config.key() enforced in instructions that touch both).
+    pub config: Pubkey,
+    pub mint_fee_bps: u16,
+    pub platform_retain_bps: u16,
+    pub weekly_pool_bps: u16,
+    pub monthly_pool_bps: u16,
+    pub creator_rebate_bps: u16,
+    pub force_redeem_grace_secs: i64,
+    pub weekly_distribution_bps: [u16; 10],
+    pub monthly_distribution_bps: [u16; 10],
+    pub bump: u8,
+    pub _reserved: [u8; 64],
+}
+
+impl FeeConfig {
+    pub const LEN: usize = 8
+        + 32 // config
+        + 2  // mint_fee_bps
+        + 2  // platform_retain_bps
+        + 2  // weekly_pool_bps
+        + 2  // monthly_pool_bps
+        + 2  // creator_rebate_bps
+        + 8  // force_redeem_grace_secs
+        + 2 * 10 // weekly_distribution_bps
+        + 2 * 10 // monthly_distribution_bps
+        + 1  // bump
+        + 64; // _reserved
+}
+
 // LeaderboardCommitments (DR-010) lives in P3 work — see commits after this
 // one. It cannot be a standard `#[account]` struct because the 24-entry
 // fixed-size array (~2208 bytes payload) overruns the BPF 4096-byte stack

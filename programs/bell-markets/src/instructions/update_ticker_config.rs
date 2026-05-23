@@ -26,8 +26,15 @@ use crate::errors::BellMarketsError;
 //     to 50% for the same tickers → 5000 is the operational ceiling)
 //   - tick_size must be > 0 (rem_euclid by 0 panics)
 //   - threshold_bps follows the same bounds as deviation (informational)
-//   - strike_count must be ≤ MAX_ALLOWED_STRIKES (compile-time enforced by
-//     [i64; MAX_ALLOWED_STRIKES]; we only validate the runtime count)
+//   - strike_count must be > 0 AND ≤ MAX_ALLOWED_STRIKES
+//     (strike_count > 0: post-P1 audit footgun guard — DR-006 phase-1/2/3
+//     cron updates fire every 30 min during AH/PM windows, so a time-based
+//     staleness lock would break legitimate updates. Instead we require the
+//     grid never go to zero in a single update — admin must explicitly pause
+//     via `pause` ix if they want to halt new markets for a ticker, which
+//     surfaces intent unambiguously vs. a silent grid wipe.)
+//     (≤ MAX_ALLOWED_STRIKES: compile-time enforced by [i64; MAX_ALLOWED_STRIKES];
+//     we still validate the runtime count.)
 pub const MAX_DEVIATION_BPS: u16 = 5_000;
 pub const MAX_THRESHOLD_BPS: u16 = 5_000;
 
@@ -82,7 +89,7 @@ pub fn handler(
         BellMarketsError::InvalidTickerParam
     );
     require!(
-        (strike_count as usize) <= MAX_ALLOWED_STRIKES,
+        strike_count > 0 && (strike_count as usize) <= MAX_ALLOWED_STRIKES,
         BellMarketsError::InvalidTickerParam
     );
     require!(cap_center > 0, BellMarketsError::InvalidTickerParam);

@@ -117,4 +117,52 @@ pub mod bell_markets {
     ) -> Result<()> {
         instructions::user_create_strike_market::handler(ctx, strike_price, expiry_unix)
     }
+
+    pub fn initialize_fee_config(
+        ctx: Context<InitializeFeeConfig>,
+        mint_fee_bps: u16,
+        platform_retain_bps: u16,
+        weekly_pool_bps: u16,
+        monthly_pool_bps: u16,
+        creator_rebate_bps: u16,
+        force_redeem_grace_secs: i64,
+        weekly_distribution_bps: [u16; 10],
+        monthly_distribution_bps: [u16; 10],
+    ) -> Result<()> {
+        instructions::initialize_fee_config::handler(
+            ctx,
+            mint_fee_bps,
+            platform_retain_bps,
+            weekly_pool_bps,
+            monthly_pool_bps,
+            creator_rebate_bps,
+            force_redeem_grace_secs,
+            weekly_distribution_bps,
+            monthly_distribution_bps,
+        )
+    }
+
+    pub fn update_fee_config(
+        ctx: Context<UpdateFeeConfig>,
+        mint_fee_bps: u16,
+        platform_retain_bps: u16,
+        weekly_pool_bps: u16,
+        monthly_pool_bps: u16,
+        creator_rebate_bps: u16,
+        force_redeem_grace_secs: i64,
+        weekly_distribution_bps: [u16; 10],
+        monthly_distribution_bps: [u16; 10],
+    ) -> Result<()> {
+        instructions::update_fee_config::handler(
+            ctx,
+            mint_fee_bps,
+            platform_retain_bps,
+            weekly_pool_bps,
+            monthly_pool_bps,
+            creator_rebate_bps,
+            force_redeem_grace_secs,
+            weekly_distribution_bps,
+            monthly_distribution_bps,
+        )
+    }
 }

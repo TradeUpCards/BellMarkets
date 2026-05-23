@@ -10,6 +10,8 @@ pub mod redeem_pair;
 pub mod pause;
 pub mod update_ticker_config;
 pub mod user_create_strike_market;
+pub mod initialize_fee_config;
+pub mod update_fee_config;
 
 pub use initialize_config::*;
 pub use create_strike_market::*;
@@ -23,3 +25,5 @@ pub use redeem_pair::*;
 pub use pause::*;
 pub use update_ticker_config::*;
 pub use user_create_strike_market::*;
+pub use initialize_fee_config::*;
+pub use update_fee_config::*;

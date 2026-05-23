@@ -350,6 +350,115 @@
       ]
     },
     {
+      "name": "initialize_fee_config",
+      "discriminator": [
+        62,
+        162,
+        20,
+        133,
+        121,
+        65,
+        145,
+        27
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "fee_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "mint_fee_bps",
+          "type": "u16"
+        },
+        {
+          "name": "platform_retain_bps",
+          "type": "u16"
+        },
+        {
+          "name": "weekly_pool_bps",
+          "type": "u16"
+        },
+        {
+          "name": "monthly_pool_bps",
+          "type": "u16"
+        },
+        {
+          "name": "creator_rebate_bps",
+          "type": "u16"
+        },
+        {
+          "name": "force_redeem_grace_secs",
+          "type": "i64"
+        },
+        {
+          "name": "weekly_distribution_bps",
+          "type": {
+            "array": [
+              "u16",
+              10
+            ]
+          }
+        },
+        {
+          "name": "monthly_distribution_bps",
+          "type": {
+            "array": [
+              "u16",
+              10
+            ]
+          }
+        }
+      ]
+    },
+    {
       "name": "mint_pair",
       "discriminator": [
         19,
@@ -381,6 +490,53 @@
                   105,
                   103
                 ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "fee_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "config"
+              },
+              {
+                "kind": "account",
+                "path": "user"
               }
             ]
           }
@@ -463,10 +619,85 @@
           "writable": true
         },
         {
+          "name": "fee_collector_usdc",
+          "docs": [
+            "Fee-collector USDC ATA — destination for platform_retain_bps share.",
+            "Constrained to be a USDC token account owned by `config.treasury`.",
+            "Bram/Cleo derive the ATA pubkey client-side via getAssociatedTokenAddress."
+          ],
+          "writable": true
+        },
+        {
+          "name": "weekly_pool",
+          "docs": [
+            "Weekly rewards pool — destination for weekly_pool_bps share.",
+            "PDA at seeds `[b\"weekly_pool\"]`. P3 creates this; until then mint_pair",
+            "fails at deserialization (AccountNotInitialized)."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  119,
+                  101,
+                  101,
+                  107,
+                  108,
+                  121,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "monthly_pool",
+          "docs": [
+            "Monthly rewards pool — destination for monthly_pool_bps share.",
+            "PDA at seeds `[b\"monthly_pool\"]`."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  111,
+                  110,
+                  116,
+                  104,
+                  108,
+                  121,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
           "name": "usdc_mint",
           "relations": [
             "config"
           ]
+        },
+        {
+          "name": "clock",
+          "address": "SysvarC1ock11111111111111111111111111111111"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         },
         {
           "name": "token_program",
@@ -941,6 +1172,111 @@
       "args": []
     },
     {
+      "name": "update_fee_config",
+      "discriminator": [
+        104,
+        184,
+        103,
+        242,
+        88,
+        151,
+        107,
+        20
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "fee_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "mint_fee_bps",
+          "type": "u16"
+        },
+        {
+          "name": "platform_retain_bps",
+          "type": "u16"
+        },
+        {
+          "name": "weekly_pool_bps",
+          "type": "u16"
+        },
+        {
+          "name": "monthly_pool_bps",
+          "type": "u16"
+        },
+        {
+          "name": "creator_rebate_bps",
+          "type": "u16"
+        },
+        {
+          "name": "force_redeem_grace_secs",
+          "type": "i64"
+        },
+        {
+          "name": "weekly_distribution_bps",
+          "type": {
+            "array": [
+              "u16",
+              10
+            ]
+          }
+        },
+        {
+          "name": "monthly_distribution_bps",
+          "type": {
+            "array": [
+              "u16",
+              10
+            ]
+          }
+        }
+      ]
+    },
+    {
       "name": "update_ticker_config",
       "discriminator": [
         134,
@@ -1250,6 +1586,19 @@
   ],
   "accounts": [
     {
+      "name": "FeeConfig",
+      "discriminator": [
+        143,
+        52,
+        146,
+        187,
+        219,
+        123,
+        76,
+        155
+      ]
+    },
+    {
       "name": "MarketConfig",
       "discriminator": [
         119,
@@ -1286,6 +1635,19 @@
         29,
         71,
         106
+      ]
+    },
+    {
+      "name": "UserConfig",
+      "discriminator": [
+        58,
+        201,
+        49,
+        59,
+        232,
+        236,
+        180,
+        75
       ]
     }
   ],
@@ -1498,6 +1860,102 @@
   ],
   "types": [
     {
+      "name": "FeeConfig",
+      "docs": [
+        "Separate global singleton (sidesteps a destructive realloc on the existing",
+        "devnet `MarketConfig` PDA at `6CYzWhTM...`). Seed = [b\"fee_config\"].",
+        "",
+        "All bps fields are u16 (max 10000 = 100%). Enforced on `initialize_fee_config`",
+        "+ `update_fee_config`:",
+        "- platform_retain_bps + weekly_pool_bps + monthly_pool_bps == 10000",
+        "- weekly_distribution_bps.iter().sum() == 10000",
+        "- monthly_distribution_bps.iter().sum() == 10000",
+        "- mint_fee_bps ≤ 10000",
+        "- creator_rebate_bps ≤ 10000",
+        "- force_redeem_grace_secs > 0",
+        "",
+        "Default values (per DR-008 + DR-010):",
+        "- mint_fee_bps = 0           (mechanism present but disabled; admin flips",
+        "to 200 = 2% via signed update_fee_config)",
+        "- platform_retain_bps = 5000 (50%)",
+        "- weekly_pool_bps = 2500     (25%)",
+        "- monthly_pool_bps = 2500    (25%)",
+        "- creator_rebate_bps = 10000 (100% rebate = creator pays 0% on all mints",
+        "into their strike until settle)",
+        "- force_redeem_grace_secs = DEFAULT_FORCE_REDEEM_GRACE_SECS (30 days)",
+        "- weekly_distribution_bps   = [2500, 1800, 1200, 1000, 800, 700, 600, 500, 500, 400]",
+        "- monthly_distribution_bps  = same default"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "config",
+            "docs": [
+              "Back-pointer to MarketConfig PDA (binding — fee_config.config ==",
+              "market_config.key() enforced in instructions that touch both)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "mint_fee_bps",
+            "type": "u16"
+          },
+          {
+            "name": "platform_retain_bps",
+            "type": "u16"
+          },
+          {
+            "name": "weekly_pool_bps",
+            "type": "u16"
+          },
+          {
+            "name": "monthly_pool_bps",
+            "type": "u16"
+          },
+          {
+            "name": "creator_rebate_bps",
+            "type": "u16"
+          },
+          {
+            "name": "force_redeem_grace_secs",
+            "type": "i64"
+          },
+          {
+            "name": "weekly_distribution_bps",
+            "type": {
+              "array": [
+                "u16",
+                10
+              ]
+            }
+          },
+          {
+            "name": "monthly_distribution_bps",
+            "type": {
+              "array": [
+                "u16",
+                10
+              ]
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "_reserved",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "MarketConfig",
       "type": {
         "kind": "struct",
@@ -1707,6 +2165,59 @@
           },
           {
             "name": "last_updated_unix",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "_reserved",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "UserConfig",
+      "docs": [
+        "Per-user mint-volume tracker. PDA seed = [b\"user\", config, user].",
+        "",
+        "`mint_volume_30d` is in USDC base units (6 decimals). Linear decay applied",
+        "on each `mint_pair` entry — see `mint_pair::apply_linear_decay`. Decay is",
+        "lazy (no cron); each entry recomputes the surviving volume before adding",
+        "the new contribution.",
+        "",
+        "`mint_volume_lifetime` is informational (never decays).",
+        "",
+        "Anti-tier-gaming safeguard (DR-008): mints that fire the creator rebate",
+        "(full OR partial) do NOT update `mint_volume_30d`. `mint_volume_lifetime`",
+        "IS still incremented (informational only — not used for tier lookup).",
+        "",
+        "init_if_needed at mint_pair time — first mint pays the ~$0.16 rent."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint_volume_30d",
+            "type": "u64"
+          },
+          {
+            "name": "mint_volume_lifetime",
+            "type": "u64"
+          },
+          {
+            "name": "last_decay_unix",
             "type": "i64"
           },
           {

@@ -20,6 +20,7 @@ use anchor_spl::token::{Mint, Token, TokenAccount};
 use crate::state::*;
 use crate::adapters::phoenix::verify_phoenix_market;
 use crate::errors::BellMarketsError;
+use crate::instructions::user_create_strike_market::expiry_is_market_close_time;
 
 #[derive(Accounts)]
 #[instruction(strike_price: i64, expiry_unix: i64)]
@@ -113,6 +114,17 @@ pub fn handler(
     require!(strike_price > 0, BellMarketsError::InvalidStrikePrice);
     let now = Clock::get()?.unix_timestamp;
     require!(expiry_unix > now, BellMarketsError::ExpiryInPast);
+    // P1 audit fix (symmetric with `user_create_strike_market`): admin path
+    // also enforces standard market-close expiries + 7-day horizon to prevent
+    // off-hours markets that would burn the `admin_settle` override budget.
+    require!(
+        expiry_unix.saturating_sub(now) <= MAX_EXPIRY_HORIZON_SECS,
+        BellMarketsError::ExpiryTooFar
+    );
+    require!(
+        expiry_is_market_close_time(expiry_unix),
+        BellMarketsError::ExpiryNotMarketClose
+    );
 
     verify_phoenix_market(&ctx.accounts.phoenix_market.to_account_info())?;
 
