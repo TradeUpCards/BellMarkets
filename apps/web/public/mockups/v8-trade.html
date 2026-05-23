@@ -193,9 +193,12 @@
     padding: 6px 12px;
   }
   .market-header-top {
-    display: flex; align-items: center; justify-content: space-between;
+    display: flex; align-items: center;
+    /* Was justify-content: space-between — that was shoving strike pills to the right edge.
+       Now flex-start so pills hug right next to the market-id / expires chip. */
+    justify-content: flex-start;
     margin-bottom: 0;
-    gap: 12px;
+    gap: 6px;
   }
   .market-id {
     display: flex; align-items: center; gap: 8px;
@@ -1197,7 +1200,9 @@
     display: flex;
     gap: 3px;
     align-items: center;
-    flex: 1;
+    /* Removed flex:1 — that was expanding the container to fill all remaining
+       space. Now it sizes to its content so pills stay glued next to the title. */
+    flex: 0 1 auto;
     justify-content: flex-start;
     max-width: 720px;
     overflow-x: auto;
