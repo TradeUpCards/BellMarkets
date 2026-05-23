@@ -489,7 +489,14 @@ fee × monthly_pool_bps / 10_000     → monthly_rewards_pool PDA
 
 Under Option B, admin CANNOT manipulate distributions to wrong recipients — proof verification rejects unauthorized addresses. Stores ~24 roots (12 weeks + 12 months) in a `LeaderboardCommitments` PDA. Adds ~3 hr to total implementation (~10-11 hr total for #7 with Merkle).
 
-**Default for MVP:** Option A (off-chain trust). Documented Merkle migration path is additive (adds verification without breaking existing distributions). User-decision pending on whether to ship A or B for MVP demo — see `cory_questions_1_answers.md` discussion.
+**LOCKED for MVP: Option B (Merkle commitment).** Aligns with non-custodial / verifiable thesis (DR-002, DR-005, DR-009). Distributions cryptographically verifiable from day 1; admin cannot manipulate recipient selection. Adds ~3 hr to baseline implementation (~10-11 hr total for #7).
+
+**Implementation breakdown for Option B:**
+- Aria: WeeklyRewardsPool + MonthlyRewardsPool PDAs + LeaderboardCommitments PDA + commit_leaderboard_root ix + Merkle proof verification helper + distribute_weekly/monthly_rewards ixs (accept proof + verify) + fee-split logic in mint_pair + bps configuration fields + sum-to-10000 validation. **~3-4 hr.**
+- Bram: Helius webhook for settle_market events + per-user streak state tracker (Postgres or JSON for MVP) + Merkle tree builder (use `merkletreejs` library or equivalent) + per-period root computation + proof generation per top-10 winner + weekly + monthly distribution crons + tiebreaker logic + rollover for under-10 case + admin-signed distribution flow. **~3-4 hr.**
+- Cleo: Leaderboard page (top-10 weekly + monthly) + streak badges + toast notifications + past rewards display + pool balance visibility + "verifiable leaderboard" link to indexer instructions. **~1.5-2 hr post-design-lock.**
+- Drew: Tests for valid + invalid + tampered proofs + fee split correctness + rollover edge case + admin-only distribute ixs + sum-validation. **~1 hr.**
+- **Total: ~9-11 hr.**
 
 **Distribution (admin-signed, top-10 per period):**
 
