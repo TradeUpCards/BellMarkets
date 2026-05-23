@@ -431,6 +431,114 @@ Per-market revenue at $10K mint volume / 95% redemption rate: A ~$190, B ~$200, 
 
 ---
 
+### DR-010 — Win-streak rewards: pool structure, fee split, leaderboard, distribution
+
+**Date:** 2026-05-22 evening (composes with DR-008)
+**Status:** Active — implementation queued for Aria + Bram + Cleo + Drew
+**Made by:** Cory (Tate-routed)
+
+**Context:** DR-008 establishes a mint-side 2% fee flowing to `fee_collector`. User originally proposed in `cory_questions_1.md` that a portion of fee revenue fund win-streak contests with weekly + monthly prizes. This DR formalizes the funding split, pool structure, leaderboard, and distribution mechanics.
+
+**Decision:** Win-streak contests structured as **two-period prize pools (weekly + monthly), funded by fee skim at mint time, leaderboard tracked off-chain via Helius indexer, distribution signed by admin via on-chain ixs.**
+
+**Default funding split (configurable):**
+- Platform retains: 50% (`platform_retain_bps = 5000`)
+- Weekly pool: 25% (`weekly_pool_bps = 2500`)
+- Monthly pool: 25% (`monthly_pool_bps = 2500`)
+- Sum must equal 10,000 (enforced on-chain)
+
+In every `mint_pair` call, the fee is split three ways immediately:
+```
+fee × platform_retain_bps / 10_000  → fee_collector ATA (platform revenue)
+fee × weekly_pool_bps / 10_000      → weekly_rewards_pool PDA
+fee × monthly_pool_bps / 10_000     → monthly_rewards_pool PDA
+```
+
+**Promo mode example (admin signs config update):**
+- `mint_fee_bps` = 100 (1% — half off normal)
+- `platform_retain_bps` = 0
+- `weekly_pool_bps` = 5000 (50%)
+- `monthly_pool_bps` = 5000 (50%)
+- Result: Black-Friday-style promo — half-fee + 100% to contests. Strong engagement narrative.
+
+**Pool PDAs (on-chain):**
+- `WeeklyRewardsPool` — USDC token account, owned by program PDA. Funded by mint fee skim. Drained by `distribute_weekly_rewards` ix.
+- `MonthlyRewardsPool` — Same for monthly.
+- Each pool ~$0.23 one-time rent (paid by platform at deploy).
+
+**Leaderboard (off-chain, by Helius indexer):**
+- Bram's automation listens to `settle_market` events via Helius webhooks
+- Per-user streak state stored in Postgres or simple JSON
+- Win = user held winning side (any amount > 0) at settle time
+- Loss = user held losing side at settle (resets streak to 0)
+- Abstained = user held nothing at settle (doesn't reset, doesn't extend)
+- Weekly streak = longest consecutive run in past 7 trading days
+- Monthly streak = longest consecutive run in past 30 trading days
+- Tiebreakers: (1) total markets traded in period, (2) random
+
+**Trust model — two options:**
+
+*Option A (off-chain trust, simplest):* leaderboard ranks are off-chain; underlying event data is public on-chain. Anyone can run their own indexer + verify our ranking informally. Admin signs distributions trusting Bram's indexer output.
+
+*Option B (Merkle commitment, trustless verifiable):* the proper cryptographic upgrade. Per-period flow:
+1. Bram's indexer computes full leaderboard at period end (every user with any streak, ranked)
+2. Builds Merkle tree (leaves = `hash(user_pubkey, streak_count, position, period_id)`)
+3. Admin commits root on-chain: `commit_leaderboard_root(period_id, merkle_root)` — 32 bytes stored
+4. Distribute ix accepts Merkle proof: `distribute_weekly_rewards(period_id, recipient, position, amount, merkle_proof)` — verifies proof against committed root; reverts if invalid
+5. Anyone can run their own indexer over public settle events, compute their own root, verify it matches the committed root
+
+Under Option B, admin CANNOT manipulate distributions to wrong recipients — proof verification rejects unauthorized addresses. Stores ~24 roots (12 weeks + 12 months) in a `LeaderboardCommitments` PDA. Adds ~3 hr to total implementation (~10-11 hr total for #7 with Merkle).
+
+**Default for MVP:** Option A (off-chain trust). Documented Merkle migration path is additive (adds verification without breaking existing distributions). User-decision pending on whether to ship A or B for MVP demo — see `cory_questions_1_answers.md` discussion.
+
+**Distribution (admin-signed, top-10 per period):**
+
+Default smooth-decay distribution (configurable per-position bps):
+
+| Place | Bps | Pct | Notes |
+|---|---|---|---|
+| #1 | 2500 | 25% | Champion |
+| #2 | 1800 | 18% | |
+| #3 | 1200 | 12% | |
+| #4 | 1000 | 10% | |
+| #5 | 800 | 8% | |
+| #6 | 700 | 7% | |
+| #7 | 600 | 6% | |
+| #8 | 500 | 5% | |
+| #9 | 500 | 5% | |
+| #10 | 400 | 4% | |
+| **Total** | **10000** | **100%** | |
+
+Stored in `MarketConfig.weekly_distribution_bps: [u16; 10]` and `monthly_distribution_bps: [u16; 10]`. Admin can update via signed config change.
+
+**Edge case — fewer than 10 unique users with active streaks:**
+- Pay out only positions that have qualifying winners
+- Unpaid prize amounts stay in pool and roll over to next period
+- Implementation: Bram's distribution cron iterates winners array; only calls `distribute_X_rewards` for positions with winners
+
+**Distribution timing:**
+- Weekly: Fridays at 5 PM ET (after market close + settle); Bram's cron triggers
+- Monthly: Last Friday of the month, 5 PM ET; Bram's cron triggers
+- Holiday adjustments per DR-007 (skip non-trading days; distribute on next trading day)
+
+**Trade-off:** We pay engineering complexity (~7-8 hr cross-lead) + retain ~50% of fee revenue instead of 100% in exchange for: strong user engagement / retention mechanism; differentiation from Polymarket (they don't have win-streak contests); growth-marketing tool (promo mode flexibility); aligns with user's explicit growth-vector ask in cory_questions_1.md.
+
+**Consequences:**
+- **Aria's program:** Add 2 new PDAs (WeeklyRewardsPool + MonthlyRewardsPool token accounts). Add 3 new bps fields to MarketConfig with sum-validation. Add 2 distribution arrays (`weekly_distribution_bps` + `monthly_distribution_bps`). Add 2 new admin ixs (`distribute_weekly_rewards` + `distribute_monthly_rewards`). Modify `mint_pair` to split fee three ways. ~2-2.5 hr.
+- **Bram's automation:** Helius webhook listener for `settle_market` events. Per-user streak state tracking (Postgres or JSON for MVP). Weekly + monthly distribution crons. Admin-signed distribution flow. Rollover for under-10 case. Tiebreaker logic. ~2.5-3 hr.
+- **Cleo's frontend:** Leaderboard page (top-10 weekly + monthly with streak counts). User's own streak badge in portfolio. Toast notifications on milestone streaks ("🔥 5-streak!"). Past rewards display. Pool balance visibility (read PDA via RPC). ~1.5-2 hr post-design-lock.
+- **Drew's tests:** Fee split correctness (3 transfers totaling fee). Distribution ix (admin-only; transfers from pool). Sum=10000 validation. Rollover edge case. ~45 min.
+- **Total: ~7-8 hr cross-lead.** Significant addition but bounded.
+
+**Alternatives considered:**
+- **20/20/60 split (more to platform):** rejected. User explicitly wanted growth mechanism funded aggressively; 50% to platform retain still preserves majority revenue.
+- **Top-3 distribution only:** rejected. Top-10 spreads engagement to more users; tiebreaker depth matters for healthy contest dynamics.
+- **On-chain leaderboard:** rejected for MVP. Per-user state writes per market = ~$120/year tx cost + complexity. Off-chain handles MVP scale; v2 could add Merkle commitment if trust becomes concern.
+- **Daily contests instead of weekly:** deferred. Daily would create more frequent dopamine but tinier pools per period. Could be added v2 as third tier (daily + weekly + monthly).
+- **Single combined pool (weekly drains from same as monthly):** rejected. Separate pools cleaner accounting; admin can tune ratios independently; rollover semantics simpler.
+
+---
+
 > Aim for 5–15 active DRs over a project's life. Fewer and you're not
 > locking enough; more and the file becomes unscannable (rotate stable
 > ones into `specs/architecture.md` if they've become "just how the
