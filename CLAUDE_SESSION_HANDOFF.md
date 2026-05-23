@@ -70,13 +70,14 @@ All committed work is preserved. Sync command was safe.
 
 Before stopping, I launched 2 research agents for the AI v2 plan:
 
-1. **Trading platforms AI features research** (agent ID `ae7e3317e4304ea92`) — researching AI features in TradFi (TradeStation, Interactive Brokers, Robinhood, eToro, etc.) + DeFi (Drift, Hyperliquid, Polymarket, Kalshi) + regulatory landscape + specific binary-options applications. **Status unknown at session end — may still be running OR may have hit rate limit.**
+1. **Trading platforms AI features research** (agent ID `ae7e3317e4304ea92`) — **COMPLETED** while writing this handoff. Full output preserved at `.project/bell-markets/coordination/ai-v2-research-notes.md`. Covers: TradFi (Robinhood Cortex, Webull Vega, TradeStation MCP+Claude, Schwab, eToro Tori, Tastytrade), institutional (Bloomberg ASKB, TradingView Copilot), DeFi (Hyperliquid agent ecosystem, Polymarket Rust CLI, ElizaOS / Virtuals, Predictool/JogoJogo on Solana), feature-by-feature what-works analysis, full regulatory landscape (SEC IAA-1940, FINRA Notice 24-09, CFTC Feb 2026 prediction-market guidance), and a 6-item recommended v2 feature priority ranking. **Read that file first when synthesizing the v2 plan.**
 
-2. **Solana AI agent infrastructure research** (agent ID `a8bad160aee31a891`) — researching Anthropic Claude API, OpenAI Assistants, Solana AI frameworks (Eliza, SendAI), orchestration (LangChain), on-chain integration patterns, ZK-ML, cost analysis. **Status: hit API rate limit at 0 tokens — needs to be re-launched on resume.**
+2. **Solana AI agent infrastructure research** (agent ID `a8bad160aee31a891`) — **DID NOT RUN**. Hit API rate limit at 0 tokens. Needs to be re-launched on resume to fill the gap on: Anthropic Claude API stack details (Tool Use, Agent SDK), Solana AI frameworks (ElizaOS / SendAI / Senpi Skills technical details), orchestration patterns, on-chain ZK-ML for verifiable signals, cost projections by tier.
 
-**On resume, check status of agent `ae7e3317e4304ea92`** via `SendMessage` or check the output file at `C:\Users\User\AppData\Local\Temp\claude\C--Dev-GauntletAI-BellMarkets\5dc634bf-ae21-4863-972f-8406cac61433\tasks\ae7e3317e4304ea92.output`. If still running, await completion. If done, integrate results into the AI v2 plan.
-
-**Re-launch the Solana agent infrastructure research** when ready to synthesize the v2 plan.
+**On resume:**
+- Read `.project/bell-markets/coordination/ai-v2-research-notes.md` for the trading-platform landscape
+- Re-launch the Solana agent infrastructure research to complete the picture
+- Synthesize both into the comprehensive v2 plan + freemium pricing model
 
 ---
 
