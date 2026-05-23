@@ -12,6 +12,22 @@ pub const DEFAULT_ADMIN_OVERRIDE_DELAY_SECS: i64 = 3600;
 pub const MAX_STRIKES_PER_MARKET: usize = 16;
 pub const USDC_DECIMALS: u8 = 6;
 
+// ─── DR-005 / DR-007 — user-funded strike creation ──────────────────────────
+// Maximum slot count in TickerConfig.allowed_strikes. Sized for DR-006 baseline
+// (7 strikes: ATM + ±3/6/9%) plus DR-011 earnings-eve expansion (+4 strikes at
+// ±15/20%) plus headroom. Fixed-size array gives deterministic borsh layout.
+pub const MAX_ALLOWED_STRIKES: usize = 16;
+
+// Max time horizon for user_create_strike_market.expiry_unix. Catches typos
+// while letting Bram's grid evolution (DR-006) anchor "next trading day" +
+// minor calendar drift. 7 days covers Friday → Tuesday Memorial-Day-style
+// long weekends with margin.
+pub const MAX_EXPIRY_HORIZON_SECS: i64 = 7 * 24 * 60 * 60;
+
+// DR-010 (Leaderboard / reward pool constants) are introduced in P3 — the
+// zero-copy account types they back are too large for the standard
+// `#[account]` deserialize path.
+
 // ─── Outcome enum ───────────────────────────────────────────────────────────
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Debug)]
@@ -60,6 +76,25 @@ impl MarketConfig {
 
 // Same Default-derive caveat as MarketConfig — see note above.
 
+// DR-005 + DR-008: `creator` is set at create time (user pubkey for
+// `user_create_strike_market`, `Pubkey::default()` for admin-pathed
+// `create_strike_market`). Immutable. Read by `mint_pair`'s fee path to
+// determine creator-rebate eligibility.
+//
+// Layout note: `creator` claims the first 32 bytes of the original 64-byte
+// `_reserved` buffer. Total LEN unchanged, so the existing 7 META devnet
+// markets (created pre-DR-005 by Bram) deserialize correctly — those bytes
+// were init-zeroed by Anchor, so they read as `Pubkey::default()` which is
+// the documented admin-origin sentinel.
+//
+// `pairs_outstanding` (DR-008 closed-rent recovery + P4 `close_settled_market`)
+// takes the next 8 bytes after `creator`. Incremented in `mint_pair`,
+// decremented in `redeem` / `redeem_invalid` / `redeem_pair` / `force_redeem`.
+// Existing markets read as 0; pre-DR-008 mints already happened against those
+// markets so the counter is informational/best-effort for those — Drew's
+// invariant suite will exercise on freshly-created markets where the
+// counter is authoritative.
+
 #[account]
 pub struct StrikeMarket {
     pub config: Pubkey,
@@ -80,7 +115,9 @@ pub struct StrikeMarket {
     pub yes_mint_bump: u8,
     pub no_mint_bump: u8,
     pub vault_bump: u8,
-    pub _reserved: [u8; 64],
+    pub creator: Pubkey,
+    pub pairs_outstanding: u64,
+    pub _reserved: [u8; 24],
 }
 
 impl StrikeMarket {
@@ -100,5 +137,63 @@ impl StrikeMarket {
         + 1  // Outcome (borsh enum tag — 1 byte for ≤256 variants, no payloads)
         + 8  // admin_override_eligible_at
         + 1 + 1 + 1 + 1 // bumps
-        + 64; // _reserved
+        + 32 // creator (DR-005)
+        + 8  // pairs_outstanding (DR-008 / P4)
+        + 24; // _reserved (was 64; -32 creator, -8 pairs_outstanding)
 }
+
+// ─── TickerConfig (DR-005 / DR-006) ─────────────────────────────────────────
+// One per Pyth feed (per ticker). PDA seed = [b"ticker", pyth_feed].
+//
+// `cap_center` is the most recent close-anchor price (DR-006 phase 1) or the
+// most recent wild-swing-update center (phase 2/3). Stored pre-scaled in the
+// same i64 units as `StrikeMarket.strike_price` (i.e., scaled by Pyth feed
+// exponent).
+//
+// `allowed_strikes` is the curated grid Bram's cron offers users to spawn.
+// Fixed-size [i64; 16] + `strike_count: u8`. The on-chain user_create_strike
+// path does NOT check membership (that's Bram's UX scope); it only enforces
+// tick alignment + deviation cap against LIVE Pyth spot.
+//
+// `max_user_strike_deviation_bps` is the loose cap user_create checks against.
+// `strike_tick_size` is the grid alignment (same i64 units as strike_price).
+// `threshold_bps` is DR-006 phase-2/3 wild-swing trigger; informational only
+// on-chain (Bram's cron interprets it).
+
+#[account]
+pub struct TickerConfig {
+    pub pyth_feed: Pubkey,
+    pub cap_center: i64,
+    pub allowed_strikes: [i64; MAX_ALLOWED_STRIKES],
+    pub strike_count: u8,
+    pub max_user_strike_deviation_bps: u16,
+    pub strike_tick_size: i64,
+    pub threshold_bps: u16,
+    pub last_updated_unix: i64,
+    pub bump: u8,
+    pub _reserved: [u8; 32],
+}
+
+impl TickerConfig {
+    pub const LEN: usize = 8
+        + 32 // pyth_feed
+        + 8  // cap_center
+        + 8 * MAX_ALLOWED_STRIKES // allowed_strikes
+        + 1  // strike_count
+        + 2  // max_user_strike_deviation_bps
+        + 8  // strike_tick_size
+        + 2  // threshold_bps
+        + 8  // last_updated_unix
+        + 1  // bump
+        + 32; // _reserved
+}
+
+// UserConfig (DR-008) and FeeConfig (DR-008 / DR-010) are introduced in P2.
+//
+// LeaderboardCommitments (DR-010) lives in P3 work — see commits after this
+// one. It cannot be a standard `#[account]` struct because the 24-entry
+// fixed-size array (~2208 bytes payload) overruns the BPF 4096-byte stack
+// frame inside Anchor's macro-generated `try_deserialize_unchecked`
+// (kickoff §4.11). P3 introduces it as `#[account(zero_copy)]` + `repr(C)`
+// + `AccountLoader<'info, T>` accessor so the struct stays in mapped memory
+// and never enters the stack.

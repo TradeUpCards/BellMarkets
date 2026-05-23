@@ -8,6 +8,8 @@ pub mod redeem;
 pub mod redeem_invalid;
 pub mod redeem_pair;
 pub mod pause;
+pub mod update_ticker_config;
+pub mod user_create_strike_market;
 
 pub use initialize_config::*;
 pub use create_strike_market::*;
@@ -19,3 +21,5 @@ pub use redeem::*;
 pub use redeem_invalid::*;
 pub use redeem_pair::*;
 pub use pause::*;
+pub use update_ticker_config::*;
+pub use user_create_strike_market::*;

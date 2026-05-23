@@ -79,4 +79,49 @@ pub enum BellMarketsError {
 
     #[msg("strike_market.config does not match the supplied config account.")]
     ConfigMismatch,
+
+    #[msg("Strike price is not aligned to TickerConfig.strike_tick_size grid.")]
+    StrikeTickMisaligned,
+
+    #[msg("Strike price is outside TickerConfig.max_user_strike_deviation_bps of live Pyth spot.")]
+    StrikeOutsideDeviationCap,
+
+    #[msg("Expiry timestamp is not at a recognized US-equity market close (1:00 or 4:00 PM ET).")]
+    ExpiryNotMarketClose,
+
+    #[msg("Expiry timestamp is more than 7 days in the future.")]
+    ExpiryTooFar,
+
+    #[msg("TickerConfig.pyth_feed does not match the supplied underlying_pyth_feed account.")]
+    TickerConfigFeedMismatch,
+
+    #[msg("TickerConfig param out of allowed bounds (see update_ticker_config MAX_* constants).")]
+    InvalidTickerParam,
+
+    #[msg("Sum of bps fields must equal 10000 exactly.")]
+    BpsSumMismatch,
+
+    #[msg("FeeConfig param out of allowed bounds (see initialize_fee_config MAX_* constants).")]
+    InvalidFeeParam,
+
+    #[msg("strike_market.creator does not match the supplied creator account.")]
+    CreatorMismatch,
+
+    #[msg("Grace period for force_redeem has not elapsed since settlement.")]
+    ForceRedeemGraceActive,
+
+    #[msg("Market still has pairs_outstanding > 0; cannot close until fully redeemed.")]
+    MarketNotEmpty,
+
+    #[msg("Merkle proof failed verification against committed leaderboard root.")]
+    MerkleProofInvalid,
+
+    #[msg("Distribution position out of [1, 10] range.")]
+    InvalidDistributionPosition,
+
+    #[msg("Leaderboard period_id has no committed root for the requested period_type.")]
+    LeaderboardRootNotFound,
+
+    #[msg("Pyth price is negative; refusing to bind a negative spot for strike validation.")]
+    PythNegativePrice,
 }

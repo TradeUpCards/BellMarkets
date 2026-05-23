@@ -23,7 +23,7 @@ pub mod adapters;
 pub mod instructions;
 
 use instructions::*;
-use state::Outcome;
+use state::{Outcome, MAX_ALLOWED_STRIKES};
 
 // Program ID derived from keys/devnet-program-keypair.json (gitignored; also
 // mirrored at target/deploy/bell_markets-keypair.json where Anchor reads it
@@ -88,5 +88,33 @@ pub mod bell_markets {
 
     pub fn pause(ctx: Context<Pause>, paused: bool) -> Result<()> {
         instructions::pause::handler(ctx, paused)
+    }
+
+    pub fn update_ticker_config(
+        ctx: Context<UpdateTickerConfig>,
+        cap_center: i64,
+        allowed_strikes: [i64; MAX_ALLOWED_STRIKES],
+        strike_count: u8,
+        max_user_strike_deviation_bps: u16,
+        strike_tick_size: i64,
+        threshold_bps: u16,
+    ) -> Result<()> {
+        instructions::update_ticker_config::handler(
+            ctx,
+            cap_center,
+            allowed_strikes,
+            strike_count,
+            max_user_strike_deviation_bps,
+            strike_tick_size,
+            threshold_bps,
+        )
+    }
+
+    pub fn user_create_strike_market(
+        ctx: Context<UserCreateStrikeMarket>,
+        strike_price: i64,
+        expiry_unix: i64,
+    ) -> Result<()> {
+        instructions::user_create_strike_market::handler(ctx, strike_price, expiry_unix)
     }
 }

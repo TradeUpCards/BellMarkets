@@ -141,6 +141,11 @@ pub fn handler(
     sm.yes_mint_bump = ctx.bumps.yes_mint;
     sm.no_mint_bump = ctx.bumps.no_mint;
     sm.vault_bump = ctx.bumps.usdc_vault;
+    // DR-005: admin-pathed creation marks creator as zero pubkey. Distinguishes
+    // admin-spawned markets from user_create_strike_market (where creator =
+    // signer pubkey) for the DR-008 creator-rebate path in mint_pair.
+    sm.creator = Pubkey::default();
+    sm.pairs_outstanding = 0;
     Ok(())
 }
 

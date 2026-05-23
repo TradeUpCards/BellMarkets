@@ -939,6 +939,313 @@
         }
       ],
       "args": []
+    },
+    {
+      "name": "update_ticker_config",
+      "discriminator": [
+        134,
+        131,
+        89,
+        228,
+        78,
+        76,
+        13,
+        195
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "pyth_feed",
+          "docs": [
+            "validated as a parseable Pyth account here; that check fires at",
+            "user_create_strike_market time against the live feed account. Off-chain",
+            "operator is responsible for binding the right pubkey to the right ticker."
+          ]
+        },
+        {
+          "name": "ticker_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  105,
+                  99,
+                  107,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pyth_feed"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "cap_center",
+          "type": "i64"
+        },
+        {
+          "name": "allowed_strikes",
+          "type": {
+            "array": [
+              "i64",
+              16
+            ]
+          }
+        },
+        {
+          "name": "strike_count",
+          "type": "u8"
+        },
+        {
+          "name": "max_user_strike_deviation_bps",
+          "type": "u16"
+        },
+        {
+          "name": "strike_tick_size",
+          "type": "i64"
+        },
+        {
+          "name": "threshold_bps",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "user_create_strike_market",
+      "discriminator": [
+        134,
+        160,
+        149,
+        111,
+        133,
+        104,
+        115,
+        144
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "docs": [
+            "Rent payer. Signs but holds no privileged role beyond paying.",
+            "`creator` is set to this signer's pubkey."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "ticker_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  105,
+                  99,
+                  107,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "underlying_pyth_feed"
+              }
+            ]
+          }
+        },
+        {
+          "name": "strike_market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  114,
+                  105,
+                  107,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "underlying_pyth_feed"
+              },
+              {
+                "kind": "arg",
+                "path": "expiry_unix"
+              },
+              {
+                "kind": "arg",
+                "path": "strike_price"
+              }
+            ]
+          }
+        },
+        {
+          "name": "underlying_pyth_feed",
+          "docs": [
+            "(magic / version / atype / status / staleness / confidence). Pubkey is",
+            "bound into `strike_market.underlying_pyth_feed`."
+          ]
+        },
+        {
+          "name": "yes_mint",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  121,
+                  101,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "strike_market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "no_mint",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  110,
+                  111
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "strike_market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "usdc_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "strike_market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "usdc_mint",
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "phoenix_market",
+          "docs": [
+            "the handler via verify_phoenix_market. Per kickoff §4.12, this remains",
+            "UncheckedAccount (Phoenix is not an Anchor program; Account<T> would",
+            "fail the discriminator check)."
+          ]
+        },
+        {
+          "name": "clock",
+          "address": "SysvarC1ock11111111111111111111111111111111"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "rent",
+          "address": "SysvarRent111111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "strike_price",
+          "type": "i64"
+        },
+        {
+          "name": "expiry_unix",
+          "type": "i64"
+        }
+      ]
     }
   ],
   "accounts": [
@@ -966,6 +1273,19 @@
         219,
         99,
         7
+      ]
+    },
+    {
+      "name": "TickerConfig",
+      "discriminator": [
+        146,
+        205,
+        119,
+        109,
+        54,
+        29,
+        71,
+        106
       ]
     }
   ],
@@ -1099,6 +1419,81 @@
       "code": 6025,
       "name": "ConfigMismatch",
       "msg": "strike_market.config does not match the supplied config account."
+    },
+    {
+      "code": 6026,
+      "name": "StrikeTickMisaligned",
+      "msg": "Strike price is not aligned to TickerConfig.strike_tick_size grid."
+    },
+    {
+      "code": 6027,
+      "name": "StrikeOutsideDeviationCap",
+      "msg": "Strike price is outside TickerConfig.max_user_strike_deviation_bps of live Pyth spot."
+    },
+    {
+      "code": 6028,
+      "name": "ExpiryNotMarketClose",
+      "msg": "Expiry timestamp is not at a recognized US-equity market close (1:00 or 4:00 PM ET)."
+    },
+    {
+      "code": 6029,
+      "name": "ExpiryTooFar",
+      "msg": "Expiry timestamp is more than 7 days in the future."
+    },
+    {
+      "code": 6030,
+      "name": "TickerConfigFeedMismatch",
+      "msg": "TickerConfig.pyth_feed does not match the supplied underlying_pyth_feed account."
+    },
+    {
+      "code": 6031,
+      "name": "InvalidTickerParam",
+      "msg": "TickerConfig param out of allowed bounds (see update_ticker_config MAX_* constants)."
+    },
+    {
+      "code": 6032,
+      "name": "BpsSumMismatch",
+      "msg": "Sum of bps fields must equal 10000 exactly."
+    },
+    {
+      "code": 6033,
+      "name": "InvalidFeeParam",
+      "msg": "FeeConfig param out of allowed bounds (see initialize_fee_config MAX_* constants)."
+    },
+    {
+      "code": 6034,
+      "name": "CreatorMismatch",
+      "msg": "strike_market.creator does not match the supplied creator account."
+    },
+    {
+      "code": 6035,
+      "name": "ForceRedeemGraceActive",
+      "msg": "Grace period for force_redeem has not elapsed since settlement."
+    },
+    {
+      "code": 6036,
+      "name": "MarketNotEmpty",
+      "msg": "Market still has pairs_outstanding > 0; cannot close until fully redeemed."
+    },
+    {
+      "code": 6037,
+      "name": "MerkleProofInvalid",
+      "msg": "Merkle proof failed verification against committed leaderboard root."
+    },
+    {
+      "code": 6038,
+      "name": "InvalidDistributionPosition",
+      "msg": "Distribution position out of [1, 10] range."
+    },
+    {
+      "code": 6039,
+      "name": "LeaderboardRootNotFound",
+      "msg": "Leaderboard period_id has no committed root for the requested period_type."
+    },
+    {
+      "code": 6040,
+      "name": "PythNegativePrice",
+      "msg": "Pyth price is negative; refusing to bind a negative spot for strike validation."
     }
   ],
   "types": [
@@ -1253,11 +1648,77 @@
             "type": "u8"
           },
           {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "pairs_outstanding",
+            "type": "u64"
+          },
+          {
             "name": "_reserved",
             "type": {
               "array": [
                 "u8",
-                64
+                24
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "TickerConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pyth_feed",
+            "type": "pubkey"
+          },
+          {
+            "name": "cap_center",
+            "type": "i64"
+          },
+          {
+            "name": "allowed_strikes",
+            "type": {
+              "array": [
+                "i64",
+                16
+              ]
+            }
+          },
+          {
+            "name": "strike_count",
+            "type": "u8"
+          },
+          {
+            "name": "max_user_strike_deviation_bps",
+            "type": "u16"
+          },
+          {
+            "name": "strike_tick_size",
+            "type": "i64"
+          },
+          {
+            "name": "threshold_bps",
+            "type": "u16"
+          },
+          {
+            "name": "last_updated_unix",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "_reserved",
+            "type": {
+              "array": [
+                "u8",
+                32
               ]
             }
           }
