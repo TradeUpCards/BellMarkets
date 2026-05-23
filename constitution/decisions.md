@@ -608,6 +608,82 @@ Pre-expansion magnitudes (per-ticker, configurable):
 
 ---
 
+### DR-013 — Web2 onboarding via embedded wallets (v2.x scope)
+
+**Date:** 2026-05-23
+**Status:** Active — v2.x scope, not v1
+**Made by:** Cory (Tate-routed)
+
+**Context:** v1 ships pure non-custodial — users bring a Solana wallet (Phantom, Backpack, Solflare) via `@solana/wallet-adapter-react`. This is interview-defensible and matches Polymarket's design. But it excludes web2 users: anyone who has never used crypto cannot participate. Kalshi (the regulated competitor to Polymarket) does not require a crypto wallet, and that's a meaningful TAM gap — Kalshi's user count is multiples of Polymarket's. The product opportunity in v2.x: open the funnel to users who pay with a card and have never touched crypto, without compromising the non-custodial trust boundary.
+
+**Decision:** Add embedded-wallet onboarding as a v2.x feature using **Privy** or **Turnkey** (decision deferred to v2 design). Key properties locked:
+
+1. **User owns the key, not BellMarkets.** Both Privy and Turnkey use TEE (Trusted Execution Environment) or MPC (Multi-Party Computation) key custody — the user's email/social login derives a key the *user* controls; BellMarkets never has the key in custody. **Legal accounting consequence: embedded-wallet balances are not on BellMarkets' books**, same as a self-custodial wallet. No money-transmitter licensing risk; no custodial KYC obligations beyond what v1 already requires.
+2. **Fiat ramp via Helio (primary) or MoonPay (alternative).** Card → ramp → USDC into embedded wallet → mint flow. Helio includes integrated card on-ramp + Solana-native USDC subscription support (validated by Squads, Backpack). MoonPay is the alternative if Helio's ramp coverage is insufficient for target geographies.
+3. **Withdrawals are user-initiated SPL transfers** (or back through ramp for cashout). User signs, on-chain, no admin touch.
+4. **Email becomes mandatory for embedded-wallet users** (Privy/Turnkey require it for account recovery). Captured at onboarding, used for transactional + opt-in newsletter (see DR-014).
+5. **Wallet abstraction layer** — frontend wraps `@solana/wallet-adapter-react` so embedded wallets (Privy/Turnkey) and self-custodial wallets (Phantom/Backpack) present a uniform signing interface to the rest of the app. No conditional code paths in mint/redeem/Phoenix builders.
+
+**Trade-off:** We pay onboarding-flow complexity (email verification, account recovery UX, ramp integration, additional KYC review at the ramp layer) **in exchange for** ~10× addressable market versus pure web3 onboarding (Kalshi/Robinhood demographic) and a smoother first-time experience for users who would bounce on the "install Phantom" step.
+
+**Consequences:**
+- **Frontend:** Cleo's wallet-adapter integration in v1 is compatible — Privy ships `@privy-io/react-auth` that wraps wallet-adapter cleanly. No v1 rework needed; v2.x adds the embedded-wallet provider on top.
+- **Compliance scope:** the *ramp* layer (Helio/MoonPay) handles KYC, not us. We never touch fiat directly. Our compliance burden grows only by "we are a venue an embedded-wallet user transacts through," not by "we are a custodian."
+- **AI v2 plan:** Bell Pro subscription via Helio works for both wallet types — embedded-wallet users pay in USDC through the same on-chain flow as self-custodial users. The MCP server (DR-014 spec) treats embedded wallets and self-custodial wallets identically.
+- **Geo-fencing inherits from v1.** US blocked at v1; embedded-wallet users get blocked at the same border check. No looser policy for embedded users — Privy/Turnkey users can still be in non-US geographies same as Phantom users.
+- **Anti-Sybil:** embedded wallets are easier to spin up than Phantom (email = one wallet vs phone-verified email). Tier-1 mint-volume gaming (DR-008) needs review at v2 launch: consider tying the 30-day-volume tier to KYC'd identity at the ramp layer rather than just (config, user) pubkey.
+- **DR-014 (profiles + social linking) is the user-facing companion** — embedded-wallet users get a profile with their email/social capture; self-custodial users opt-in to the same profile system.
+
+**Alternatives considered:**
+- **Custodial wallet (we hold the key):** rejected. Triggers money-transmitter licensing (state-by-state in the US), AML/KYC obligations, fiduciary-duty scrutiny. Polymarket's strategic mistake — they later had to unwind US custody to settle with regulators. We don't repeat it.
+- **No web2 onboarding at all (Polymarket model):** rejected for v2.x. The TAM gap is meaningful and Kalshi proves it; pure web3 is fine for v1 demo but caps long-term growth.
+- **Web3Auth (formerly Torus) / Magic.link:** considered as embedded-wallet alternatives to Privy/Turnkey. Magic.link's Solana support is mature but its TEE model is older. Privy and Turnkey are the 2026 frontier. Final pick deferred to v2 implementation.
+- **Build our own embedded wallet:** rejected. Custom key-management infra is a hard-to-justify build vs ~5K-10K/yr in Privy/Turnkey costs at our scale. We are not a wallet company.
+
+---
+
+### DR-014 — User profiles + social linking + notification channels (v1.5/v2.0 scope)
+
+**Date:** 2026-05-23
+**Status:** Active — v1.5/v2.0 scope
+**Made by:** Cory (Tate-routed)
+
+**Context:** A pure wallet-pubkey-only identity (v1 default) is a known retention ceiling. Polymarket-style "you are a hex address" prevents the marketing loop (newsletter, push notifications, share-card virality) that drives every successful retail finance product. Cory has prior production experience building this stack at **fffanalytics_t3** (`/c/Dev/fffanalytics_t3`) — NextAuth v4 OAuth + Neon Postgres + Discord.js v14 + nodemailer + web-push. The patterns are reusable, which collapses the design risk to schema choices.
+
+**Decision:** Add an opt-in user-profile layer that captures:
+
+1. **Identity:** wallet pubkey (canonical) + email (optional for self-custodial users, **mandatory for embedded-wallet users per DR-013**)
+2. **Display:** avatar + handle. Avatar priority order: **explicit upload → most-recent linked social-account avatar → SNS metadata (`.sol` name) → generated identicon (Boring Avatars or equivalent)**. ENS (`.eth`) resolution is nice-to-have, not load-bearing.
+3. **Social links via OAuth (no post-verify required):** X (Twitter), Discord, Google. Each provider may surface email — capture opportunistically. OAuth-only flow; no manual "paste your handle" + verification post.
+4. **Notification preferences (granular opt-in per channel):**
+   - **Email** — transactional (settlements, won-trades) + opt-in newsletter
+   - **Discord DM** — via shared-server bot pattern (user must be in BellMarkets Discord; bot DMs them). Production-tested at fanalytics.
+   - **Browser push** — web-push API, where supported
+   - **Telegram** — bot pattern, added in v2.0
+   - **X** — deferred until ≥5K MAU justifies API tier ($200/mo Basic for read access, $5K/mo Pro for posting). X *OAuth* (identity, email capture) is free at any scale; X *posting/reading* is the gated capability.
+5. **Stack:** NextAuth v4 (OAuth) + Neon Postgres (user/session/notification-pref tables) + Discord.js v14 + nodemailer + web-push. Pattern reuse from fanalytics; schema-level details deferred to implementation pickup.
+
+**Trade-off:** We pay the engineering scope of a user-profile system, OAuth integration, notification infrastructure, and email/DM template authoring — plus the perception cost of "this is no longer pure wallet-only" — **in exchange for** real marketing surface (newsletter, share-cards, push retention) and the foundation DR-013 needs (email mandatory for embedded-wallet users).
+
+**Consequences:**
+- **Database:** Neon Postgres becomes a hard dependency (already adopted in DR-010 for leaderboard state; this confirms the choice). User table, OAuth account-link table, notification-preference table, push-subscription table all live in Neon.
+- **Profile creation is gated behind reward-claim** (high-intent moment). Don't surface email-capture during pre-trade browsing — convert at the moment of meaningful upside.
+- **Share-card generator** — PNG generation of "I went 7-0 on MAG7 today" / win-streak milestones / leaderboard rank, with BellMarkets watermark. Generated server-side (Node canvas or `@vercel/og`), stored ephemerally, shareable to X/Discord/Telegram. Drives viral loop without requiring X API access.
+- **Reference implementation:** `fffanalytics_t3` patterns lift cleanly. Specifically:
+  - `src/app/api/auth/[...nextauth]/options.ts` — provider config (Twitter, Discord)
+  - `src/actions/pushNotificationActions.ts` + `src/utils/pushNotifications.ts` — web-push subscription model
+  - `src/components/PushNotificationTester.tsx` + `ReminderSubscriptionModal.tsx` — UI patterns
+- **Token impact:** if `$BELL` ever launches (v2.5+, deferred per AI v2 plan §6), profiles become the natural attachment point for token-balance display + governance.
+- **Privacy:** Hard NOs around PII unchanged. Email + social handles are PII; stored in Neon, never logged to handoffs / commit messages / public chat.
+
+**Alternatives considered:**
+- **Wallet-pubkey-only forever (Polymarket model):** rejected. Capped retention; no email = no newsletter = no re-engagement loop.
+- **Auth0 / Clerk:** considered as NextAuth alternatives. Auth0/Clerk are heavier (Auth0 is $240/mo above hobby; Clerk is similar). NextAuth is free + already battle-tested at fanalytics. No reason to migrate to a paid auth platform.
+- **Build the profile system on-chain (profile PDA per user):** rejected. Profiles are write-heavy (notification prefs change, avatar updates, social links toggled), on-chain writes are expensive vs. Neon row updates. On-chain profile = bad UX. Wallet pubkey is the only identity primitive that needs to be on-chain.
+- **SIWE (Sign-In With Ethereum-style) only, no OAuth:** rejected. Doesn't capture email. Without email we lose the newsletter + recovery channels.
+
+---
+
 > Aim for 5–15 active DRs over a project's life. Fewer and you're not
 > locking enough; more and the file becomes unscannable (rotate stable
 > ones into `specs/architecture.md` if they've become "just how the
