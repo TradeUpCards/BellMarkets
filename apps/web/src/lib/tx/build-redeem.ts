@@ -12,6 +12,8 @@ import {
 
 import type { Outcome, StrikeMarket } from "@/lib/solana/types";
 import { outcomeTag } from "@/lib/solana/types";
+import { deriveMarketConfigPda } from "@/lib/solana/anchor";
+import { deriveUsdcVaultPda } from "@/lib/solana/pdas";
 
 import { callAnchorMethod } from "./anchor-helper";
 
@@ -71,6 +73,9 @@ export async function buildRedeemTx(
     );
   }
 
+  const [config] = deriveMarketConfigPda();
+  const [usdcVault] = deriveUsdcVaultPda(marketPda);
+
   const userUsdc = getAssociatedTokenAddressSync(usdcMint, user, true);
   const prelude: TransactionInstruction[] = [
     createAssociatedTokenAccountIdempotentInstruction(
@@ -93,9 +98,13 @@ export async function buildRedeemTx(
       new BN(amount.toString()),
       {
         user,
+        config,
         strikeMarket: marketPda,
+        yesMint: market.yesMint,
+        noMint: market.noMint,
         userYes,
         userNo,
+        usdcVault,
         userUsdc,
         usdcMint,
         tokenProgram: TOKEN_PROGRAM_ID,
@@ -118,9 +127,11 @@ export async function buildRedeemTx(
     new BN(amount.toString()),
     {
       user,
+      config,
       strikeMarket: marketPda,
       winningMint,
       userWinningToken,
+      usdcVault,
       userUsdc,
       usdcMint,
       tokenProgram: TOKEN_PROGRAM_ID,

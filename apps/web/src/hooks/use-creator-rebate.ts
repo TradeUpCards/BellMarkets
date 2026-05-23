@@ -10,13 +10,7 @@ export interface CreatorRebateInfo {
   /** True iff `market.creator == user && market is unsettled`. */
   applies: boolean;
   /** Reason flag — useful for UI rendering ("market settled, rebate inactive"). */
-  reason:
-    | "applies"
-    | "not-creator"
-    | "settled"
-    | "no-market"
-    | "no-user"
-    | "no-creator-field";
+  reason: "applies" | "not-creator" | "settled" | "no-market" | "no-user";
   /** Echo the creator pubkey for display, if known. */
   creator: PublicKey | null;
 }
@@ -49,15 +43,7 @@ export function useCreatorRebate(
     if (!market) {
       return { applies: false, reason: "no-market", creator: null };
     }
-    // The pre-refresh IDL doesn't include `creator`. Cast through a
-    // structural guard rather than tightly binding to the new shape.
-    const maybe = market as unknown as {
-      creator?: PublicKey;
-    };
-    const creator = maybe.creator ?? null;
-    if (!creator) {
-      return { applies: false, reason: "no-creator-field", creator: null };
-    }
+    const creator = market.creator;
 
     if (isSettled(market.outcome)) {
       return { applies: false, reason: "settled", creator };

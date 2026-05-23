@@ -11,7 +11,12 @@ import {
 } from "@solana/web3.js";
 import type { MarketState } from "@ellipsis-labs/phoenix-sdk";
 
-import { deriveNoMintPda, deriveYesMintPda } from "@/lib/solana/pdas";
+import { deriveMarketConfigPda } from "@/lib/solana/anchor";
+import {
+  deriveNoMintPda,
+  deriveUsdcVaultPda,
+  deriveYesMintPda,
+} from "@/lib/solana/pdas";
 
 import { callAnchorMethod } from "./anchor-helper";
 import { PhoenixSide, buildPhoenixSwapIx } from "./phoenix";
@@ -80,8 +85,10 @@ export async function buildSellNoTx(
     maxQuoteLotsToSpend,
   } = params;
 
+  const [config] = deriveMarketConfigPda();
   const [yesMint] = deriveYesMintPda(marketPda);
   const [noMint] = deriveNoMintPda(marketPda);
+  const [usdcVault] = deriveUsdcVaultPda(marketPda);
 
   const userUsdc = getAssociatedTokenAddressSync(usdcMint, trader, true);
   const userYes = getAssociatedTokenAddressSync(yesMint, trader, true);
@@ -133,9 +140,13 @@ export async function buildSellNoTx(
     new BN(amount.toString()),
     {
       user: trader,
+      config,
       strikeMarket: marketPda,
+      yesMint,
+      noMint,
       userYes,
       userNo,
+      usdcVault,
       userUsdc,
       usdcMint,
       tokenProgram: TOKEN_PROGRAM_ID,

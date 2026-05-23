@@ -6,13 +6,21 @@ import {
 } from "@solana/spl-token";
 import {
   PublicKey,
+  SYSVAR_CLOCK_PUBKEY,
+  SystemProgram,
   Transaction,
   type TransactionInstruction,
 } from "@solana/web3.js";
 import type { MarketState } from "@ellipsis-labs/phoenix-sdk";
 
+import { deriveMarketConfigPda } from "@/lib/solana/anchor";
 import {
+  deriveFeeConfigPda,
+  deriveMonthlyPoolPda,
   deriveNoMintPda,
+  deriveUsdcVaultPda,
+  deriveUserConfigPda,
+  deriveWeeklyPoolPda,
   deriveYesMintPda,
 } from "@/lib/solana/pdas";
 
@@ -28,6 +36,8 @@ export interface BuildBuyNoParams {
   phoenixMarket: MarketState;
   /** USDC mint pubkey from MarketConfig. */
   usdcMint: PublicKey;
+  /** `MarketConfig.treasury` — fee-collector wallet (drives fee_collector_usdc ATA). */
+  treasury: PublicKey;
   /** Pair count to mint = also the base lots sold on Phoenix. */
   amount: bigint;
   /** Slippage floor on the Phoenix sell-Yes leg. */
@@ -45,25 +55,29 @@ export interface BuildBuyNoResult {
 }
 
 /**
- * Build the **atomic** Buy-No transaction per POV-3 / `specs/architecture.md`
- * §"Buy No / Sell No atomicity":
+ * Build the **atomic** Buy-No transaction per POV-3:
  *
  *   tx = [
  *     <ATA creates>,
- *     mint_pair(amount),          // → Yes:+amount, No:+amount, USDC:-amount
+ *     mint_pair(amount),          // → Yes:+amount, No:+amount, USDC:-(amount + fee)
  *     phoenix.swap(Side.Ask, numBaseLots=amount),  // → Yes:-amount, USDC:+~(amount * bid)
  *   ]
  *
- * Net effect: user holds `+amount` No tokens, paid roughly `amount * (1-bid)`
- * USDC. The user never sees intermediate Yes balances — POV-3 atomicity is
- * enforced at the tx level by both instructions being in one signed bundle.
+ * Now wired against the 20-ix IDL's `mint_pair` shape — threads the full
+ * DR-008/010 fee surface (fee_config, user_config, fee_collector_usdc,
+ * weekly_pool, monthly_pool, clock). On the pre-flip default state
+ * (`mint_fee_bps == 0`) no fee transfers fire so this remains a clean atomic
+ * mint+swap; once admin flips fees on, the user pays `amount + fee` USDC and
+ * the swap proceeds at the same base size.
  *
- * Caveat — tx size budget: a Solana tx is capped at 1232 bytes. With the
- * three ATA prelude ixes + mint_pair + Phoenix swap we land around ~900 b
- * (rough), within budget. If the actual signed tx ever overflows, the ATA
- * creates can be moved into a separate setup tx (one-time per user per
- * market) so the trade itself stays single-tx. Day-3 visual layer should
- * not yet attempt this optimization.
+ * Net effect: user holds `+amount` No tokens, paid roughly `amount * (1-bid)`
+ * USDC plus protocol fee. The user never sees intermediate Yes balances —
+ * POV-3 atomicity enforced at the tx level.
+ *
+ * Tx-size budget: 4 ATA prelude ixes + mint_pair (18 accounts) + Phoenix
+ * swap (8 accounts) — fits within the 1232-byte legacy-tx cap. If it ever
+ * overflows post-deploy, the ATA creates can be moved into a separate
+ * one-time setup tx per user per market.
  */
 export async function buildBuyNoTx(
   params: BuildBuyNoParams,
@@ -74,16 +88,28 @@ export async function buildBuyNoTx(
     marketPda,
     phoenixMarket,
     usdcMint,
+    treasury,
     amount,
     minQuoteLotsToFill,
   } = params;
 
+  const [config] = deriveMarketConfigPda();
+  const [feeConfig] = deriveFeeConfigPda();
+  const [userConfig] = deriveUserConfigPda(config, trader);
+  const [weeklyPool] = deriveWeeklyPoolPda();
+  const [monthlyPool] = deriveMonthlyPoolPda();
   const [yesMint] = deriveYesMintPda(marketPda);
   const [noMint] = deriveNoMintPda(marketPda);
+  const [usdcVault] = deriveUsdcVaultPda(marketPda);
 
   const userUsdc = getAssociatedTokenAddressSync(usdcMint, trader, true);
   const userYes = getAssociatedTokenAddressSync(yesMint, trader, true);
   const userNo = getAssociatedTokenAddressSync(noMint, trader, true);
+  const feeCollectorUsdc = getAssociatedTokenAddressSync(
+    usdcMint,
+    treasury,
+    true,
+  );
 
   const prelude: TransactionInstruction[] = [
     createAssociatedTokenAccountIdempotentInstruction(
@@ -104,22 +130,13 @@ export async function buildBuyNoTx(
       trader,
       noMint,
     ),
-  ];
-
-  const mintPairIx = await callAnchorMethod(
-    program,
-    "mintPair",
-    new BN(amount.toString()),
-    {
-      user: trader,
-      strikeMarket: marketPda,
-      userUsdc,
-      userYes,
-      userNo,
+    createAssociatedTokenAccountIdempotentInstruction(
+      trader,
+      feeCollectorUsdc,
+      treasury,
       usdcMint,
-      tokenProgram: TOKEN_PROGRAM_ID,
-    },
-  );
+    ),
+  ];
 
   // Phoenix's Yes/USDC market base mint MUST match our derived yes_mint —
   // safety guard against the trader passing a phoenixMarket that belongs to
@@ -130,6 +147,32 @@ export async function buildBuyNoTx(
       `buildBuyNoTx: phoenixMarket.base (${phoenixBase.toBase58()}) != derived yes_mint (${yesMint.toBase58()}). Mismatched market arguments.`,
     );
   }
+
+  const mintPairIx = await callAnchorMethod(
+    program,
+    "mintPair",
+    new BN(amount.toString()),
+    {
+      user: trader,
+      config,
+      feeConfig,
+      userConfig,
+      strikeMarket: marketPda,
+      userUsdc,
+      usdcVault,
+      yesMint,
+      noMint,
+      userYes,
+      userNo,
+      feeCollectorUsdc,
+      weeklyPool,
+      monthlyPool,
+      usdcMint,
+      clock: SYSVAR_CLOCK_PUBKEY,
+      systemProgram: SystemProgram.programId,
+      tokenProgram: TOKEN_PROGRAM_ID,
+    },
+  );
 
   const sellYesIx = buildPhoenixSwapIx({
     market: phoenixMarket,

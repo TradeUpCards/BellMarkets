@@ -7,8 +7,8 @@ import { AccountLayout } from "@solana/spl-token";
 import { queryKeys } from "@/lib/queries/keys";
 import { useAccountSubscription } from "./use-account-subscription";
 import {
-  deriveMonthlyRewardsPoolPda,
-  deriveWeeklyRewardsPoolPda,
+  deriveMonthlyPoolPda,
+  deriveWeeklyPoolPda,
 } from "@/lib/solana/pdas";
 
 export type RewardsPoolPeriod = "weekly" | "monthly";
@@ -40,9 +40,7 @@ export function useRewardsPoolBalance(
 } {
   const pool = useMemo(
     () =>
-      period === "weekly"
-        ? deriveWeeklyRewardsPoolPda()[0]
-        : deriveMonthlyRewardsPoolPda()[0],
+      period === "weekly" ? deriveWeeklyPoolPda()[0] : deriveMonthlyPoolPda()[0],
     [period],
   );
 

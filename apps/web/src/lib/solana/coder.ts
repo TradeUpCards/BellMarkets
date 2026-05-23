@@ -2,7 +2,13 @@ import { BorshAccountsCoder, type Idl } from "@coral-xyz/anchor";
 
 import idlJson from "@/idl/bell_markets.json";
 
-import type { MarketConfig, StrikeMarket } from "./types";
+import type {
+  FeeConfig,
+  MarketConfig,
+  StrikeMarket,
+  TickerConfig,
+  UserConfig,
+} from "./types";
 
 const idl = idlJson as Idl;
 
@@ -20,6 +26,23 @@ export function decodeMarketConfig(data: Buffer): MarketConfig {
 export function decodeStrikeMarket(data: Buffer): StrikeMarket {
   return bellMarketsCoder.decode<StrikeMarket>("StrikeMarket", data);
 }
+
+export function decodeFeeConfig(data: Buffer): FeeConfig {
+  return bellMarketsCoder.decode<FeeConfig>("FeeConfig", data);
+}
+
+export function decodeUserConfig(data: Buffer): UserConfig {
+  return bellMarketsCoder.decode<UserConfig>("UserConfig", data);
+}
+
+export function decodeTickerConfig(data: Buffer): TickerConfig {
+  return bellMarketsCoder.decode<TickerConfig>("TickerConfig", data);
+}
+
+// LeaderboardCommitments uses bytemuck/repr(C) (zero-copy) per IDL — Anchor's
+// BorshAccountsCoder cannot decode it. We expose the raw account-fetch path
+// in the hook layer and decode by hand if/when we need the entries; the pool
+// balances themselves come from SPL Token AccountLayout, not this struct.
 
 /**
  * Anchor account discriminator (first 8 bytes of sha256("account:<Name>")).

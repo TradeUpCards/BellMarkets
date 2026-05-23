@@ -1,26 +1,22 @@
 import { BN, type Program, type Idl } from "@coral-xyz/anchor";
-import {
-  TOKEN_PROGRAM_ID,
-  createAssociatedTokenAccountIdempotentInstruction,
-  getAssociatedTokenAddressSync,
-} from "@solana/spl-token";
+import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import {
   PublicKey,
+  SYSVAR_CLOCK_PUBKEY,
   SYSVAR_RENT_PUBKEY,
   SystemProgram,
   Transaction,
   type TransactionInstruction,
 } from "@solana/web3.js";
 
+import { deriveMarketConfigPda } from "@/lib/solana/anchor";
 import {
   deriveNoMintPda,
   deriveStrikeMarketPda,
+  deriveTickerConfigPda,
   deriveUsdcVaultPda,
   deriveYesMintPda,
 } from "@/lib/solana/pdas";
-import { deriveMarketConfigPda } from "@/lib/solana/anchor";
-
-import { callAnchorMethod } from "./anchor-helper";
 
 export interface BuildUserCreateStrikeMarketParams {
   program: Program<Idl>;
@@ -40,7 +36,6 @@ export interface BuildUserCreateStrikeMarketParams {
 
 export interface BuildUserCreateStrikeMarketResult {
   tx: Transaction;
-  prelude: TransactionInstruction[];
   ix: TransactionInstruction;
   pdas: {
     strikeMarket: PublicKey;
@@ -48,38 +43,36 @@ export interface BuildUserCreateStrikeMarketResult {
     noMint: PublicKey;
     usdcVault: PublicKey;
     config: PublicKey;
-  };
-  ataKeys: {
-    userUsdc: PublicKey;
-    userYes: PublicKey;
-    userNo: PublicKey;
+    tickerConfig: PublicKey;
   };
 }
 
 /**
  * Build (don't send) the user-funded strike-creation transaction (DR-005).
  *
- *   tx = [
- *     <ATA creates: USDC + Yes + No>,
- *     bell_markets.user_create_strike_market(strike, expiry),
- *   ]
+ * Reconciled against the 20-ix IDL post-Aria P5 deploy. Account order /
+ * names match `instructions[].select(.name == "user_create_strike_market")`
+ * — including the `ticker_config` PDA I omitted in the IDL-pending stub.
  *
- * The signer pays ~0.00455 SOL rent for the StrikeMarket + Yes/No mints + USDC
- * vault and is recorded immutably as `StrikeMarket.creator` (DR-008 creator-
- * rebate eligibility).
+ *   tx = bell_markets.user_create_strike_market(strike, expiry)
+ *
+ * The signer pays ~0.00455 SOL rent for the StrikeMarket + Yes/No mints +
+ * USDC vault and is recorded immutably as `StrikeMarket.creator` (DR-008
+ * creator-rebate eligibility).
+ *
+ * **No ATA prelude here** — the create ix doesn't touch user token accounts.
+ * The follow-up `mint_pair` call (typically bundled by the caller as the
+ * first-trade flow per DR-005 §Consequences) is where ATAs get created.
+ * Caller is responsible for: (a) checking tx-size budget if composing the
+ * full `[user_create + mint_pair + phoenix_swap]` atomic flow — likely
+ * requires a VersionedTransaction + address lookup tables; (b) prepending
+ * the ATA creates if going that route.
  *
  * On-chain enforcement (per DR-005 §"On-chain enforcement"):
- *  - Strike within per-ticker `max_user_strike_deviation_bps` of current spot
- *  - Strike aligned to per-ticker `strike_tick_size` grid
- *  - Expiry must be 13:00 or 16:00 UTC (post-EDT/EST adjustment) within 7 days
+ *  - Strike within `ticker_config.max_user_strike_deviation_bps` of current spot
+ *  - Strike aligned to `ticker_config.strike_tick_size` grid
+ *  - Expiry must be 13:00 or 16:00 ET within 7 days (per DR-007)
  *  - Pyth must pass staleness + confidence checks at create time
- *
- * **IDL note:** the `user_create_strike_market` ix has not landed in
- * `apps/web/src/idl/bell_markets.json` yet (10-ix IDL as of session start).
- * Once Aria's refresh hits main, `useBellMarketsProgram()` picks it up
- * automatically — no changes needed here. `callAnchorMethod` will throw a
- * clear "method missing from IDL" until then; callers should gate via
- * `program.idl.instructions.some(i => i.name === "userCreateStrikeMarket")`.
  */
 export async function buildUserCreateStrikeMarketTx(
   params: BuildUserCreateStrikeMarketParams,
@@ -94,6 +87,8 @@ export async function buildUserCreateStrikeMarketTx(
     usdcMint,
   } = params;
 
+  const [config] = deriveMarketConfigPda();
+  const [tickerConfig] = deriveTickerConfigPda(underlyingPythFeed);
   const [strikeMarket] = deriveStrikeMarketPda(
     underlyingPythFeed,
     expiryUnix,
@@ -102,32 +97,6 @@ export async function buildUserCreateStrikeMarketTx(
   const [yesMint] = deriveYesMintPda(strikeMarket);
   const [noMint] = deriveNoMintPda(strikeMarket);
   const [usdcVault] = deriveUsdcVaultPda(strikeMarket);
-  const [config] = deriveMarketConfigPda();
-
-  const userUsdc = getAssociatedTokenAddressSync(usdcMint, user, true);
-  const userYes = getAssociatedTokenAddressSync(yesMint, user, true);
-  const userNo = getAssociatedTokenAddressSync(noMint, user, true);
-
-  const prelude: TransactionInstruction[] = [
-    createAssociatedTokenAccountIdempotentInstruction(
-      user,
-      userUsdc,
-      user,
-      usdcMint,
-    ),
-    createAssociatedTokenAccountIdempotentInstruction(
-      user,
-      userYes,
-      user,
-      yesMint,
-    ),
-    createAssociatedTokenAccountIdempotentInstruction(
-      user,
-      userNo,
-      user,
-      noMint,
-    ),
-  ];
 
   const ix = await callAnchorMethodPair(
     program,
@@ -135,8 +104,9 @@ export async function buildUserCreateStrikeMarketTx(
     new BN(strikePrice.toString()),
     new BN(expiryUnix.toString()),
     {
-      creator: user,
+      user,
       config,
+      tickerConfig,
       strikeMarket,
       underlyingPythFeed,
       yesMint,
@@ -144,22 +114,19 @@ export async function buildUserCreateStrikeMarketTx(
       usdcVault,
       usdcMint,
       phoenixMarket,
+      clock: SYSVAR_CLOCK_PUBKEY,
       systemProgram: SystemProgram.programId,
       tokenProgram: TOKEN_PROGRAM_ID,
       rent: SYSVAR_RENT_PUBKEY,
     },
   );
 
-  const tx = new Transaction();
-  for (const p of prelude) tx.add(p);
-  tx.add(ix);
+  const tx = new Transaction().add(ix);
 
   return {
     tx,
-    prelude,
     ix,
-    pdas: { strikeMarket, yesMint, noMint, usdcVault, config },
-    ataKeys: { userUsdc, userYes, userNo },
+    pdas: { strikeMarket, yesMint, noMint, usdcVault, config, tickerConfig },
   };
 }
 

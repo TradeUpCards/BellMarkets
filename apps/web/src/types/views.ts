@@ -173,23 +173,31 @@ export function formatUsdc(micros: bigint, decimals: number = 2): string {
  * Projection of the on-chain `TickerConfig` PDA per DR-005 / DR-006. Used by
  * the Markets-grid filter row, the strike picker, and the "wider strikes
  * available" earnings indicator (DR-011).
+ *
+ * Field names mirror the post-P5 IDL `TickerConfig` schema. Use the
+ * `TickerConfigVM` alias below in UI code per Tate's naming convention.
  */
 export interface TickerConfigView {
   /** Pyth feed pubkey — primary identity. */
   pythFeed: PublicKey;
   /** Current "cap_center" (post-close anchor; updated on AH/PM wild swings). */
   capCenter: bigint;
-  /** Strikes the program currently allows for user creation, in micros. */
+  /** Strikes the program currently allows for user creation, in i64 units. */
   allowedStrikes: bigint[];
+  /** Live count of populated entries in the fixed-16-slot allowed_strikes. */
+  strikeCount: number;
   /** Max % deviation from `capCenter` for `user_create_strike_market`. */
   maxDeviationBps: number;
-  /** `strike_tick_size` per DR-005 table — minimum strike granularity. */
+  /** Strike grid tick per DR-005 table — minimum strike granularity (i64 units). */
+  strikeTickSize: bigint;
+  /** AH/PM wild-swing trigger (per DR-006). */
   thresholdBps: number;
-  /** Last slot the config was touched. */
-  lastUpdatedSlot: bigint;
-  /** Which phase cron last wrote this. */
-  updatedByPhase: "anchor" | "ah-window" | "pm-window" | "manual";
+  /** Last unix-seconds the config was touched. */
+  lastUpdatedUnix: bigint;
 }
+
+/** Tate-naming alias — UI code should reference VM-suffixed types. */
+export type TickerConfigVM = TickerConfigView;
 
 // ─── DR-008: UserConfig view ──────────────────────────────────────────────
 
@@ -205,9 +213,12 @@ export interface UserConfigView {
   currentTier: 1 | 2 | 3;
   /** Default tier fee bps BEFORE creator rebate. */
   projectedFeeBps: number;
-  /** Approximate seconds until oldest volume rolls off the 30-day window. */
-  decayRemainingSecs: number;
+  /** Last linear-decay timestamp from on-chain — UI computes decay-remaining itself. */
+  lastDecayUnix: bigint;
 }
+
+/** Tate-naming alias. */
+export type UserConfigVM = UserConfigView;
 
 // ─── DR-010: Rewards pool view ────────────────────────────────────────────
 
@@ -249,6 +260,9 @@ export interface OpenOrderView {
   placeUnix: number | null;
 }
 
+/** Tate-naming alias. */
+export type OpenOrderVM = OpenOrderView;
+
 // ─── DR-010: Leaderboard entry view ───────────────────────────────────────
 
 /**
@@ -266,3 +280,6 @@ export interface LeaderboardEntryView {
   totalMarkets: number;
   prizeAmountMicros: bigint;
 }
+
+/** Tate-naming alias. */
+export type LeaderboardEntryVM = LeaderboardEntryView;

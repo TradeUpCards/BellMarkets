@@ -1,50 +1,23 @@
 "use client";
 
 import type { PublicKey } from "@solana/web3.js";
-import { useMemo } from "react";
-import type { UseQueryResult } from "@tanstack/react-query";
+import { useCallback, useMemo } from "react";
 
 import { useAccountSubscriptionOrNull } from "@/hooks/use-account-subscription";
 import { queryKeys } from "@/lib/queries/keys";
+import { decodeUserConfig } from "@/lib/solana/coder";
 import { feeBpsForTier, tierForVolume, type FeeTier } from "@/lib/fees";
+import { deriveMarketConfigPda } from "@/lib/solana/anchor";
 import { deriveUserConfigPda } from "@/lib/solana/pdas";
-
-/**
- * Decoded `UserConfig` shape per DR-008. Mirrors the on-chain fields once
- * Aria's IDL refresh lands; until then the placeholder decoder returns
- * `null` and consumers default to tier 1.
- */
-export interface UserConfigView {
-  user: PublicKey;
-  /** Rolling 30-day USDC volume in micros. */
-  mintVolume30dMicros: bigint;
-  /** Lifetime USDC mint volume in micros. */
-  mintVolumeLifetimeMicros: bigint;
-  /** Last slot the 30-day window was decayed. */
-  lastDecaySlot: bigint;
-  /** Tier derived from `mintVolume30dMicros`. */
-  tier: FeeTier;
-  /** Default tier-fee bps. Composes with creator-rebate at mint time. */
-  projectedFeeBps: number;
-  /** Approximate seconds until the 30-day window starts decaying old volume. */
-  decayRemainingSecs: number;
-}
-
-/**
- * Placeholder decoder — returns `null` until Aria's IDL refresh lands. The
- * subscription still wires the cache-update path; UI just shows "tier 1" as
- * a sensible default for users whose UserConfig PDA hasn't been initialized
- * (which is most users until their first mint_pair call).
- */
-function decodeUserConfigPlaceholder(_data: Buffer): UserConfigView | null {
-  return null;
-}
+import type { UserConfig } from "@/lib/solana/types";
 
 export interface UseUserConfigResult {
-  data: UserConfigView | null | undefined;
+  data: UserConfig | null | undefined;
   /** True when query is fetching or no data yet. */
   isLoading: boolean;
   error: Error | null;
+  /** PDA the hook subscribed to (useful for invalidation by other hooks). */
+  pda: PublicKey | null;
   /** Synthetic "default" view for users without a UserConfig PDA yet. */
   derived: {
     tier: FeeTier;
@@ -54,34 +27,45 @@ export interface UseUserConfigResult {
 }
 
 /**
- * Subscribe to a user's `UserConfig` PDA. Returns the decoded view + a
- * `derived` block that gives sensible defaults (tier 1, 200 bps, $0 30d
- * volume) when the PDA doesn't yet exist on chain.
+ * Subscribe to a user's `UserConfig` PDA. PDA seed per IDL =
+ * `[b"user", config, user]`. Returns the decoded view + a `derived` block
+ * that gives sensible defaults (tier 1, 200 bps, $0 30d volume) when the
+ * PDA doesn't yet exist on chain (which is most users until their first
+ * `mint_pair` call — `init_if_needed` creates it then).
  *
  * Hard YES #9 compliant — subscription-driven via `useAccountSubscriptionOrNull`.
  */
 export function useUserConfig(
   userPubkey: PublicKey | null,
 ): UseUserConfigResult {
+  const [config] = useMemo(() => deriveMarketConfigPda(), []);
+
   const pda = useMemo(
-    () => (userPubkey ? deriveUserConfigPda(userPubkey)[0] : null),
-    [userPubkey?.toBase58() ?? null], // eslint-disable-line react-hooks/exhaustive-deps
+    () => (userPubkey ? deriveUserConfigPda(config, userPubkey)[0] : null),
+    [config, userPubkey?.toBase58() ?? null], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
-  const query: UseQueryResult<UserConfigView | null> =
-    useAccountSubscriptionOrNull<UserConfigView | null>(
-      pda,
-      decodeUserConfigPlaceholder,
-      queryKeys.userConfig(userPubkey),
-    );
+  const decode = useCallback(
+    (data: Buffer): UserConfig => decodeUserConfig(data),
+    [],
+  );
 
-  const volumeMicros = query.data?.mintVolume30dMicros ?? 0n;
+  const query = useAccountSubscriptionOrNull<UserConfig>(
+    pda,
+    decode,
+    queryKeys.userConfig(userPubkey),
+  );
+
+  const volumeMicros = query.data
+    ? BigInt(query.data.mintVolume30d.toString())
+    : 0n;
   const tier = tierForVolume(volumeMicros);
 
   return {
     data: query.data,
     isLoading: query.isLoading,
     error: query.error ?? null,
+    pda,
     derived: {
       tier,
       projectedFeeBps: feeBpsForTier(tier),

@@ -54,6 +54,48 @@ export interface StrikeMarket {
   yesMintBump: number;
   noMintBump: number;
   vaultBump: number;
+  /** Set on user_create_strike_market — drives DR-008 creator rebate. */
+  creator: PublicKey;
+  /** Total Yes (and No) tokens outstanding — invariant: usdc_vault.amount == pairs_outstanding × $1. */
+  pairsOutstanding: BN;
+}
+
+/** Mirror of `programs/bell-markets/src/state.rs::FeeConfig` per DR-008. */
+export interface FeeConfig {
+  config: PublicKey;
+  mintFeeBps: number;
+  platformRetainBps: number;
+  weeklyPoolBps: number;
+  monthlyPoolBps: number;
+  creatorRebateBps: number;
+  forceRedeemGraceSecs: BN;
+  /** Top-10 weekly payout splits (bps; sums to 10000). */
+  weeklyDistributionBps: number[];
+  monthlyDistributionBps: number[];
+  bump: number;
+}
+
+/** Mirror of `UserConfig` per DR-008. */
+export interface UserConfig {
+  user: PublicKey;
+  mintVolume30d: BN;
+  mintVolumeLifetime: BN;
+  lastDecayUnix: BN;
+  bump: number;
+}
+
+/** Mirror of `TickerConfig` per DR-005 + DR-006. */
+export interface TickerConfig {
+  pythFeed: PublicKey;
+  capCenter: BN;
+  /** Fixed-size 16-slot array; only the first `strikeCount` entries are populated. */
+  allowedStrikes: BN[];
+  strikeCount: number;
+  maxUserStrikeDeviationBps: number;
+  strikeTickSize: BN;
+  thresholdBps: number;
+  lastUpdatedUnix: BN;
+  bump: number;
 }
 
 export interface StrikeMarketWithPda {

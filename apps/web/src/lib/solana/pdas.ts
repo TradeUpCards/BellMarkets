@@ -7,14 +7,15 @@ const YES_PREFIX = Buffer.from("yes");
 const NO_PREFIX = Buffer.from("no");
 const VAULT_PREFIX = Buffer.from("vault");
 const CONFIG_PREFIX = Buffer.from("config");
-// PROVISIONAL SEEDS — confirmed seeds will land with Aria's IDL refresh.
-// Per DR-005 / DR-008 / DR-010 these are the structurally-correct labels;
-// adjust to match Aria's final account-derive_account_keys at IDL pickup.
+// Seeds reconciled against the live 20-ix IDL (`apps/web/src/idl/bell_markets.json`).
+// Each label sourced from `instructions[].accounts[].pda.seeds` — see the IDL
+// JSON for byte-level evidence.
 const TICKER_PREFIX = Buffer.from("ticker");
-const USER_CONFIG_PREFIX = Buffer.from("user_config");
-const WEEKLY_REWARDS_PREFIX = Buffer.from("weekly_rewards");
-const MONTHLY_REWARDS_PREFIX = Buffer.from("monthly_rewards");
-const LEADERBOARD_PREFIX = Buffer.from("leaderboard");
+const USER_CONFIG_PREFIX = Buffer.from("user"); // not "user_config" — short seed per IDL
+const WEEKLY_POOL_PREFIX = Buffer.from("weekly_pool");
+const MONTHLY_POOL_PREFIX = Buffer.from("monthly_pool");
+const LEADERBOARD_PREFIX = Buffer.from("leaderboard_commits");
+const FEE_CONFIG_PREFIX = Buffer.from("fee_config");
 
 function bnLe(value: bigint, byteLength: number): Buffer {
   const buf = Buffer.alloc(byteLength);
@@ -87,37 +88,58 @@ export function deriveTickerConfigPda(
 }
 
 /**
- * `UserConfig` PDA per wallet (DR-008). Holds `mint_volume_30d`,
- * `mint_volume_lifetime`, last-decay timestamps. `init_if_needed` from
- * `mint_pair`; ~$0.16 user-paid rent on first mint.
+ * `UserConfig` PDA per (config, user). Seeds `[b"user", config, user]` per
+ * IDL — the config PDA IS part of the seed (binds the user-config to the
+ * specific MarketConfig). Holds `mint_volume_30d`, `mint_volume_lifetime`,
+ * `last_decay_unix`. `init_if_needed` from `mint_pair`; ~$0.16 user-paid
+ * rent on first mint.
  */
-export function deriveUserConfigPda(user: PublicKey): [PublicKey, number] {
+export function deriveUserConfigPda(
+  config: PublicKey,
+  user: PublicKey,
+): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
-    [USER_CONFIG_PREFIX, user.toBuffer()],
+    [USER_CONFIG_PREFIX, config.toBuffer(), user.toBuffer()],
     BELL_MARKETS_PROGRAM_PUBKEY,
   );
 }
 
-/** `WeeklyRewardsPool` (USDC token account, owned by program PDA) per DR-010. */
-export function deriveWeeklyRewardsPoolPda(): [PublicKey, number] {
+/**
+ * `WeeklyPool` PDA per DR-010. Seed `[b"weekly_pool"]`. The PDA IS a USDC
+ * token account owned by the program — `weekly_pool_bps` of every `mint_pair`
+ * fee flows here; drained by `distribute_weekly_rewards`.
+ */
+export function deriveWeeklyPoolPda(): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
-    [WEEKLY_REWARDS_PREFIX],
+    [WEEKLY_POOL_PREFIX],
     BELL_MARKETS_PROGRAM_PUBKEY,
   );
 }
 
-/** `MonthlyRewardsPool` per DR-010. */
-export function deriveMonthlyRewardsPoolPda(): [PublicKey, number] {
+/** `MonthlyPool` PDA per DR-010. Seed `[b"monthly_pool"]`. */
+export function deriveMonthlyPoolPda(): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
-    [MONTHLY_REWARDS_PREFIX],
+    [MONTHLY_POOL_PREFIX],
     BELL_MARKETS_PROGRAM_PUBKEY,
   );
 }
 
-/** `LeaderboardCommitments` PDA per DR-010 §"Option B (Merkle commitment)". */
+/**
+ * `LeaderboardCommitments` PDA per DR-010 §"Option B Merkle commitment".
+ * Seed `[b"leaderboard_commits"]` — note the trailing 's' / underscore vs
+ * the more obvious `"leaderboard"`. Sourced from IDL `account_keys`.
+ */
 export function deriveLeaderboardCommitmentsPda(): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [LEADERBOARD_PREFIX],
+    BELL_MARKETS_PROGRAM_PUBKEY,
+  );
+}
+
+/** `FeeConfig` global singleton per DR-008. Seed `[b"fee_config"]`. */
+export function deriveFeeConfigPda(): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [FEE_CONFIG_PREFIX],
     BELL_MARKETS_PROGRAM_PUBKEY,
   );
 }
