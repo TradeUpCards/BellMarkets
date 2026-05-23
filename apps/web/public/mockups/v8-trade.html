@@ -1238,6 +1238,90 @@
     color: var(--accent-fg);
   }
 
+  /* ===== Trade form compressions (Cory feedback: less vertical space) ===== */
+  /* Order type tabs — match wallet-connect button style for active state */
+  .order-type-btn.active {
+    background: var(--accent-gradient);
+    color: var(--accent-fg);
+    box-shadow: 0 2px 8px var(--accent-glow);
+  }
+  /* Visibility based on order type */
+  .trade-form[data-order-type="market"] .limit-only,
+  .trade-form[data-order-type="market"] .limit-price-field { display: none; }
+  .trade-form[data-order-type="limit"] .market-only { display: none; }
+
+  /* Limit price meta line */
+  .limit-meta {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 6px;
+    padding: 6px 8px;
+    background: var(--panel-2);
+    border-radius: 3px;
+    text-align: center;
+  }
+  .limit-meta strong { color: var(--accent); }
+
+  /* Submit button — gradient matching .connect-btn (Cory feedback: same style as wallet) */
+  .submit-btn.primary-cta {
+    width: 100%; padding: 14px;
+    background: var(--accent-gradient);
+    color: var(--accent-fg);
+    border: none;
+    border-radius: 6px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 700;
+    font-size: 13px; letter-spacing: 1px;
+    text-transform: uppercase;
+    cursor: pointer;
+    min-height: 48px;
+    transition: all 150ms;
+    box-shadow: 0 2px 12px var(--accent-glow);
+  }
+  .submit-btn.primary-cta:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px var(--accent-glow);
+  }
+
+  /* Collapsible Order details below button (default closed) */
+  .trade-summary-wrap {
+    margin-top: 10px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+  }
+  .trade-summary-wrap > summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 8px 12px;
+    display: flex; align-items: center; justify-content: space-between;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--text-muted);
+    transition: background 100ms;
+  }
+  .trade-summary-wrap > summary::-webkit-details-marker { display: none; }
+  .trade-summary-wrap > summary:hover { background: var(--row-hover); color: var(--text); }
+  .ts-toggle-text { flex: 1; }
+  .ts-chevron {
+    font-size: 11px;
+    transition: transform 150ms;
+    transform: rotate(-90deg);
+  }
+  .trade-summary-wrap[open] > summary .ts-chevron { transform: rotate(0deg); }
+  .trade-summary-wrap[open] > summary {
+    border-bottom: 1px solid var(--border);
+    color: var(--text-strong);
+  }
+  /* Restyle trade-summary inside the wrap (no nested borders) */
+  .trade-summary-wrap .trade-summary {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    margin: 0;
+    padding: 8px 12px 10px;
+  }
+
   /* ===== Position+Settlement merged card subsection divider ===== */
   .info-card-subsection {
     border-top: 1px solid var(--border);
@@ -2485,10 +2569,10 @@
               <span class="sub">48% implied <span class="tip" title="Contract price $0.48 implies 48% market probability that META closes &lt; $680 at 4 PM ET.">?</span></span>
             </button>
           </div>
-          <div class="trade-form">
+          <div class="trade-form" data-order-type="market">
             <div class="order-type-row">
-              <button class="order-type-btn active">Market</button>
-              <button class="order-type-btn">Limit</button>
+              <button class="order-type-btn active" data-order="market">Market</button>
+              <button class="order-type-btn" data-order="limit">Limit</button>
             </div>
             <div class="field">
               <div class="field-label">
@@ -2506,7 +2590,30 @@
                 <button class="quick-amount">MAX</button>
               </div>
             </div>
-            <div class="slip-row">
+
+            <!-- LIMIT PRICE — shows only when Limit tab selected -->
+            <div class="field limit-price-field" hidden>
+              <div class="field-label">
+                <span>Limit price (YES)</span>
+                <span class="available">market $0.520</span>
+              </div>
+              <div class="input-wrap">
+                <input value="0.500" placeholder="0.000" step="0.005" min="0.01" max="0.99">
+                <span class="suffix">USDC</span>
+              </div>
+              <div class="quick-amounts">
+                <button class="quick-amount">market</button>
+                <button class="quick-amount">−1¢</button>
+                <button class="quick-amount">−2¢</button>
+                <button class="quick-amount">−5¢</button>
+              </div>
+              <div class="limit-meta mono">
+                ↓ 4% below market · est. fill <strong>15-30s</strong> if price drops
+              </div>
+            </div>
+
+            <!-- SLIPPAGE — Market only (limit orders don't need slippage) -->
+            <div class="slip-row market-only">
               <div class="slip-head">
                 <span>Slippage tolerance</span>
                 <span class="computed">0.50% · max $0.523</span>
@@ -2520,45 +2627,61 @@
                   <span class="slip-custom-suffix">%</span>
                 </div>
               </div>
-              <!-- Warning shown when slippage > 2% (active example) -->
               <div class="slip-warning" hidden>
                 <span aria-hidden="true">⚠</span>
                 <span><strong>High slippage tolerance</strong> — you may overpay by up to <span class="slip-overpay">$5.20</span>. Front-running risk increases above 5%.</span>
               </div>
             </div>
 
-            <!-- CHERRY-PICKED from v8-alt: row-by-row trade summary
-                 Mobile hides Avg./Fee/Slippage rows to fit above the fold;
-                 desktop shows everything. hide-mobile is the marker class. -->
-            <div class="trade-summary">
-              <div class="summary-row hide-mobile">
-                <span>Avg. price</span>
-                <span class="v">$0.520</span>
+            <!-- LIMIT EXPIRY — Limit only -->
+            <div class="field limit-only" hidden>
+              <div class="field-label">
+                <span>Order expires</span>
               </div>
-              <div class="summary-row">
-                <span>Cost</span>
-                <span class="v">$104.00</span>
-              </div>
-              <div class="summary-row fee hide-mobile">
-                <span>Fee (Tier-1 · 2.00%)</span>
-                <span class="v">+$2.08</span>
-              </div>
-              <div class="summary-row hide-mobile">
-                <span>Slippage est.</span>
-                <span class="v">+$1.20</span>
-              </div>
-              <div class="summary-divider"></div>
-              <div class="summary-row payout">
-                <span>Max payout if YES</span>
-                <span class="v">$200.00</span>
-              </div>
-              <div class="summary-row profit">
-                <span>Net profit if won</span>
-                <span class="v">+$92.72</span>
+              <div class="quick-amounts" style="grid-template-columns: repeat(4, 1fr);">
+                <button class="quick-amount">1h</button>
+                <button class="quick-amount active">until close</button>
+                <button class="quick-amount">GTC</button>
+                <button class="quick-amount">custom</button>
               </div>
             </div>
 
-            <button class="submit-btn yes">BUY 200 YES @ $0.520 · $107.28 TOTAL</button>
+            <button class="submit-btn primary-cta">BUY 200 YES @ $0.520 · $107.28 TOTAL</button>
+
+            <!-- Trade summary — collapsible, default closed, sits BELOW button (Cory feedback) -->
+            <details class="trade-summary-wrap">
+              <summary class="trade-summary-toggle">
+                <span class="ts-toggle-text">Order details · Cost $107.28 · Max payout $200.00</span>
+                <span class="ts-chevron" aria-hidden="true">▾</span>
+              </summary>
+              <div class="trade-summary">
+                <div class="summary-row">
+                  <span>Avg. price</span>
+                  <span class="v">$0.520</span>
+                </div>
+                <div class="summary-row">
+                  <span>Cost</span>
+                  <span class="v">$104.00</span>
+                </div>
+                <div class="summary-row fee">
+                  <span>Fee (Tier-1 · 2.00%)</span>
+                  <span class="v">+$2.08</span>
+                </div>
+                <div class="summary-row">
+                  <span>Slippage est.</span>
+                  <span class="v">+$1.20</span>
+                </div>
+                <div class="summary-divider"></div>
+                <div class="summary-row payout">
+                  <span>Max payout if YES</span>
+                  <span class="v">$200.00</span>
+                </div>
+                <div class="summary-row profit">
+                  <span>Net profit if won</span>
+                  <span class="v">+$92.72</span>
+                </div>
+              </div>
+            </details>
           </div>
         </div>
 
@@ -2684,6 +2807,20 @@
   }
   (function() {
     try { const s = localStorage.getItem('bm-theme'); if (s === 'light') document.documentElement.setAttribute('data-theme', 'light'); } catch (e) {}
+  })();
+
+  // Market / Limit order-type toggle
+  (function() {
+    const form = document.querySelector('.trade-form');
+    if (!form) return;
+    const buttons = form.querySelectorAll('.order-type-btn');
+    buttons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        buttons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        form.dataset.orderType = btn.dataset.order;
+      });
+    });
   })();
 
   // Orders / Trades tabs (in info-grid-2 right card)
