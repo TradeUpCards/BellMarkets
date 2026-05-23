@@ -466,9 +466,11 @@ fee × monthly_pool_bps / 10_000     → monthly_rewards_pool PDA
 - `MonthlyRewardsPool` — Same for monthly.
 - Each pool ~$0.23 one-time rent (paid by platform at deploy).
 
-**Leaderboard (off-chain, by Helius indexer):**
+**Leaderboard (off-chain, by Helius indexer + Neon Postgres):**
 - Bram's automation listens to `settle_market` events via Helius webhooks
-- Per-user streak state stored in Postgres or simple JSON
+- Per-user streak state stored in **Neon Postgres** (serverless Postgres, free tier 256MB sufficient for ~18-24 months of MVP; paid $19/mo for 1GB beyond)
+- Schema: user_streaks, settle_events, user_market_holds, leaderboard_snapshots, distributions
+- Total per-year storage at MAG7 scale: ~130MB
 - Win = user held winning side (any amount > 0) at settle time
 - Loss = user held losing side at settle (resets streak to 0)
 - Abstained = user held nothing at settle (doesn't reset, doesn't extend)
