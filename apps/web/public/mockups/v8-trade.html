@@ -945,6 +945,169 @@
   ::-webkit-scrollbar-thumb { background: var(--panel-3); border-radius: 4px; border: 1px solid var(--bg); }
   ::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
 
+  /* ===== Position+Settlement merged card subsection divider ===== */
+  .info-card-subsection {
+    border-top: 1px solid var(--border);
+    background: linear-gradient(180deg, var(--panel-2) 0%, transparent 100%);
+  }
+  .info-card-subsection-h {
+    padding: 10px 16px 6px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .info-card-subsection-h .subsection-title {
+    font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+    text-transform: uppercase; letter-spacing: 1.5px;
+    font-weight: 700; color: var(--text-strong);
+  }
+  .info-card-subsection-h .subsection-meta {
+    font-size: 9px; color: var(--text-muted);
+  }
+
+  /* ===== COMPACT MARKET HEADER (Cory 2026-05-23 feedback): strike pills inline ===== */
+  .strike-pills-inline {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex: 1;
+    justify-content: center;
+    max-width: 720px;
+    overflow-x: auto;
+    padding: 0 12px;
+  }
+  .strike-pills-inline::-webkit-scrollbar { height: 0; }
+  .strike-pills-inline .strike-pill { flex-shrink: 0; }
+  /* Strike dropdown — only shown on small screens (replaces inline pills) */
+  .strike-dropdown {
+    display: none;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text-strong);
+    padding: 10px 14px;
+    border-radius: 6px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    min-height: 44px;
+    cursor: pointer;
+    flex: 1;
+  }
+  .strike-dropdown:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-glow); }
+
+  /* ===== PRO CTA BANNER (Cory feedback: high on page) ===== */
+  .pro-cta-banner {
+    background: linear-gradient(90deg, rgba(34, 211, 238, 0.10) 0%, rgba(244, 114, 182, 0.06) 100%);
+    border-top: 1px solid rgba(34, 211, 238, 0.30);
+    border-bottom: 1px solid rgba(34, 211, 238, 0.30);
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    position: relative;
+    overflow: hidden;
+  }
+  .pro-cta-banner::before {
+    content: ""; position: absolute; top: -40px; right: 200px;
+    width: 160px; height: 160px;
+    background: radial-gradient(circle, rgba(34, 211, 238, 0.18), transparent 60%);
+    pointer-events: none;
+  }
+  .pro-cta-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex: 1;
+    min-width: 0;
+  }
+  .pro-cta-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: var(--accent-bg-strong);
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 1.2px; text-transform: uppercase;
+    flex-shrink: 0;
+  }
+  .pro-cta-text {
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 13px;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .pro-cta-btn {
+    flex-shrink: 0;
+    font-size: 11px !important;
+    padding: 8px 14px !important;
+    min-height: 38px !important;
+  }
+
+  /* ===== LEADERBOARD + CONTESTS in left rail (Cory feedback: under My Positions) ===== */
+  .rail-lb-row {
+    display: grid;
+    grid-template-columns: 20px 1fr auto;
+    gap: 8px;
+    align-items: center;
+    padding: 6px 4px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    border-bottom: 1px solid var(--border);
+  }
+  .rail-lb-row:last-child { border-bottom: none; }
+  .rail-lb-row .rank {
+    font-weight: 700;
+    color: var(--text-strong);
+    font-size: 10px;
+  }
+  .rail-lb-row .rank.gold { color: var(--amber); }
+  .rail-lb-row .rank.silver { color: #d4d4d4; }
+  .rail-lb-row .rank.bronze { color: #d97706; }
+  .rail-lb-row .name {
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 11px;
+  }
+  .rail-lb-row .pnl {
+    color: var(--yes);
+    font-weight: 700;
+    font-size: 10px;
+  }
+  .rail-contest {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 8px 10px;
+    margin-bottom: 6px;
+  }
+  .rail-contest:last-child { margin-bottom: 0; }
+  .rail-contest-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--text-strong);
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .rail-contest-pool {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--amber);
+    font-weight: 700;
+  }
+  .rail-contest-meta {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    color: var(--text-muted);
+    margin-top: 2px;
+    display: flex;
+    justify-content: space-between;
+  }
+
   /* ===== CHERRY-PICKED FROM v8-alt (Cory 2026-05-23): top-right buttons ===== */
   .icon-btn {
     width: 40px; height: 40px;
@@ -1192,12 +1355,20 @@
     /* Stats grid: hide on mobile — info is in chart card */
     .market-stats { display: none; }
 
-    /* Strike pills row stays scrollable, compact */
+    /* Strike pills inline — hide on mobile; strike dropdown shows instead */
+    .strike-pills-inline { display: none; }
+    .strike-dropdown { display: block; width: 100%; margin-top: 6px; }
+    /* Old separate strike-row no longer exists, but keep CSS in case any HTML still references */
     .strike-row { padding: 8px 14px; gap: 6px; }
     .strike-pill { min-width: 60px; padding: 6px 8px; min-height: 44px; }
     .strike-pill .px { font-size: 10px; }
     .strike-pill .prob { font-size: 12px; }
     .strike-row-label { font-size: 8px; }
+    /* Compact Pro CTA banner on mobile — vertical stack */
+    .pro-cta-banner { padding: 10px 14px; flex-direction: column; align-items: stretch; gap: 8px; }
+    .pro-cta-left { flex-direction: column; align-items: flex-start; gap: 6px; }
+    .pro-cta-text { white-space: normal; font-size: 12px; line-height: 1.4; }
+    .pro-cta-btn { width: 100%; }
 
     /* =========================================================================
        REORDER trade-grid: trade + chart above the fold, everything else below.
@@ -1263,8 +1434,11 @@
     .order-row-trade { padding: 8px 14px; }
     .order-detail-text { font-size: 11px; }
 
-    /* Info-grid-2 (position + settlement) single column below fold */
+    /* Info-grid-2 stacks on mobile + reorder so Open Orders comes BEFORE
+       Position+Settlement (Open Orders is higher-action, deserves top placement) */
     .info-grid-2 { grid-template-columns: 1fr; }
+    .info-grid-2 .open-orders-card { order: 1; }
+    .info-grid-2 > .info-card:not(.open-orders-card) { order: 2; }
     .info-rows-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
 
     /* Buttons — touch targets ≥44pt */
@@ -1339,43 +1513,50 @@
       <div>
         <div class="market-id-title">META <span class="gt">&gt;</span> $680</div>
         <div class="market-id-sub">
-          <span class="chip">close today</span>
           <span class="chip live">live</span>
-          <span class="chip">9q5S…rVBN</span>
-          <span>expires 4:00 PM ET</span>
+          <span class="chip">expires 4 PM ET</span>
         </div>
       </div>
     </div>
+    <!-- Strike pills moved INLINE with market header (Cory feedback: save vertical space) -->
+    <div class="strike-pills-inline">
+      <button class="strike-pill itm"><span class="px">$620</span><span class="prob">92%</span></button>
+      <button class="strike-pill itm"><span class="px">$640</span><span class="prob">84%</span></button>
+      <button class="strike-pill itm"><span class="px">$660</span><span class="prob">71%</span></button>
+      <button class="strike-pill active"><span class="px">$680</span><span class="prob">50%</span></button>
+      <button class="strike-pill otm"><span class="px">$700</span><span class="prob">28%</span></button>
+      <button class="strike-pill otm"><span class="px">$720</span><span class="prob">14%</span></button>
+      <button class="strike-pill otm"><span class="px">$740</span><span class="prob">6%</span></button>
+    </div>
+    <!-- Strike dropdown for small screens (replaces inline pills via CSS) -->
+    <select class="strike-dropdown" aria-label="Select strike">
+      <option>$620 · 92% YES</option>
+      <option>$640 · 84% YES</option>
+      <option>$660 · 71% YES</option>
+      <option selected>$680 · 50% YES (ATM)</option>
+      <option>$700 · 28% YES</option>
+      <option>$720 · 14% YES</option>
+      <option>$740 · 6% YES</option>
+    </select>
     <div class="market-controls">
       <button class="ctrl-btn">← AAPL</button>
       <button class="ctrl-btn">⌕ Browse <kbd>⌘K</kbd></button>
       <button class="ctrl-btn">NVDA →</button>
-      <button class="ctrl-btn">★ Watch</button>
+      <button class="ctrl-btn">★</button>
     </div>
   </div>
-
-  <div class="market-stats">
-    <div class="market-stat"><span class="lbl">Spot</span><span class="val mono">$679.84</span></div>
-    <div class="market-stat"><span class="lbl">24h chg</span><span class="val up mono">+0.32%</span></div>
-    <div class="market-stat"><span class="lbl">YES px</span><span class="val accent mono">$0.520</span></div>
-    <div class="market-stat"><span class="lbl">NO px</span><span class="val mono" style="color: var(--no);">$0.480</span></div>
-    <div class="market-stat"><span class="lbl">Implied</span><span class="val accent mono">52%</span></div>
-    <div class="market-stat"><span class="lbl">Vol 24h</span><span class="val mono">$42,184</span></div>
-    <div class="market-stat"><span class="lbl">OI</span><span class="val mono">8,420</span></div>
-    <div class="market-stat"><span class="lbl">Settles in</span><span class="val amber mono">02:13:47</span></div>
-  </div>
+  <!-- 8-stat grid REMOVED — those stats already live in the chart card's quick-stats row -->
 </div>
 
-<!-- Strike pills -->
-<div class="strike-row">
-  <span class="strike-row-label">Strikes</span>
-  <button class="strike-pill itm"><span class="px">$620</span><span class="prob">92%</span></button>
-  <button class="strike-pill itm"><span class="px">$640</span><span class="prob">84%</span></button>
-  <button class="strike-pill itm"><span class="px">$660</span><span class="prob">71%</span></button>
-  <button class="strike-pill active"><span class="px">$680</span><span class="prob">50%</span></button>
-  <button class="strike-pill otm"><span class="px">$700</span><span class="prob">28%</span></button>
-  <button class="strike-pill otm"><span class="px">$720</span><span class="prob">14%</span></button>
-  <button class="strike-pill otm"><span class="px">$740</span><span class="prob">6%</span></button>
+<!-- Pro CTA banner (Cory feedback: high on page) -->
+<div class="pro-cta-banner">
+  <div class="pro-cta-left">
+    <span class="pro-cta-badge"><span aria-hidden="true">✦</span> BELL PRO</span>
+    <span class="pro-cta-text">
+      AI briefings on all 7 MAG7 tickers · per-position PNL digests · earnings-week analysis
+    </span>
+  </div>
+  <button class="pro-cta-btn btn-primary">UNLOCK · 9 USDC/mo →</button>
 </div>
 
 <div class="layout">
@@ -1429,6 +1610,58 @@
       <div class="rail-position">
         <div><span class="rail-position-market">AAPL.230.YES</span><br><span class="rail-position-side">8 · entry $0.42</span></div>
         <span class="rail-position-pnl up">+$2.80</span>
+      </div>
+    </div>
+
+    <!-- LEADERBOARD preview (Cory feedback 2026-05-23: left rail under My Positions on desktop) -->
+    <div class="rail-section">
+      <div class="rail-section-h" style="display: flex; justify-content: space-between; align-items: baseline;">
+        <span>🏆 Weekly leaders</span>
+        <a href="#" style="color: var(--accent); font-size: 9px; text-transform: uppercase;">all →</a>
+      </div>
+      <div class="rail-lb-row">
+        <span class="rank gold">#1</span>
+        <span class="name">degen.sol</span>
+        <span class="pnl">+$2,847</span>
+      </div>
+      <div class="rail-lb-row">
+        <span class="rank silver">#2</span>
+        <span class="name">maxprob.eth</span>
+        <span class="pnl">+$2,103</span>
+      </div>
+      <div class="rail-lb-row">
+        <span class="rank bronze">#3</span>
+        <span class="name">quantfox</span>
+        <span class="pnl">+$1,876</span>
+      </div>
+      <div class="rail-lb-row" style="background: rgba(34, 211, 238, 0.05);">
+        <span class="rank" style="color: var(--accent);">#5</span>
+        <span class="name" style="color: var(--accent);">you</span>
+        <span class="pnl">+$1,247</span>
+      </div>
+    </div>
+
+    <!-- CONTESTS preview (Cory feedback: left rail with Leaderboard) -->
+    <div class="rail-section">
+      <div class="rail-section-h" style="display: flex; justify-content: space-between; align-items: baseline;">
+        <span>⚡ Contests · 3 active</span>
+        <a href="#" style="color: var(--accent); font-size: 9px; text-transform: uppercase;">all →</a>
+      </div>
+      <div class="rail-contest">
+        <div class="rail-contest-title">NVDA Earnings · 3d left</div>
+        <div class="rail-contest-pool mono">$3,400 pool</div>
+        <div class="rail-contest-meta">
+          <span>187 entries</span>
+          <span>join →</span>
+        </div>
+      </div>
+      <div class="rail-contest">
+        <div class="rail-contest-title">May Top-10 · 8d left</div>
+        <div class="rail-contest-pool mono">$12,500 pool</div>
+        <div class="rail-contest-meta">
+          <span>you · #5</span>
+          <span>view →</span>
+        </div>
       </div>
     </div>
   </aside>
@@ -1509,9 +1742,12 @@
           </div>
         </div>
 
-        <!-- Position + Settlement -->
+        <!-- 2-col below chart: [Your Position + Settlement merged] | [Open Orders]
+             (Cory feedback: Settlement combines with Your Position; Open Orders
+             moves here from the right column) -->
         <div class="info-grid-2">
 
+          <!-- LEFT: Your Position + Settlement merged into one card -->
           <div class="info-card">
             <div class="info-card-h">
               <h3>Your position</h3>
@@ -1535,44 +1771,71 @@
                 <div class="pos-stat"><div class="lbl">If YES loses</div><div class="val" style="color: var(--no);">$0.00</div></div>
               </div>
             </div>
+            <!-- Settlement scenarios merged into same card -->
+            <div class="info-card-subsection">
+              <div class="info-card-subsection-h">
+                <span class="subsection-title">Settlement preview · 3 scenarios</span>
+                <span class="subsection-meta mono">vs current pos</span>
+              </div>
+              <div class="settle-body">
+                <div class="scenario exit">
+                  <div class="scenario-h">
+                    <span class="scenario-title"><span class="dot"></span>Exit now (sell on Phoenix)</span>
+                    <span class="scenario-prob">market price</span>
+                  </div>
+                  <div class="scenario-detail">
+                    <span class="scenario-action mono">sell 5 YES @ $0.500 bid</span>
+                    <span class="scenario-pnl down mono">−$0.60</span>
+                  </div>
+                </div>
+                <div class="scenario hold-win">
+                  <div class="scenario-h">
+                    <span class="scenario-title"><span class="dot"></span>Hold to settle · YES wins</span>
+                    <span class="scenario-prob">52% prob</span>
+                  </div>
+                  <div class="scenario-detail">
+                    <span class="scenario-action mono">META ≥ $680 at 4:00 PM</span>
+                    <span class="scenario-pnl up mono">+$1.90</span>
+                  </div>
+                </div>
+                <div class="scenario hold-lose">
+                  <div class="scenario-h">
+                    <span class="scenario-title"><span class="dot"></span>Hold to settle · YES loses</span>
+                    <span class="scenario-prob">48% prob</span>
+                  </div>
+                  <div class="scenario-detail">
+                    <span class="scenario-action mono">META &lt; $680 at 4:00 PM</span>
+                    <span class="scenario-pnl down mono">−$3.10</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div class="info-card">
+          <!-- RIGHT: Open Orders (moved here from the right column) -->
+          <div class="info-card open-orders-card">
             <div class="info-card-h">
-              <h3>Settlement preview · 3 scenarios</h3>
-              <span style="font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--text-muted);">vs current pos</span>
+              <h3>Open orders</h3>
+              <span class="live-badge">2 active</span>
             </div>
-            <div class="settle-body">
-              <div class="scenario exit">
-                <div class="scenario-h">
-                  <span class="scenario-title"><span class="dot"></span>Exit now (sell on Phoenix)</span>
-                  <span class="scenario-prob">market price</span>
-                </div>
-                <div class="scenario-detail">
-                  <span class="scenario-action mono">sell 5 YES @ $0.500 bid</span>
-                  <span class="scenario-pnl down mono">−$0.60</span>
-                </div>
-              </div>
-              <div class="scenario hold-win">
-                <div class="scenario-h">
-                  <span class="scenario-title"><span class="dot"></span>Hold to settle · YES wins</span>
-                  <span class="scenario-prob">52% prob</span>
-                </div>
-                <div class="scenario-detail">
-                  <span class="scenario-action mono">META ≥ $680 at 4:00 PM</span>
-                  <span class="scenario-pnl up mono">+$1.90</span>
-                </div>
-              </div>
-              <div class="scenario hold-lose">
-                <div class="scenario-h">
-                  <span class="scenario-title"><span class="dot"></span>Hold to settle · YES loses</span>
-                  <span class="scenario-prob">48% prob</span>
-                </div>
-                <div class="scenario-detail">
-                  <span class="scenario-action mono">META &lt; $680 at 4:00 PM</span>
-                  <span class="scenario-pnl down mono">−$3.10</span>
-                </div>
-              </div>
+            <div class="order-row-trade">
+              <span class="order-side-tag yes">YES</span>
+              <span class="order-detail-text">
+                META.680 · 50 @ <span class="px">$0.55</span><br>
+                <span class="fill-state">30/50 filled · 4m ago</span>
+              </span>
+              <button class="cancel-btn">CANCEL</button>
+            </div>
+            <div class="order-row-trade">
+              <span class="order-side-tag no">NO</span>
+              <span class="order-detail-text">
+                AAPL.230 · 100 @ <span class="px">$0.20</span><br>
+                <span class="fill-state">pending · 12m ago</span>
+              </span>
+              <button class="cancel-btn">CANCEL</button>
+            </div>
+            <div style="padding: 10px 16px; text-align: center; border-top: 1px solid var(--border);">
+              <a href="#" style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--accent); text-transform: uppercase; letter-spacing: 0.5px;">View all orders →</a>
             </div>
           </div>
 
@@ -1693,29 +1956,7 @@
           </div>
         </div>
 
-        <!-- CHERRY-PICKED from v8-alt: Open Orders panel -->
-        <div class="open-orders-card">
-          <div class="ob-h" style="border-bottom: 1px solid var(--border);">
-            <h3>Open Orders (2)</h3>
-            <a href="#" style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--accent); text-transform: uppercase; letter-spacing: 0.5px;">VIEW ALL →</a>
-          </div>
-          <div class="order-row-trade">
-            <span class="order-side-tag yes">YES</span>
-            <span class="order-detail-text">
-              META.680 · 50 @ <span class="px">$0.55</span><br>
-              <span class="fill-state">30/50 filled · 4m ago</span>
-            </span>
-            <button class="cancel-btn">CANCEL</button>
-          </div>
-          <div class="order-row-trade">
-            <span class="order-side-tag no">NO</span>
-            <span class="order-detail-text">
-              AAPL.230 · 100 @ <span class="px">$0.20</span><br>
-              <span class="fill-state">pending · 12m ago</span>
-            </span>
-            <button class="cancel-btn">CANCEL</button>
-          </div>
-        </div>
+        <!-- Open Orders moved to info-grid-2 next to Your Position (Cory feedback 2026-05-23) -->
 
         <!-- Order book -->
         <div class="ob-card">
