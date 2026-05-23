@@ -12,6 +12,101 @@ This page documents how we prove that claim under demo conditions.
 
 ---
 
+## What still works when our cron dies (per DR-005/006/009/010 architecture)
+
+A reviewer's natural follow-up: "OK, settle still works — but doesn't the rest of the system break?" The Day-5 architectural revisions tighten this story. Every system component is independent of Bram's cron:
+
+| Component | Depends on Bram's cron? | What happens if cron dies |
+|---|---|---|
+| `settle_market` (DR-002) | No — permissionless | Any user keypair cranks it; on-chain rules unchanged |
+| Strike creation (DR-005) | **No** — user-funded | New strikes spawn when users pay rent; no cron involvement |
+| Strike-grid evolution (DR-006) | Yes, but reactive — next 30-min interval | Cron dying mid-cycle means stale `TickerConfig` until next fire; users can still trade existing strikes; no loss of funds |
+| Trading calendar (DR-007) | Only for cron entry-point gating | Calendar lookup is local code; doesn't need network/cron health |
+| Fee model (DR-008) | No — on-chain in `mint_pair` | Fee math + split happens inside the Anchor program; treasury + pool transfers atomic with mint |
+| Phoenix v1 CLOB (DR-009) | No — independent Solana program | Order book accepts orders regardless of our service health |
+| Pyth oracle (DR-003) | No — independent Pyth Network publishers | Price feed updates continue; `settle_market` can read freshly |
+| Win-streak indexer (DR-010) | **No** — Helius webhook + Neon Postgres | Helius pushes settle events to Neon; leaderboard updates regardless of our service health |
+| Merkle distribution (DR-010) | Admin-signed; cron is convenience | Admin can sign distributions from anywhere with the keypair |
+| Earnings pre-expansion (DR-011) | Yes, but additive to DR-006 | If pre-expansion misses, DR-006 reactive widening catches it within 30 min |
+
+The single non-redundant dependency is **Bram's morning cron writing `TickerConfig` updates** — and even that's not load-bearing for the demo (existing markets are tradeable regardless of whether new strike caps are expanded for the next day). The protocol's working state is fully owned by the on-chain program + Pyth + Helius + Phoenix, none of which we operate.
+
+### Sequence diagram — happy path (cron alive, normal day)
+
+```mermaid
+sequenceDiagram
+    participant U as User wallet
+    participant W as Web frontend (Cleo)
+    participant P as Anchor program
+    participant Ph as Phoenix v1 CLOB
+    participant Py as Pyth Hermes
+    participant C as Bram cron
+    participant He as Helius webhook
+    participant N as Neon indexer
+
+    U->>W: Open Trade page
+    W->>P: getMarketConfig + getStrikeMarket (RPC read)
+    U->>W: Mint pair $100
+    W->>P: mint_pair(100 USDC + 2 fee)
+    P->>P: split fee 50/25/25 (DR-010)
+    P-->>U: +100 YES + 100 NO tokens
+
+    Note over C: 4:05 PM ET tick
+    C->>P: settle_market (admin signer)
+    P->>Py: read SOL/USD price
+    P-->>P: write outcome immutable
+    P-->>He: settle_market event
+    He->>N: webhook (settle event)
+    N->>N: update user_streaks
+
+    U->>W: Redeem $100 YES
+    W->>P: redeem(100)
+    P-->>U: +100 USDC
+```
+
+### Sequence diagram — cron-failure path
+
+```mermaid
+sequenceDiagram
+    participant U as User wallet
+    participant W as Web frontend (Cleo)
+    participant P as Anchor program
+    participant Py as Pyth Hermes
+    participant C as Bram cron
+    participant He as Helius webhook
+    participant N as Neon indexer
+
+    Note over C: 4:05 PM ET tick<br/>SERVICE DIED
+
+    U->>W: Notices market is past-expiry but unsettled
+    W->>P: getStrikeMarket — outcome = Unsettled
+    U->>W: "Settle market" button (user-cranked path)
+    W->>P: settle_market(settler=USER)
+    P->>P: check NotAdmin? NO — settler is fee payer only
+    P->>P: check NotExpired? PASS — block_time > expiry
+    P->>Py: read SOL/USD price
+    Py-->>P: fresh price + confidence
+    P->>P: check PythStale? PASS
+    P->>P: check PythConfidenceTooWide? PASS
+    P-->>P: write outcome immutable (settle_price=$285, outcome=Yes)
+    P-->>He: settle_market event (Helius indexes EVERY event,<br/>not just admin-signed ones)
+    He->>N: webhook (settle event)
+    N->>N: update user_streaks for ALL holders
+
+    U->>W: Redeem $100 YES
+    W->>P: redeem(100)
+    P-->>U: +100 USDC
+
+    Note over C: 5:00 PM ET<br/>Service restarts
+    C->>P: settle_market (admin re-tries)
+    P-->>C: AlreadySettled (6002) — idempotent reject
+    C->>C: log + move on
+```
+
+Key visual: the cron-death path has **fewer participants but the same outcome**. The program + Pyth + Helius + Neon path is fully intact. The user redeems on the same timeline.
+
+---
+
 ## Why this matters
 
 The build commits to **DR-002 — permissionless `settle_market`; automation is convenience, not authority** (`constitution/decisions.md` DR-002). The architectural argument is that this is cheaper to operate (no monitored 24/7 hot wallet for liveness), scales better with market count, and is genuinely robust to operator failure.
@@ -157,10 +252,22 @@ The point is the architectural argument doesn't depend on devnet's mood. Three l
 
 ## Cross-references
 
-- `constitution/decisions.md` DR-002 — the decision being defended
+- `constitution/decisions.md` DR-002 — the decision being defended (permissionless settle)
+- `constitution/decisions.md` DR-005 — user-funded strike creation (proves protocol is non-custodial top to bottom; cron has no privileged role in strike spawning)
+- `constitution/decisions.md` DR-006 — reactive 30-min wild-swing detection (the cron *does* something useful, but missing one cycle doesn't break anyone's existing position)
+- `constitution/decisions.md` DR-008 — fee model lives in `mint_pair` on chain (cron never touches money flow)
+- `constitution/decisions.md` DR-009 — Phoenix v1 CLOB integration (independent program, our cron health is irrelevant to order matching)
+- `constitution/decisions.md` DR-010 — Helius webhook + Neon Postgres indexer + Merkle-committed leaderboard (the leaderboard updates from on-chain events that Helius pushes regardless of our service health; distributions are admin-signed via cryptographically verifiable Merkle proofs)
 - `BRAINLIFT.md` §4 Hard YES #5 — the requirement being satisfied
-- `tests/integration/live-deploy-verify.test.ts` — IDL proof
+- `tests/integration/live-deploy-verify.test.ts` — IDL structural proof (signer count + docs string check)
 - `tests/integration/live-program-call.test.ts` — chain-level handler-reached proof (NotExpired evidence)
 - `tests/eval/edge-cases.test.ts` — DR-002 sweep across 4 distinct settlers (mock-level)
-- `scripts/simulate-trading-day.mjs` Phase 3 — every CI run exercises the non-admin path
+- `scripts/simulate-trading-day.mjs` Phase 3 — every CI run exercises the non-admin settle path
 - `services/automation/src/jobs/settlement.ts` — what the cron actually does (Bram's territory)
+- `.project/bell-markets/coordination/cron-failure.md` — Bram's complementary doc on retry-harness terminal states + log shapes Drew's demo can rely on
+
+## Strongest reviewer-defense line
+
+> "If you want to be really mean, kill our cron right now and watch the demo continue."
+
+The architecture supports this. The doc above is the evidence. The tests above are the proof.
