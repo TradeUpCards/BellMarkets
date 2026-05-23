@@ -132,5 +132,9 @@ pub fn handler(ctx: Context<RedeemInvalid>, amount: u64) -> Result<()> {
         amount,
     )?;
 
+    // P2 / DR-008: decrement pairs_outstanding (see redeem.rs).
+    let sm = &mut ctx.accounts.strike_market;
+    sm.pairs_outstanding = sm.pairs_outstanding.saturating_sub(amount);
+
     Ok(())
 }
