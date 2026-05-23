@@ -1361,28 +1361,28 @@
     font-size: 14px;
     letter-spacing: 1px;
   }
-  /* High-contrast YES/NO badge inside button (visual confirmation per Cory) */
+  /* Outcome badge — clean Polymarket-style chip on the colored button.
+     Dark translucent backing + bright outline + bright text for high
+     contrast without being garish. */
   .sb-outcome {
     display: inline-flex;
     align-items: center;
-    padding: 3px 10px;
+    padding: 3px 11px;
     border-radius: 4px;
-    font-weight: 800;
-    font-size: 13px;
+    font-weight: 700;
+    font-size: 12px;
     letter-spacing: 1.5px;
-    border: 2px solid;
+    background: rgba(6, 8, 16, 0.45);
+    border: 1px solid;
+    backdrop-filter: blur(4px);
   }
   .sb-outcome.yes {
-    background: var(--yes);
-    color: #0a2010;
-    border-color: #15803d;
-    box-shadow: 0 0 12px rgba(74, 222, 128, 0.55);
+    color: var(--yes);
+    border-color: var(--yes);
   }
   .sb-outcome.no {
-    background: var(--no);
-    color: #2a0a0a;
-    border-color: #b91c1c;
-    box-shadow: 0 0 12px rgba(248, 113, 113, 0.55);
+    color: var(--no);
+    border-color: var(--no);
   }
   /* Detail (qty + price + total) — secondary weight */
   .sb-detail {
