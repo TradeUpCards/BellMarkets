@@ -154,6 +154,18 @@ Each rule has:
 
 ---
 
+## 7. Design & Accessibility
+
+### §7.1 Mobile-first design — 375px baseline, desktop is the expansion case
+**Rationale:** Retail finance is consumed on phones. A Trade panel that's beautiful at 1440px and broken at 375px shoots the product in the foot — even web3-native users open BellMarkets on mobile when they're checking a position mid-day. Designing desktop-first and "responsively scaling down" almost always produces a mobile experience that feels like an afterthought (cramped touch targets, hover-only states that disappear, multi-pane layouts that collapse into unreadable scrolls). Mobile-first inverts the constraint: the smallest viewport is the canonical case; desktop is what we *expand* into with extra space.
+**Enforcement:** Cleo designs Trade panel, Market list, Probability matrix, Carousel, Profile, Leaderboard, Contests at 375×812 (iPhone 13/14/15 baseline) first. Expansion to 768px tablet and 1280px+ desktop comes second. All mockups must show the mobile viewport. Touch targets ≥44pt (Apple HIG) on every interactive element. No hover-only interactions — every hover state must have a tap equivalent (long-press, tap-to-expand, bottom sheet, etc.). WCAG AA contrast minimums: 4.5:1 for body text, 3:1 for large text (18pt+ or 14pt+ bold). Cross-references DR-014 (profiles must work on mobile because most social-login users are mobile-native).
+
+### §7.2 Never ship a UI that fails accessibility (WCAG AA) on color, contrast, or keyboard nav
+**Rationale:** The cyan-on-near-black palette of v7 Terminal is at risk of failing AA contrast on small/secondary text. We've identified illegibility issues in iteration. Beyond compliance, contrast and keyboard nav are usability for *all* users in suboptimal conditions — outdoor sunlight, tired eyes, screen readers, switch users.
+**Enforcement:** Cleo validates every locked design pass against WCAG AA — 4.5:1 body / 3:1 large text contrast, full keyboard tab navigation, focus ring visible on every interactive element. Failing color combinations either get adjusted or get a higher-contrast alternative under user preference. No `tabindex="-1"` on interactive elements unless paired with a custom focus mechanism.
+
+---
+
 > Add more sections as the project surfaces new constraint classes.
 > Each new section gets a top-level number; each rule inside gets a sub-number.
 > Don't renumber existing rules — citations break. Mark deprecated rules
