@@ -218,4 +218,12 @@ pub mod bell_markets {
             merkle_proof,
         )
     }
+
+    pub fn force_redeem(ctx: Context<ForceRedeem>, amount: u64) -> Result<()> {
+        instructions::force_redeem::handler(ctx, amount)
+    }
+
+    pub fn close_settled_market(ctx: Context<CloseSettledMarket>) -> Result<()> {
+        instructions::close_settled_market::handler(ctx)
+    }
 }

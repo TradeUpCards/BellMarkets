@@ -13,6 +13,7 @@ use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 use crate::state::*;
 use crate::errors::BellMarketsError;
 use crate::merkle::{compute_leaf, verify_merkle_proof};
+use crate::instructions::distribute_weekly_rewards::{is_valid_position, is_position_claimed, position_bit};
 
 #[derive(Accounts)]
 pub struct DistributeMonthlyRewards<'info> {
@@ -63,10 +64,7 @@ pub fn handler(
     amount: u64,
     merkle_proof: Vec<[u8; 32]>,
 ) -> Result<()> {
-    require!(
-        position >= 1 && (position as usize) <= DISTRIBUTION_SLOTS,
-        BellMarketsError::InvalidDistributionPosition
-    );
+    require!(is_valid_position(position), BellMarketsError::InvalidDistributionPosition);
     require!(amount > 0, BellMarketsError::ZeroAmount);
 
     let leaf = compute_leaf(
@@ -96,12 +94,11 @@ pub fn handler(
             BellMarketsError::MerkleProofInvalid
         );
 
-        let bit = 1u32 << (position - 1);
         require!(
-            entry.claimed_bitmap & bit == 0,
+            !is_position_claimed(entry.claimed_bitmap, position),
             BellMarketsError::MerkleProofInvalid
         );
-        entry.claimed_bitmap |= bit;
+        entry.claimed_bitmap |= position_bit(position);
     }
 
     let bump_arr = [monthly_pool_bump];

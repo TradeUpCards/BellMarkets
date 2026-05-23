@@ -16,6 +16,8 @@ pub mod initialize_rewards_pools;
 pub mod commit_leaderboard_root;
 pub mod distribute_weekly_rewards;
 pub mod distribute_monthly_rewards;
+pub mod force_redeem;
+pub mod close_settled_market;
 
 pub use initialize_config::*;
 pub use create_strike_market::*;
@@ -35,3 +37,5 @@ pub use initialize_rewards_pools::*;
 pub use commit_leaderboard_root::*;
 pub use distribute_weekly_rewards::*;
 pub use distribute_monthly_rewards::*;
+pub use force_redeem::*;
+pub use close_settled_market::*;
