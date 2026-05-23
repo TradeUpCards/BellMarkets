@@ -399,11 +399,72 @@
   </div>
 </div>
 
-<!-- v7 (featured, feedback-driven) -->
+<!-- v8 (Terminal refined per 2026-05-23 feedback) -->
 <div class="candidate featured">
   <div class="candidate-h">
+    <div class="candidate-num">08 / TERMINAL REFINED</div>
+    <h2>Terminal Refined<span class="sub">v7 DNA + minor tweaks on trade · new sections on landing</span></h2>
+    <div class="candidate-colors">
+      <div class="swatch" style="background: #060810;"></div>
+      <div class="swatch" style="background: #0c1018;"></div>
+      <div class="swatch" style="background: #22d3ee;"></div>
+      <div class="swatch" style="background: #4ade80;"></div>
+      <div class="swatch" style="background: #f87171;"></div>
+    </div>
+  </div>
+  <div class="candidate-body">
+    <div class="candidate-row">
+      <div class="candidate-desc">
+        <h3>Vibe</h3>
+        <p>
+          v7 trade page layout PRESERVED (left rail + chart + buy/sell + OB + recent trades — what Cory called "pretty good before").
+          Only minor tweaks applied to trade. New content (leaderboard, contests, AI teaser, Pro CTA, carousel) moves to <strong>v8-landing</strong>.
+          Probability matrix on landing already has tickers as rows + 7 strikes as columns (matches Cory's requirement — scales by adding rows, not columns).
+        </p>
+        <p><strong>Minor tweaks applied to both pages:</strong></p>
+        <ul style="margin-left: 18px; margin-top: 6px; color: var(--text-muted); font-size: 13px;">
+          <li>Base font 14px (was 12) for legibility</li>
+          <li>WCAG AA contrast — accent cyan lifted to #22d3ee (9.2:1), muted text to #9aa6c0 (7.8:1)</li>
+          <li>Logo lockup separated from MARKETS nav (vertical divider + 32px gap)</li>
+          <li>Tooltips explaining "$0.52 = 52% implied probability" convention on price cells</li>
+          <li>Mobile-first responsive — 375px baseline, bottom tab bar at &lt;768px, ≥44pt touch targets, no hover-only interactions, visible focus rings</li>
+        </ul>
+        <p style="margin-top: 12px;"><strong>v8-landing new content:</strong></p>
+        <ul style="margin-left: 18px; margin-top: 6px; color: var(--text-muted); font-size: 13px;">
+          <li>CNBC-style ticker marquee replaces static ticker row</li>
+          <li>4-slide carousel (Markets / Leaderboard / Contests / Bell Pro) replaces static hero CTAs · 6s autoplay, pauses on hover, dot + arrow controls</li>
+          <li>Leaderboard section — weekly + monthly side-by-side, top-5 each, prize pool surfaced</li>
+          <li>Contests section — 3 active contests with prize pool, progress, time-left</li>
+          <li>Bell Pro CTA section — features grid + 9 USDC/mo pricing + Founder Pass NFT note</li>
+        </ul>
+        <p style="margin-top: 12px;"><strong>v8-trade new additions:</strong> slippage slider in the trade form (DR-008) — 0-5% with computed worst-price display.</p>
+      </div>
+      <div class="candidate-dna">
+        <h3>DNA</h3>
+        <div class="dna-row"><span class="lbl">trade layout</span><span class="val">v7 preserved</span></div>
+        <div class="dna-row"><span class="lbl">accent</span><span class="val" style="color: #22d3ee;">#22d3ee</span></div>
+        <div class="dna-row"><span class="lbl">body</span><span class="val">IBM Plex Sans 14px</span></div>
+        <div class="dna-row"><span class="lbl">numbers</span><span class="val">IBM Plex Mono</span></div>
+        <div class="dna-row"><span class="lbl">contrast</span><span class="val">WCAG AA ✓</span></div>
+        <div class="dna-row"><span class="lbl">mobile</span><span class="val">375px + bottom tabs</span></div>
+        <div class="dna-row"><span class="lbl">landing hero</span><span class="val">4-slide carousel</span></div>
+        <div class="dna-row"><span class="lbl">landing sections</span><span class="val">LB + contests + Pro</span></div>
+        <div class="dna-row"><span class="lbl">matrix</span><span class="val">tickers as rows ✓</span></div>
+      </div>
+    </div>
+    <div class="candidate-links">
+      <a href="v8-landing.html" class="link-btn">View landing →</a>
+      <a href="v8-trade.html" class="link-btn outline">View trade page →</a>
+      <a href="v8-alt-trade.html" class="link-btn" style="background: #fef3c7; color: #92400e; border-color: #fcd34d;">⚠ v8-alt trade (reference, rejected)</a>
+    </div>
+  </div>
+</div>
+
+<!-- v7 (previous iteration before refinement) -->
+<div class="candidate">
+  <div class="candidate-h">
     <div class="candidate-num">07 / TERMINAL</div>
-    <h2>Terminal<span class="sub">Bloomberg-cyan + polished density</span></h2>
+    <h2>Terminal<span class="sub">Bloomberg-cyan + polished density (pre-refinement)</span></h2>
     <div class="candidate-colors">
       <div class="swatch" style="background: #060810;"></div>
       <div class="swatch" style="background: #0c1018;"></div>
