@@ -1229,7 +1229,7 @@
     background: linear-gradient(180deg, var(--panel-2) 0%, transparent 100%);
   }
   .info-card-subsection-h {
-    padding: 10px 16px 6px;
+    padding: 8px 14px 4px;
     display: flex; justify-content: space-between; align-items: center;
   }
   .info-card-subsection-h .subsection-title {
@@ -1240,6 +1240,111 @@
   .info-card-subsection-h .subsection-meta {
     font-size: 9px; color: var(--text-muted);
   }
+
+  /* ===== Compact Position card (Cory feedback: too much vertical space) ===== */
+  .pos-body.compact { padding: 10px 14px 8px; }
+  .pos-summary-compact {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+  }
+  .pos-summary-compact .pos-side-badge {
+    /* Existing .pos-side-badge styles apply (yes/no bg + border) */
+    padding: 4px 10px;
+    font-size: 11px;
+  }
+  .pos-summary-compact .pos-pnl-val {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 18px; font-weight: 700;
+    letter-spacing: -0.02em;
+    margin-left: auto;
+  }
+  .pos-summary-compact .pos-pnl-val.up { color: var(--yes); }
+  .pos-summary-compact .pos-pnl-val.down { color: var(--no); }
+  .pos-summary-compact .pos-pnl-pct {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px; font-weight: 600;
+    color: var(--text-muted);
+  }
+  .pos-summary-compact .pos-pnl-pct.up { color: var(--yes); }
+  .pos-summary-compact .pos-pnl-pct.down { color: var(--no); }
+  /* Stats bar — moved up + made readable per Cory feedback */
+  .pos-stats-bar {
+    display: flex; gap: 16px;
+    padding: 8px 10px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 12px;
+    align-items: baseline;
+    flex-wrap: wrap;
+  }
+  .pos-stats-bar .pos-stat-lbl {
+    color: var(--text-subtle);
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: 600;
+    margin-right: 4px;
+  }
+  .pos-stats-bar .pos-stat-val {
+    color: var(--text-strong);
+    font-weight: 700;
+    font-size: 13px;
+  }
+  .pos-stats-bar .pos-stat-age {
+    margin-left: auto;
+    color: var(--text-muted);
+    font-size: 10px;
+  }
+
+  /* Single-line settlement scenarios (compact) */
+  .settle-body.compact { padding: 6px 14px 10px; }
+  .scenario-line {
+    display: grid;
+    grid-template-columns: 10px auto 1fr auto;
+    gap: 10px;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px dotted var(--border);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+  }
+  .scenario-line:last-child { border-bottom: none; }
+  .scenario-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+  }
+  .scenario-line.exit .scenario-dot { background: var(--accent); box-shadow: 0 0 4px var(--accent); }
+  .scenario-line.hold-win .scenario-dot { background: var(--yes); }
+  .scenario-line.hold-lose .scenario-dot { background: var(--no); }
+  .scenario-line .scenario-label {
+    color: var(--text-strong);
+    font-weight: 600;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+  .scenario-line .scenario-prob {
+    color: var(--text-muted);
+    font-weight: 500;
+    margin-left: 4px;
+  }
+  .scenario-line .scenario-action {
+    color: var(--text-muted);
+    font-size: 10px;
+    text-align: right;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .scenario-line .scenario-pnl {
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: -0.02em;
+  }
+  .scenario-line .scenario-pnl.up { color: var(--yes); }
+  .scenario-line .scenario-pnl.down { color: var(--no); }
 
   /* ===== COMPACT MARKET HEADER (Cory 2026-05-23 feedback): strike pills inline ===== */
   .strike-pills-inline {
@@ -2115,64 +2220,51 @@
              moves here from the right column) -->
         <div class="info-grid-2">
 
-          <!-- LEFT: Your Position + Settlement merged into one card -->
+          <!-- LEFT: Your Position + Settlement merged into one card (compressed per Cory feedback) -->
           <div class="info-card">
             <div class="info-card-h">
               <h3>Your position</h3>
               <span class="live-badge">P&L live</span>
             </div>
-            <div class="pos-body">
-              <div class="pos-summary">
-                <div>
-                  <span class="pos-side-badge">⬆ YES · 5 contracts</span>
-                  <div class="pos-side-sub">$3.10 cost · $2.60 value · avg $0.62 · 32m ago</div>
-                </div>
-                <div>
-                  <div class="pos-pnl-val down mono">−$0.50</div>
-                  <div class="pos-pnl-pct">unrealized · −16.1%</div>
-                </div>
+            <div class="pos-body compact">
+              <!-- Compact summary row: badge + key stats inline + PNL -->
+              <div class="pos-summary-compact">
+                <span class="pos-side-badge">⬆ YES · 5</span>
+                <span class="pos-pnl-val down mono">−$0.50</span>
+                <span class="pos-pnl-pct down">−16.1%</span>
               </div>
-              <!-- 4-stat grid removed (Cory feedback 2026-05-23):
-                   "If YES wins" / "If YES loses" already shown in the Settlement
-                   scenarios below; "Cost basis" + "Current value" moved into
-                   the pos-side-sub line above. Saves 2 rows of vertical space. -->
+              <!-- Stats moved UP and made readable (Cory feedback) -->
+              <div class="pos-stats-bar mono">
+                <span><span class="pos-stat-lbl">Cost</span> <span class="pos-stat-val">$3.10</span></span>
+                <span><span class="pos-stat-lbl">Value</span> <span class="pos-stat-val">$2.60</span></span>
+                <span><span class="pos-stat-lbl">Avg</span> <span class="pos-stat-val">$0.62</span></span>
+                <span class="pos-stat-age">opened 32m ago</span>
+              </div>
             </div>
-            <!-- Settlement scenarios merged into same card -->
+            <!-- Settlement scenarios — single-line per scenario (compressed) -->
             <div class="info-card-subsection">
               <div class="info-card-subsection-h">
                 <span class="subsection-title">Settlement preview · 3 scenarios</span>
                 <span class="subsection-meta mono">vs current pos</span>
               </div>
-              <div class="settle-body">
-                <div class="scenario exit">
-                  <div class="scenario-h">
-                    <span class="scenario-title"><span class="dot"></span>Exit now (sell on Phoenix)</span>
-                    <span class="scenario-prob">market price</span>
-                  </div>
-                  <div class="scenario-detail">
-                    <span class="scenario-action mono">sell 5 YES @ $0.500 bid</span>
-                    <span class="scenario-pnl down mono">−$0.60</span>
-                  </div>
+              <div class="settle-body compact">
+                <div class="scenario-line exit">
+                  <span class="scenario-dot" aria-hidden="true"></span>
+                  <span class="scenario-label">Exit now</span>
+                  <span class="scenario-action mono">sell 5 YES @ $0.500</span>
+                  <span class="scenario-pnl down mono">−$0.60</span>
                 </div>
-                <div class="scenario hold-win">
-                  <div class="scenario-h">
-                    <span class="scenario-title"><span class="dot"></span>Hold to settle · YES wins</span>
-                    <span class="scenario-prob">52% prob</span>
-                  </div>
-                  <div class="scenario-detail">
-                    <span class="scenario-action mono">META ≥ $680 at 4:00 PM</span>
-                    <span class="scenario-pnl up mono">+$1.90</span>
-                  </div>
+                <div class="scenario-line hold-win">
+                  <span class="scenario-dot" aria-hidden="true"></span>
+                  <span class="scenario-label">Hold · YES wins <span class="scenario-prob">52%</span></span>
+                  <span class="scenario-action mono">META ≥ $680 @ 4PM</span>
+                  <span class="scenario-pnl up mono">+$1.90</span>
                 </div>
-                <div class="scenario hold-lose">
-                  <div class="scenario-h">
-                    <span class="scenario-title"><span class="dot"></span>Hold to settle · YES loses</span>
-                    <span class="scenario-prob">48% prob</span>
-                  </div>
-                  <div class="scenario-detail">
-                    <span class="scenario-action mono">META &lt; $680 at 4:00 PM</span>
-                    <span class="scenario-pnl down mono">−$3.10</span>
-                  </div>
+                <div class="scenario-line hold-lose">
+                  <span class="scenario-dot" aria-hidden="true"></span>
+                  <span class="scenario-label">Hold · YES loses <span class="scenario-prob">48%</span></span>
+                  <span class="scenario-action mono">META &lt; $680 @ 4PM</span>
+                  <span class="scenario-pnl down mono">−$3.10</span>
                 </div>
               </div>
             </div>
