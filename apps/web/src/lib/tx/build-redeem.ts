@@ -51,6 +51,13 @@ export interface BuildRedeemResult {
  *                                        `buildBuyNoTx` for pre-settlement
  *                                        liquidation, both atomic via
  *                                        `redeem_pair` under the hood)
+ *
+ * **DR-008 (fee model) — redeem stays at original $1 payout.** Mint-only fees:
+ * `redeem` / `redeem_invalid` / `redeem_pair` charge ZERO protocol fee. The
+ * fee was captured at `mint_pair` time and settled to `MarketConfig.treasury`
+ * + the weekly/monthly pools per DR-010 split. Do NOT add fee-related accounts
+ * (no treasury, no UserConfig) when the on-chain IDL refreshes — those belong
+ * exclusively on the mint path.
  */
 export async function buildRedeemTx(
   params: BuildRedeemParams,

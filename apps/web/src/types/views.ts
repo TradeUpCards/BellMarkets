@@ -166,3 +166,103 @@ export function formatUsdc(micros: bigint, decimals: number = 2): string {
   const fracStr = frac.toString().padStart(6, "0").slice(0, decimals);
   return `${negative ? "-" : ""}${whole.toString()}${decimals > 0 ? "." + fracStr : ""}`;
 }
+
+// ─── DR-005 / DR-006: TickerConfig view ───────────────────────────────────
+
+/**
+ * Projection of the on-chain `TickerConfig` PDA per DR-005 / DR-006. Used by
+ * the Markets-grid filter row, the strike picker, and the "wider strikes
+ * available" earnings indicator (DR-011).
+ */
+export interface TickerConfigView {
+  /** Pyth feed pubkey — primary identity. */
+  pythFeed: PublicKey;
+  /** Current "cap_center" (post-close anchor; updated on AH/PM wild swings). */
+  capCenter: bigint;
+  /** Strikes the program currently allows for user creation, in micros. */
+  allowedStrikes: bigint[];
+  /** Max % deviation from `capCenter` for `user_create_strike_market`. */
+  maxDeviationBps: number;
+  /** `strike_tick_size` per DR-005 table — minimum strike granularity. */
+  thresholdBps: number;
+  /** Last slot the config was touched. */
+  lastUpdatedSlot: bigint;
+  /** Which phase cron last wrote this. */
+  updatedByPhase: "anchor" | "ah-window" | "pm-window" | "manual";
+}
+
+// ─── DR-008: UserConfig view ──────────────────────────────────────────────
+
+/**
+ * Per-user fee-state projection (DR-008). Drives "tier 2, 1.5% fee" badges,
+ * "$X USDC volume / 30d" progress bars, and the projected total cost on
+ * mint inputs.
+ */
+export interface UserConfigView {
+  user: PublicKey;
+  mintVolume30dMicros: bigint;
+  mintVolumeLifetimeMicros: bigint;
+  currentTier: 1 | 2 | 3;
+  /** Default tier fee bps BEFORE creator rebate. */
+  projectedFeeBps: number;
+  /** Approximate seconds until oldest volume rolls off the 30-day window. */
+  decayRemainingSecs: number;
+}
+
+// ─── DR-010: Rewards pool view ────────────────────────────────────────────
+
+/**
+ * Read-side view of one weekly/monthly rewards pool. The distribution amount
+ * fields show "if the period closed now, here's what each top-10 winner gets"
+ * — useful for the leaderboard CTA and the streak-badge tooltip.
+ */
+export interface RewardsPoolView {
+  period: "weekly" | "monthly";
+  totalBalanceUsdcMicros: bigint;
+  /**
+   * Projected payouts for positions 1-10, in USDC micros. Index 0 = #1.
+   * Computed from the live pool balance × `distribution_bps[position]`.
+   */
+  distributionAmountsTop10: bigint[];
+}
+
+// ─── DR-008: Open Phoenix order view ──────────────────────────────────────
+
+/**
+ * UI projection of one trader's resting order on a Phoenix market. Mirrors
+ * the `OpenOrder` shape from `useOpenOrders` with a friendlier name for the
+ * portfolio "open orders" table.
+ */
+export interface OpenOrderView {
+  /** Phoenix order primary id — sufficient for cancel-by-id. */
+  orderId: {
+    side: "Bid" | "Ask";
+    priceInTicks: bigint;
+    orderSequenceNumber: bigint;
+  };
+  side: "Bid" | "Ask";
+  priceUi: number;
+  /** Resting size in base lots. */
+  sizeBaseLots: bigint;
+  marketId: PublicKey;
+  /** Unix seconds when the order was placed (best-effort; from `lastValidSlot`). */
+  placeUnix: number | null;
+}
+
+// ─── DR-010: Leaderboard entry view ───────────────────────────────────────
+
+/**
+ * Projection of one ranked user in the weekly/monthly leaderboard. The
+ * indexer's `LeaderboardResponse.entries` deserialize to this shape; the
+ * frontend renders the streak badge + prize and (for the connected user)
+ * highlights their own row.
+ */
+export interface LeaderboardEntryView {
+  rank: number;
+  userPubkey: string;
+  /** Longest consecutive winning settle in the period. */
+  streakCount: number;
+  /** Total markets traded in the period (tiebreaker per DR-010). */
+  totalMarkets: number;
+  prizeAmountMicros: bigint;
+}
