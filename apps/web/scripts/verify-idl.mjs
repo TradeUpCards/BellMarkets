@@ -330,10 +330,16 @@ async function main() {
   }
 
   banner("DR-008 / DR-010: FeeConfig + reward pools + tickers + commits");
-  // Best-effort presence check for the new singleton PDAs. We use
-  // getProgramAccounts filtered by each new account discriminator and report
-  // counts — if FeeConfig is missing, the next `mint_pair` call will fail
-  // at deserialization, which is the right time to surface that.
+  // Hard asserts for the singleton-PDA presence. `mint_pair` requires
+  // FeeConfig + LeaderboardCommitments existing on-chain (Anchor
+  // AccountNotInitialized otherwise); the assert turns "logs look fine"
+  // into a CI gate. TickerConfig + UserConfig start at zero by design
+  // (initialized lazily by user_create_strike_market / init_if_needed
+  // mint_pair) — informational only.
+  const REQUIRED_SINGLETONS = {
+    FeeConfig: 1,
+    LeaderboardCommitments: 1,
+  };
   for (const name of [
     "FeeConfig",
     "TickerConfig",
@@ -352,7 +358,19 @@ async function main() {
       },
     ]);
     const count = Array.isArray(accs) ? accs.length : 0;
-    console.log(`${name.padEnd(24)}: ${count} account(s) on chain`);
+    const required = REQUIRED_SINGLETONS[name];
+    if (required !== undefined) {
+      if (count < required) {
+        throw new Error(
+          `[ASSERT FAIL] ${name}: ${count} accounts on chain; expected at least ${required}. mint_pair will fail until this PDA is initialized.`,
+        );
+      }
+      console.log(
+        `${name.padEnd(24)}: ${count} account(s) on chain  [ASSERT PASS]`,
+      );
+    } else {
+      console.log(`${name.padEnd(24)}: ${count} account(s) on chain`);
+    }
   }
 
   // Pool PDA presence is left to a downstream check that has web3.js
