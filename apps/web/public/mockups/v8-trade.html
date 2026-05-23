@@ -104,8 +104,9 @@
 
   header.top { background: var(--bg); border-bottom: 1px solid var(--border); }
   .header-inner {
+    /* Compressed: was 12px 16px → 8px 16px (Cory feedback: shrink hero bar vertical) */
     display: grid; grid-template-columns: auto 1fr auto;
-    gap: 24px; align-items: center; padding: 12px 16px;
+    gap: 24px; align-items: center; padding: 8px 16px;
   }
   /* Increased brand→nav gap + vertical divider per Cory feedback */
   .brand { display: flex; align-items: center; gap: 32px; }
@@ -186,36 +187,42 @@
   .wallet .addr { color: var(--text-muted); }
 
   /* ===== MARKET HEADER ===== */
+  /* Compressed vertical padding per Cory feedback (was 14px → 8px) */
   .market-header {
     background: var(--panel); border-bottom: 1px solid var(--border);
-    padding: 14px 16px;
+    padding: 8px 16px;
   }
   .market-header-top {
     display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 14px;
+    margin-bottom: 0;
   }
   .market-id {
-    display: flex; align-items: center; gap: 14px;
+    display: flex; align-items: center; gap: 10px;
   }
+  /* Smaller market-id-mark (40 → 32) */
   .market-id-mark {
-    width: 40px; height: 40px;
+    width: 32px; height: 32px;
     background: var(--accent-bg); border: 1px solid var(--accent);
-    border-radius: 6px;
+    border-radius: 5px;
     display: flex; align-items: center; justify-content: center;
     font-family: 'IBM Plex Mono', monospace; font-weight: 700;
-    font-size: 16px; color: var(--accent);
-    box-shadow: 0 0 16px var(--accent-glow);
+    font-size: 13px; color: var(--accent);
+    box-shadow: 0 0 12px var(--accent-glow);
+    flex-shrink: 0;
   }
+  /* Title compressed: 22 → 18; sub-chips moved inline to save row */
   .market-id-title {
     font-family: 'IBM Plex Mono', monospace;
-    font-size: 22px; font-weight: 700;
+    font-size: 18px; font-weight: 700;
     letter-spacing: -0.03em;
+    display: flex; align-items: center; gap: 8px;
   }
-  .market-id-title .gt { color: var(--accent); margin: 0 4px; }
+  .market-id-title .gt { color: var(--accent); margin: 0 2px; }
   .market-id-sub {
-    display: flex; align-items: center; gap: 10px;
-    font-family: 'IBM Plex Mono', monospace; font-size: 11px;
-    color: var(--text-muted); margin-top: 2px;
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+    color: var(--text-muted);
+    margin-left: 6px;
   }
   .market-id-sub .chip {
     background: var(--panel-2); border: 1px solid var(--border);
@@ -322,26 +329,51 @@
     min-height: calc(100vh - 90px);
   }
 
-  /* Left rail (compact version for trade page) */
+  /* Left rail — natural-height, no internal scroll per Cory feedback.
+     Rail extends to content height and scrolls with the page (not sticky). */
   .left-rail {
     background: var(--panel);
     border-right: 1px solid var(--border);
     padding: 12px 0;
-    overflow-y: auto;
-    max-height: calc(100vh - 90px);
-    position: sticky; top: 0;
   }
+  /* Collapsible rail-section using <details>/<summary> (Cory feedback) */
   .rail-section {
-    padding: 0 12px 12px;
+    padding: 0;
     border-bottom: 1px solid var(--border);
-    margin-bottom: 12px;
+    margin: 0 0 4px;
   }
   .rail-section:last-child { border-bottom: none; }
+  .rail-section[open] { padding-bottom: 8px; }
+  /* Strip default <details> marker */
+  .rail-section > summary { list-style: none; }
+  .rail-section > summary::-webkit-details-marker { display: none; }
   .rail-section-h {
-    font-family: 'IBM Plex Mono', monospace; font-size: 9px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 10px;
     text-transform: uppercase; letter-spacing: 1.5px;
-    color: var(--accent); font-weight: 700; margin-bottom: 8px;
+    color: var(--accent); font-weight: 700;
+    padding: 8px 12px;
+    cursor: pointer;
+    display: flex; align-items: center; gap: 8px;
+    transition: background 100ms;
+    user-select: none;
   }
+  .rail-section-h:hover { background: var(--row-hover); }
+  .rail-section-title { flex: 1; }
+  .rail-section-link {
+    color: var(--accent); font-size: 9px;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    text-decoration: none;
+    padding: 2px 4px;
+    border-radius: 3px;
+  }
+  .rail-section-link:hover { background: var(--accent-bg); }
+  .rail-chevron {
+    font-size: 11px; color: var(--text-muted);
+    transition: transform 150ms;
+    transform: rotate(-90deg);
+  }
+  .rail-section[open] > .rail-section-h .rail-chevron { transform: rotate(0deg); }
+  .rail-section-body { padding: 0 12px; }
   .rail-ticker-list { display: flex; flex-direction: column; gap: 2px; }
   .rail-ticker {
     display: grid; grid-template-columns: 1fr auto;
@@ -945,7 +977,25 @@
   ::-webkit-scrollbar-thumb { background: var(--panel-3); border-radius: 4px; border: 1px solid var(--bg); }
   ::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
 
-  /* ===== Pro CTA inline card — lives in market header next to ★ Watch ===== */
+  /* ===== Chart watch button — sits in chart-controls (top right of chart) ===== */
+  .chart-watch-btn {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 150ms;
+    margin-left: 4px;
+  }
+  .chart-watch-btn:hover { color: var(--amber); border-color: var(--amber); }
+  .chart-watch-btn.watching { color: var(--amber); border-color: var(--amber); background: rgba(251, 191, 36, 0.10); }
+
+  /* ===== Pro CTA inline card — DEPRECATED (Cory feedback: thin bar wrong shape).
+     Kept in CSS in case markup is referenced elsewhere; HTML element removed. ===== */
   .pro-card-inline {
     display: inline-flex;
     align-items: center;
@@ -1081,13 +1131,14 @@
   /* ===== COMPACT MARKET HEADER (Cory 2026-05-23 feedback): strike pills inline ===== */
   .strike-pills-inline {
     display: flex;
-    gap: 6px;
+    gap: 4px;
     align-items: center;
     flex: 1;
     justify-content: flex-start;
     max-width: 720px;
     overflow-x: auto;
-    padding: 0 0 0 16px;
+    padding: 0 0 0 4px;
+    margin-left: 4px;
   }
   .strike-pills-inline::-webkit-scrollbar { height: 0; }
   .strike-pills-inline .strike-pill { flex-shrink: 0; }
@@ -1693,12 +1744,12 @@
   <div class="market-header-top">
     <div class="market-id">
       <div class="market-id-mark">M</div>
-      <div>
-        <div class="market-id-title">META <span class="gt">&gt;</span> $680</div>
-        <div class="market-id-sub">
+      <div class="market-id-title">
+        META <span class="gt">&gt;</span> $680
+        <span class="market-id-sub">
           <span class="chip live">live</span>
           <span class="chip">expires 4 PM ET</span>
-        </div>
+        </span>
       </div>
     </div>
     <!-- Strike pills moved INLINE with market header (Cory feedback: save vertical space) -->
@@ -1721,15 +1772,7 @@
       <option>$720 · 14% YES</option>
       <option>$740 · 6% YES</option>
     </select>
-    <!-- Star/Watch only — browse buttons removed (redundant with ⌘K search) -->
-    <button class="ctrl-btn" aria-label="Watch this market">★ Watch</button>
-    <!-- Bell Pro CTA card — compact horizontal version sits in market header (Cory feedback) -->
-    <a href="#pro" class="pro-card-inline">
-      <span class="pro-card-glow" aria-hidden="true"></span>
-      <span class="pro-card-badge"><span aria-hidden="true">✦</span> BELL PRO</span>
-      <span class="pro-card-text">AI briefings · PNL digests · earnings analysis</span>
-      <span class="pro-card-cta">9 USDC/mo →</span>
-    </a>
+    <!-- Star/Watch moved to chart card top-right (Cory feedback) -->
   </div>
 </div>
 
@@ -1738,8 +1781,25 @@
   <!-- Compact left rail -->
   <aside class="left-rail">
 
-    <div class="rail-section">
-      <div class="rail-section-h">Tickers</div>
+    <!-- Pro CTA card — tall vertical card per Cory feedback (the "make it like it was" one) -->
+    <div class="pro-rail-card" id="pro">
+      <span class="pro-rail-badge"><span aria-hidden="true">✦</span> BELL PRO</span>
+      <div class="pro-rail-title">Today's META briefing</div>
+      <div class="pro-rail-sub">
+        AI analysis of earnings proximity, sector beta, and 5-day momentum
+        for the −6% strike. Daily briefings on all 7 MAG7 tickers.
+      </div>
+      <button class="pro-rail-cta">
+        UNLOCK · 9 USDC/mo <span aria-hidden="true">→</span>
+      </button>
+    </div>
+
+    <details class="rail-section" id="rail-tickers" open>
+      <summary class="rail-section-h">
+        <span class="rail-section-title">Tickers</span>
+        <span class="rail-chevron" aria-hidden="true">▾</span>
+      </summary>
+      <div class="rail-section-body">
       <div class="rail-ticker-list">
         <div class="rail-ticker active">
           <div class="rail-ticker-info"><span class="rail-ticker-sym">META</span><span class="rail-ticker-spot">$679.84</span></div>
@@ -1770,75 +1830,87 @@
           <span class="rail-ticker-chg down">-0.70%</span>
         </div>
       </div>
-    </div>
+      </div>
+    </details>
 
-    <div class="rail-section">
-      <div class="rail-section-h">My positions · 3</div>
-      <div class="rail-position">
-        <div><span class="rail-position-market">META.680.YES</span><br><span class="rail-position-side">5 · entry $0.62</span></div>
-        <span class="rail-position-pnl down">−$0.50</span>
+    <details class="rail-section" id="rail-positions" open>
+      <summary class="rail-section-h">
+        <span class="rail-section-title">My positions · 3</span>
+        <span class="rail-chevron" aria-hidden="true">▾</span>
+      </summary>
+      <div class="rail-section-body">
+        <div class="rail-position">
+          <div><span class="rail-position-market">META.680.YES</span><br><span class="rail-position-side">5 · entry $0.62</span></div>
+          <span class="rail-position-pnl down">−$0.50</span>
+        </div>
+        <div class="rail-position">
+          <div><span class="rail-position-market">NVDA.1340.NO</span><br><span class="rail-position-side">3 · entry $0.50</span></div>
+          <span class="rail-position-pnl down">−$0.06</span>
+        </div>
+        <div class="rail-position">
+          <div><span class="rail-position-market">AAPL.230.YES</span><br><span class="rail-position-side">8 · entry $0.42</span></div>
+          <span class="rail-position-pnl up">+$2.80</span>
+        </div>
       </div>
-      <div class="rail-position">
-        <div><span class="rail-position-market">NVDA.1340.NO</span><br><span class="rail-position-side">3 · entry $0.50</span></div>
-        <span class="rail-position-pnl down">−$0.06</span>
-      </div>
-      <div class="rail-position">
-        <div><span class="rail-position-market">AAPL.230.YES</span><br><span class="rail-position-side">8 · entry $0.42</span></div>
-        <span class="rail-position-pnl up">+$2.80</span>
-      </div>
-    </div>
+    </details>
 
     <!-- LEADERBOARD preview (Cory feedback 2026-05-23: left rail under My Positions on desktop) -->
-    <div class="rail-section">
-      <div class="rail-section-h" style="display: flex; justify-content: space-between; align-items: baseline;">
-        <span>🏆 Weekly leaders</span>
-        <a href="#" style="color: var(--accent); font-size: 9px; text-transform: uppercase;">all →</a>
+    <details class="rail-section" id="rail-leaders" open>
+      <summary class="rail-section-h">
+        <span class="rail-section-title">🏆 Weekly leaders</span>
+        <a href="#" class="rail-section-link" onclick="event.stopPropagation();">all →</a>
+        <span class="rail-chevron" aria-hidden="true">▾</span>
+      </summary>
+      <div class="rail-section-body">
+        <div class="rail-lb-row">
+          <span class="rank gold">#1</span>
+          <span class="name">degen.sol</span>
+          <span class="pnl">+$2,847</span>
+        </div>
+        <div class="rail-lb-row">
+          <span class="rank silver">#2</span>
+          <span class="name">maxprob.eth</span>
+          <span class="pnl">+$2,103</span>
+        </div>
+        <div class="rail-lb-row">
+          <span class="rank bronze">#3</span>
+          <span class="name">quantfox</span>
+          <span class="pnl">+$1,876</span>
+        </div>
+        <div class="rail-lb-row" style="background: rgba(34, 211, 238, 0.05);">
+          <span class="rank" style="color: var(--accent);">#5</span>
+          <span class="name" style="color: var(--accent);">you</span>
+          <span class="pnl">+$1,247</span>
+        </div>
       </div>
-      <div class="rail-lb-row">
-        <span class="rank gold">#1</span>
-        <span class="name">degen.sol</span>
-        <span class="pnl">+$2,847</span>
-      </div>
-      <div class="rail-lb-row">
-        <span class="rank silver">#2</span>
-        <span class="name">maxprob.eth</span>
-        <span class="pnl">+$2,103</span>
-      </div>
-      <div class="rail-lb-row">
-        <span class="rank bronze">#3</span>
-        <span class="name">quantfox</span>
-        <span class="pnl">+$1,876</span>
-      </div>
-      <div class="rail-lb-row" style="background: rgba(34, 211, 238, 0.05);">
-        <span class="rank" style="color: var(--accent);">#5</span>
-        <span class="name" style="color: var(--accent);">you</span>
-        <span class="pnl">+$1,247</span>
-      </div>
-    </div>
+    </details>
 
     <!-- CONTESTS preview (Cory feedback: left rail with Leaderboard) -->
-    <div class="rail-section">
-      <div class="rail-section-h" style="display: flex; justify-content: space-between; align-items: baseline;">
-        <span>⚡ Contests · 3 active</span>
-        <a href="#" style="color: var(--accent); font-size: 9px; text-transform: uppercase;">all →</a>
-      </div>
-      <div class="rail-contest">
-        <div class="rail-contest-title">NVDA Earnings · 3d left</div>
-        <div class="rail-contest-pool mono">$3,400 pool</div>
-        <div class="rail-contest-meta">
-          <span>187 entries</span>
-          <span>join →</span>
+    <details class="rail-section" id="rail-contests" open>
+      <summary class="rail-section-h">
+        <span class="rail-section-title">⚡ Contests · 3 active</span>
+        <a href="#" class="rail-section-link" onclick="event.stopPropagation();">all →</a>
+        <span class="rail-chevron" aria-hidden="true">▾</span>
+      </summary>
+      <div class="rail-section-body">
+        <div class="rail-contest">
+          <div class="rail-contest-title">NVDA Earnings · 3d left</div>
+          <div class="rail-contest-pool mono">$3,400 pool</div>
+          <div class="rail-contest-meta">
+            <span>187 entries</span>
+            <span>join →</span>
+          </div>
+        </div>
+        <div class="rail-contest">
+          <div class="rail-contest-title">May Top-10 · 8d left</div>
+          <div class="rail-contest-pool mono">$12,500 pool</div>
+          <div class="rail-contest-meta">
+            <span>you · #5</span>
+            <span>view →</span>
+          </div>
         </div>
       </div>
-      <div class="rail-contest">
-        <div class="rail-contest-title">May Top-10 · 8d left</div>
-        <div class="rail-contest-pool mono">$12,500 pool</div>
-        <div class="rail-contest-meta">
-          <span>you · #5</span>
-          <span>view →</span>
-        </div>
-      </div>
-    </div>
+    </details>
   </aside>
 
   <!-- MAIN -->
@@ -1882,6 +1954,8 @@
                 <button class="chart-icon-btn" title="Candle">📊</button>
                 <button class="chart-icon-btn" title="Depth">📊</button>
               </div>
+              <!-- Watch button moved here from market header (Cory feedback) -->
+              <button class="chart-watch-btn" title="Watch this market" aria-label="Watch this market">★ Watch</button>
             </div>
           </div>
           <div class="chart-viz">
@@ -2229,6 +2303,21 @@
   }
   (function() {
     try { const s = localStorage.getItem('bm-theme'); if (s === 'light') document.documentElement.setAttribute('data-theme', 'light'); } catch (e) {}
+  })();
+
+  // Collapsible rail sections — persist open/closed state in localStorage
+  (function() {
+    document.querySelectorAll('.rail-section[id]').forEach(d => {
+      const key = 'bm-rail-' + d.id;
+      try {
+        const saved = localStorage.getItem(key);
+        if (saved === 'closed') d.open = false;
+        if (saved === 'open') d.open = true;
+      } catch (e) {}
+      d.addEventListener('toggle', () => {
+        try { localStorage.setItem(key, d.open ? 'open' : 'closed'); } catch (e) {}
+      });
+    });
   })();
 
   // Slippage tolerance — preset toggles + custom input + warning thresholds
