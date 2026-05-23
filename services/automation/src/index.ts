@@ -28,7 +28,6 @@ export {
 } from "./clients/anchor.js";
 export type { AnchorClientOptions } from "./clients/anchor.js";
 export {
-  morningCreateMarketsJob,
   runMorningCreateMarkets,
   scaleStrikeToI64,
 } from "./jobs/morning.js";
@@ -41,7 +40,6 @@ export type {
   TickerOutcome,
 } from "./jobs/morning.js";
 export {
-  settlementNudgerJob,
   runSettlementNudger,
   defaultShouldRetry,
   SETTLE_RETRY_INTERVAL_MS,
@@ -56,3 +54,42 @@ export type {
 } from "./jobs/settlement.js";
 export { retryUntilDeadline } from "./lib/retry.js";
 export type { RetryOptions, RetryResult, RetryDeps } from "./lib/retry.js";
+
+// DR-005 / DR-006 — strike-grid evolution
+export {
+  TICKER_DEFAULTS,
+  computeStrikeGrid,
+  driftBps,
+  expandedStrikeGrid,
+  roundToTick,
+  phaseLabelToOnChainCode,
+} from "./ticker-config.js";
+export type {
+  PhaseLabel,
+  TickerConfigView,
+  TickerDefaults,
+} from "./ticker-config.js";
+export {
+  runAnchorPhase,
+  runWildSwingPhase,
+  isInPhaseWindow,
+  isRegularTradingDay,
+} from "./grid-evolution.js";
+export type {
+  GridPhaseDeps,
+  GridPhaseOutcome,
+  PerTickerOutcome,
+  UpdateTickerConfigInput,
+  UpdateTickerConfigResult,
+  UpdateTickerConfigFn,
+  ReadTickerConfigFn,
+} from "./grid-evolution.js";
+
+// DR-007 — trading calendar
+export {
+  isTradingDay,
+  isHalfDay,
+  getCloseTime,
+  nextTradingDay,
+  toEtDateString,
+} from "./calendar.js";

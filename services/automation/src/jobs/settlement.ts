@@ -12,10 +12,11 @@
 //   - After 15min exhaustion, the market stays Unsettled; admin can call
 //     `admin_settle` after the on-chain ≥1hr override window opens.
 //
-// Cron: `5 21 * * 1-5` = 4:05 PM ET on US weekdays during EDT (UTC-4).
-// DST flip same known issue as morning.ts.
-
-import { schedules } from "@trigger.dev/sdk/v3";
+// Cron: NO LONGER A STANDALONE CRON.  DR-006 wraps settlement into Phase 1
+// (4:05 PM ET full days) + Phase 1b (1:05 PM ET half-days) — see
+// jobs/grid-evolution.ts.  This module retains `runSettlementNudger` as the
+// pure orchestration function those wrappers call, plus the operator script
+// `scripts/run-settle-once.ts`.
 
 import { loadConfig, type AutomationConfig } from "../config.js";
 import { BellMarketsAnchorClient } from "../clients/anchor.js";
@@ -25,17 +26,6 @@ import { retryUntilDeadline } from "../lib/retry.js";
 export const SETTLE_RETRY_INTERVAL_MS = 30_000;
 /** 15 minutes — PRD-mandated retry-deadline window. */
 export const SETTLE_RETRY_DEADLINE_MS = 15 * 60 * 1000;
-
-export const settlementNudgerJob = schedules.task({
-  id: "settlement-nudger",
-  cron: "5 21 * * 1-5",
-  maxDuration: 900, // 15min — matches the PRD-mandated retry window
-  run: async (payload, { ctx }) =>
-    runSettlementNudger({
-      runAt: payload.timestamp,
-      ctxRunId: ctx.run.id,
-    }),
-});
 
 export type OpenMarketRef = {
   pubkey: string;

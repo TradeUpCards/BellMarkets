@@ -11,17 +11,18 @@
 // the client fail-fasts with a descriptive AnchorClientError until then,
 // so a partial deploy can never silently no-op.
 //
-// Cron: `0 13 * * 1-5` = 8:00 AM ET on US weekdays during EDT (UTC-4).
-// DST: the EST half of the year (early Nov on) needs `0 14 * * 1-5`.
-// Tracked as a Day-1 known issue.
+// Cron: NO LONGER A STANDALONE CRON.  DR-005 deprecates eager
+// `create_strike_market` in favor of user-funded creation; DR-006 reduces
+// Bram's cron to TickerConfig anchor + wild-swing checks (see
+// jobs/grid-evolution.ts).  This module retains the orchestration function +
+// helpers so the `morning:once` operator script can still reproduce Day-4
+// PATH A live evidence on demand.
 //
 // DR-002 reminder: this job has NO special signing authority. The
 // platform-admin keypair we sign with is required by Aria's
 // `constraint = config.admin == admin.key()`; any wallet whose pubkey
 // matches MarketConfig.admin can sign the same call. We are a
 // convenience caller, not an authority.
-
-import { schedules } from "@trigger.dev/sdk/v3";
 
 import { MAG7, type Ticker } from "../types.js";
 import { computeStrikesForStock } from "../strike-calc.js";
@@ -33,17 +34,6 @@ import {
 } from "../config.js";
 import { PythClient, type PreviousCloseResponse } from "../clients/pyth.js";
 import { BellMarketsAnchorClient } from "../clients/anchor.js";
-
-export const morningCreateMarketsJob = schedules.task({
-  id: "morning-create-markets",
-  cron: "0 13 * * 1-5",
-  maxDuration: 300,
-  run: async (payload, { ctx }) =>
-    runMorningCreateMarkets({
-      runAt: payload.timestamp,
-      ctxRunId: ctx.run.id,
-    }),
-});
 
 // ── Vitest-friendly orchestration ───────────────────────────────────────────
 // The Trigger.dev `schedules.task` wrapper above is a thin shell over this
