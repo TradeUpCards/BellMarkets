@@ -117,10 +117,19 @@ if [[ "${LIVE_DEMO:-0}" == "1" ]]; then
   # live-program-call.test.ts test 4 simulates settle_market signed by Drew
   # (non-admin) against a real seeded StrikeMarket and asserts NotExpired (6003).
   # That's the positive chain-level evidence settle has no admin gate.
-  if LIVE_DEVNET=1 pnpm --filter @bell-markets/tests test:integration 2>&1 | grep -q "DR-002 chain evidence"; then
+  #
+  # IMPORTANT: must verify the test actually PASSED, not just appeared in output.
+  # mocha prints pending-test descriptions too — earlier draft grepped for the
+  # test name only and would emit a false-positive ✓ when the test SKIPPED
+  # (e.g., when no seeded StrikeMarket exists on devnet). Sonnet audit caught
+  # this 2026-05-23. We now look for the pass tick + name on the same line.
+  LIVE_OUT=$(LIVE_DEVNET=1 pnpm --filter @bell-markets/tests test:integration 2>&1)
+  if echo "$LIVE_OUT" | grep -qE '✔.*DR-002 chain evidence'; then
     ok "DR-002 chain proof: real NotExpired (6003) against seeded market via non-admin Drew"
+  elif echo "$LIVE_OUT" | grep -qE '-.*DR-002 chain evidence'; then
+    warn "DR-002 chain proof: test SKIPPED (no seeded StrikeMarket on devnet or Drew keypair unfunded)"
   else
-    warn "DR-002 chain proof: expected test name not found in output"
+    warn "DR-002 chain proof: test not found in output (check devnet RPC)"
   fi
 else
   ok "live chain proof skipped (set LIVE_DEMO=1 to run)"

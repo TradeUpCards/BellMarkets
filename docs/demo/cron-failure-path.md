@@ -99,7 +99,9 @@ sequenceDiagram
     C->>C: log + move on
 ```
 
-**Leaderboard indexing (DR-010) intentionally NOT in this diagram** — that's a separate dependency (Helius webhook + Bram's indexer service + Neon Postgres) with its own failure profile (Helius retry window ~72h, after which events drop unless a re-index pass is run against historical chain state). It is **not gated on the settlement cron**, but it IS gated on the indexer service being reachable to receive the webhook. Settle events persist on-chain forever, so streak state is rebuildable from chain history by any indexer — it's eventually-consistent, not load-bearing for the settlement / redemption demo.
+**Leaderboard indexing (DR-010) intentionally NOT in this diagram** — that's a separate dependency (Helius webhook + Bram's indexer service + Neon Postgres) with its own failure profile (Helius retry window ~72h, after which events drop unless a re-index pass is run against historical chain state). It is **not gated on the settlement cron**, but it IS gated on the indexer service being reachable to receive the webhook.
+
+**Scope caveat on streak rebuild:** settle outcomes are permanently on-chain via `StrikeMarket.outcome` + `settled_at_unix`, but a full streak rebuild also needs to know **which side each user held at settle time** (winning vs losing). That information lives in token-account balance snapshots and is recoverable from Helius's compressed-transaction history (or any equivalent indexer's archive). If both Helius's archive AND any team-operated archive are lost simultaneously, position-side history for past settlements is not recoverable from on-chain state alone — only the OUTCOMES are. Streak state is therefore *recoverable in practice* (Helius has not historically lost archive), not *recoverable in cryptographic principle from chain alone*. Eventually-consistent, not load-bearing for the settlement / redemption demo.
 
 Key visual: the cron-death path has the same SETTLEMENT AND REDEMPTION outcome as happy path. The program + Pyth path is fully intact. The user redeems on the same timeline. The leaderboard path (not shown) is a separate concern.
 
