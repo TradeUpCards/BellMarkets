@@ -243,6 +243,17 @@
     background: var(--yes); border-radius: 50%;
     animation: pulse 1.5s ease-in-out infinite;
   }
+  /* Verify-on-chain link chip (opens a popover with PDAs, mints, vault, etc.) */
+  .market-id-sub .chip-link {
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: all 100ms;
+  }
+  .market-id-sub .chip-link:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+    background: var(--accent-bg);
+  }
   .market-controls { display: flex; gap: 6px; }
   .ctrl-btn {
     padding: 7px 12px;
@@ -2349,6 +2360,7 @@
         <span class="market-id-sub">
           <span class="chip live">live</span>
           <span class="chip">expires 4 PM ET</span>
+          <a href="#verify" class="chip chip-link" title="Open on-chain verification details">Verify on-chain ↗</a>
         </span>
       </div>
     </div>
@@ -2696,31 +2708,8 @@
 
         </div>
 
-        <!-- On-chain market info -->
-        <div class="info-card">
-          <div class="info-card-h">
-            <h3>On-chain · market data</h3>
-            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--text-muted);">devnet · live</span>
-          </div>
-          <div class="info-rows-grid">
-            <div class="info-row"><span class="lbl">Strike</span><span class="val">$680.00</span></div>
-            <div class="info-row"><span class="lbl">Expiry</span><span class="val">4:00 PM ET</span></div>
-            <div class="info-row"><span class="lbl">Oracle</span><span class="val live">Pyth · fresh</span></div>
-            <div class="info-row"><span class="lbl">Settled by</span><span class="val accent">anyone (DR-002)</span></div>
-            <div class="info-row"><span class="lbl">Market PDA</span><span class="val">9q5S…rVBN</span></div>
-            <div class="info-row"><span class="lbl">YES mint</span><span class="val">2Yz8…h1Qx</span></div>
-            <div class="info-row"><span class="lbl">NO mint</span><span class="val">3Nb9…k2Lr</span></div>
-            <div class="info-row"><span class="lbl">USDC vault</span><span class="val">5Tg7…n3Mz</span></div>
-            <div class="info-row"><span class="lbl">Phoenix market</span><span class="val">6Wq4…d8Yj</span></div>
-            <div class="info-row"><span class="lbl">Pyth feed</span><span class="val">8Tz9…f4Lp</span></div>
-            <div class="info-row"><span class="lbl">Pairs outstanding</span><span class="val accent">8,420</span></div>
-            <div class="info-row"><span class="lbl">Vault USDC</span><span class="val accent">$8,420.00</span></div>
-            <div class="info-row"><span class="lbl">Confidence</span><span class="val">12 bps (max 50)</span></div>
-            <div class="info-row"><span class="lbl">Staleness</span><span class="val">12s (max 300)</span></div>
-            <div class="info-row"><span class="lbl">Override delay</span><span class="val">+1h after expiry</span></div>
-            <div class="info-row"><span class="lbl">Created at</span><span class="val">8:00 AM ET</span></div>
-          </div>
-        </div>
+        <!-- On-chain market data card removed (Cory feedback: not trader-actionable).
+             Accessible via "Verify on-chain ↗" chip in the market header for auditors. -->
 
       </div>
 
