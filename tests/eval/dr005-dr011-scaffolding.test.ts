@@ -405,6 +405,36 @@ describe("DR-005 — close_settled_market", () => {
       expect((e as Error).message).to.match(/NotSettled/);
     }
   });
+
+  it("audit-4: pairs_outstanding tracked independently of vault — force_redeem decrements both in lockstep", async () => {
+    // Earlier mock used `vault > 0` as a proxy for `pairs_outstanding > 0`. That works
+    // for normal mint/redeem flow but breaks if any future ix decremented one without the
+    // other. New mock tracks `pairsOutstanding: bigint` on StrikeMarket directly (matches
+    // Rust state.rs). This test verifies the field is decremented by every redeem-class
+    // ix and that close_settled_market gates on the field, not vault balance.
+    const { program, state } = await setupWithTickerConfig();
+    const res = await program.userCreateStrikeMarket({
+      user: USER, underlyingPythFeed: PYTH, strikePrice: 200_000_000n,
+      expiryUnix: state.blockTime + 60n, phoenixMarket: PHOENIX,
+    });
+    await program.mintPair({ user: USER, marketId: res.marketId, amount: ONE_USDC });
+    const afterMint = await program.fetchStrikeMarket(res.marketId);
+    expect(afterMint.pairsOutstanding).to.equal(ONE_USDC);
+    expect(await program.fetchVaultBalance(res.marketId)).to.equal(ONE_USDC);
+
+    state.blockTime += 70n;
+    await program.settleMarket({ settler: USER, marketId: res.marketId });
+    state.blockTime += DEFAULT_FEE_CONFIG.forceRedeemGraceSecs + 1n;
+    await program.forceRedeem({ admin: ADMIN, marketId: res.marketId, user: USER, amount: ONE_USDC });
+
+    // After force_redeem: both vault AND pairs_outstanding should be 0.
+    const afterForce = await program.fetchStrikeMarket(res.marketId);
+    expect(afterForce.pairsOutstanding).to.equal(0n);
+    expect(await program.fetchVaultBalance(res.marketId)).to.equal(0n);
+
+    // close_settled_market should succeed (gate is pairs_outstanding == 0).
+    await program.closeSettledMarket({ closer: USER, marketId: res.marketId });
+  });
 });
 
 // ─── DR-010 — commit_leaderboard_root + distribute_*_rewards (Merkle) ────
@@ -547,9 +577,14 @@ describe("DR-010 — commit_leaderboard_root + distribute_*_rewards (Merkle-veri
 
   // ─── New post-audit tests ─────────────────────────────────────────────
 
-  it("rejects position=0 with InvalidDistributionPosition (1..10) — matches Rust is_valid_position", async () => {
+  it("rejects position=0 BEFORE Merkle check (matches Rust is_valid_position bounds-first order)", async () => {
+    // Audit-4: commit a VALID root for position=1 with a real proof, then try distribute
+    // with position=0. If the bounds check fires first, we get InvalidDistributionPosition.
+    // If bounds check were ordered AFTER Merkle, we'd get InvalidProof instead (since the
+    // committed root encodes position=1 but we're claiming position=0). This test pins the
+    // check ORDER as well as the bounds.
     const { program } = await setupWithPoolFunds();
-    const { root, proof } = singleLeafProof(USER, 0, 1n, 0, 10n * ONE_USDC);
+    const { root, proof } = singleLeafProof(USER, 1, 1n, 0, 10n * ONE_USDC);   // valid root for position=1
     await program.commitLeaderboardRoot({
       admin: ADMIN, periodId: 1n, periodType: 0, merkleRoot: root, arweaveTxId: new Uint8Array(48),
     });
@@ -559,7 +594,8 @@ describe("DR-010 — commit_leaderboard_root + distribute_*_rewards (Merkle-veri
       });
       expect.fail("expected InvalidDistributionPosition");
     } catch (e) {
-      expect((e as Error).message).to.match(/InvalidDistributionPosition/);
+      // Must be the BOUNDS error, NOT InvalidProof — proves bounds check fires first.
+      expect((e as Error).message, "bounds check must fire BEFORE Merkle verify").to.match(/InvalidDistributionPosition/);
     }
   });
 

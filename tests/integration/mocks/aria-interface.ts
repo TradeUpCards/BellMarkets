@@ -88,6 +88,13 @@ export interface StrikeMarket {
    *  Drives DR-008 creator-rebate logic in mint_pair. Set by `user_create_strike_market`
    *  (signer is creator) OR `create_strike_market` (admin signer; admin is creator). */
   creator: Pubkey;
+  /** DR-005 close_settled_market gate: count of outstanding minted pairs.
+   *  +1 per `amount` in mint_pair; -1 per `amount` in redeem/redeem_pair/redeem_invalid/force_redeem.
+   *  Mock-mirror of Aria's on-chain `pairs_outstanding: u64` field (matches Rust state.rs).
+   *  Audit-4 (2026-05-23) tracked this separately from vault balance so closeSettledMarket
+   *  can gate on `pairs_outstanding == 0` (matching Rust) rather than the equivalent-but-
+   *  not-identical `vault > 0` proxy. */
+  pairsOutstanding: bigint;
   bump: number;                        // u8
   yesMintBump: number;
   noMintBump: number;
@@ -333,7 +340,7 @@ export interface DistributeRewardsArgs {
   admin: Pubkey;
   periodId: bigint;
   recipient: Pubkey;
-  position: number;                     // u8; 0..9
+  position: number;                     // u8; 1..10 (Rust is_valid_position requires >=1)
   amount: UsdcMicros;
   merkleProof: Uint8Array[];            // each entry is [u8; 32]; verified against committed root
 }
@@ -607,6 +614,7 @@ export function createMockAria(opts: MockOptions = {}): { program: AriaProgram; 
         outcome: OUTCOME_UNSETTLED,
         adminOverrideEligibleAt: args.expiryUnix + state.config.adminOverrideDelaySecs,
         creator: args.admin,             // DR-005/008: admin is creator when admin-created
+        pairsOutstanding: 0n,
         bump: 254, yesMintBump: 253, noMintBump: 252, vaultBump: 251,
         _reserved: new Uint8Array(64),
       };
@@ -659,6 +667,7 @@ export function createMockAria(opts: MockOptions = {}): { program: AriaProgram; 
         outcome: OUTCOME_UNSETTLED,
         adminOverrideEligibleAt: args.expiryUnix + state.config.adminOverrideDelaySecs,
         creator: args.user,              // DR-005: user is creator, drives DR-008 rebate logic
+        pairsOutstanding: 0n,
         bump: 254, yesMintBump: 253, noMintBump: 252, vaultBump: 251,
         _reserved: new Uint8Array(64),
       };
@@ -738,6 +747,7 @@ export function createMockAria(opts: MockOptions = {}): { program: AriaProgram; 
 
       // Vault gets the principal (preserves $1 invariant); fee already siphoned above.
       state.vaults.set(args.marketId, (state.vaults.get(args.marketId) ?? 0n) + args.amount);
+      m.pairsOutstanding += args.amount;       // DR-005 close_settled_market gate
       const key = posKey(args.marketId, args.user);
       const cur = state.positions.get(key) ?? {
         marketId: args.marketId, wallet: args.user, yesBalance: 0n, noBalance: 0n,
@@ -815,6 +825,7 @@ export function createMockAria(opts: MockOptions = {}): { program: AriaProgram; 
       else              pos.noBalance  -= args.amount;
       state.positions.set(key, pos);
       state.vaults.set(args.marketId, (state.vaults.get(args.marketId) ?? 0n) - args.amount);
+      m.pairsOutstanding -= args.amount;       // DR-005
 
       log("redeem", { user: args.user, marketId: args.marketId, amount: args.amount, winningSide: oc });
       return tx();
@@ -850,6 +861,7 @@ export function createMockAria(opts: MockOptions = {}): { program: AriaProgram; 
       pos.noBalance  -= args.amount;
       state.positions.set(key, pos);
       state.vaults.set(args.marketId, (state.vaults.get(args.marketId) ?? 0n) - args.amount);
+      m.pairsOutstanding -= args.amount;       // DR-005
 
       log("redeemPair", { user: args.user, marketId: args.marketId, amount: args.amount });
       return tx();
@@ -880,6 +892,7 @@ export function createMockAria(opts: MockOptions = {}): { program: AriaProgram; 
       pos.noBalance  -= args.amount;
       state.positions.set(key, pos);
       state.vaults.set(args.marketId, (state.vaults.get(args.marketId) ?? 0n) - args.amount);
+      m.pairsOutstanding -= args.amount;       // DR-005
 
       log("redeemInvalid", { user: args.user, marketId: args.marketId, amount: args.amount });
       return tx();
@@ -934,6 +947,7 @@ export function createMockAria(opts: MockOptions = {}): { program: AriaProgram; 
       const pos = state.positions.get(key) ?? { marketId: args.marketId, wallet: args.user, yesBalance: 0n, noBalance: 0n };
       // Admin can force-redeem regardless of which side won — pays out from vault.
       state.vaults.set(args.marketId, (state.vaults.get(args.marketId) ?? 0n) - args.amount);
+      m.pairsOutstanding -= args.amount;       // DR-005 + audit-4 — keep in sync with vault drain
       // Clear position (simulates burn-and-pay regardless of side).
       const oc = outcomeKind(m.outcome);
       if (oc === "yes") pos.yesBalance = pos.yesBalance > args.amount ? pos.yesBalance - args.amount : 0n;
@@ -955,10 +969,11 @@ export function createMockAria(opts: MockOptions = {}): { program: AriaProgram; 
         throw new Error("closeSettledMarket: AlreadyClosed");
       }
 
-      // Pairs-outstanding check via vault balance (vault.amount == pairs_outstanding × $1).
-      const vault = state.vaults.get(args.marketId) ?? 0n;
-      if (vault > 0n) {
-        throw new Error(`closeSettledMarket: PairsStillOutstanding (vault=${vault})`);
+      // DR-005 + audit-4: gate on `pairs_outstanding == 0` directly (matches Rust handler;
+      // earlier mock used vault > 0 as a proxy which broke when force_redeem decremented
+      // pairs_outstanding without the mock's parallel state being tracked).
+      if (m.pairsOutstanding > 0n) {
+        throw new Error(`closeSettledMarket: PairsStillOutstanding (pairs=${m.pairsOutstanding}, vault=${state.vaults.get(args.marketId) ?? 0n})`);
       }
       // Recovered rent flows to treasury per DR-005 §"Closed-rent recovery."
       const recoveredRent = 3n * 200_000n;  // mock: ~$0.60 total for yes_mint + no_mint + vault rent
