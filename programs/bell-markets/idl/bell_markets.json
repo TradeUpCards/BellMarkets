@@ -103,6 +103,108 @@
       ]
     },
     {
+      "name": "commit_leaderboard_root",
+      "discriminator": [
+        102,
+        88,
+        81,
+        227,
+        47,
+        243,
+        164,
+        168
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "leaderboard_commits",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  101,
+                  97,
+                  100,
+                  101,
+                  114,
+                  98,
+                  111,
+                  97,
+                  114,
+                  100,
+                  95,
+                  99,
+                  111,
+                  109,
+                  109,
+                  105,
+                  116,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "clock",
+          "address": "SysvarC1ock11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "period_id",
+          "type": "u64"
+        },
+        {
+          "name": "period_type",
+          "type": "u8"
+        },
+        {
+          "name": "merkle_root",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "arweave_tx_id",
+          "type": {
+            "array": [
+              "u8",
+              48
+            ]
+          }
+        }
+      ]
+    },
+    {
       "name": "create_strike_market",
       "discriminator": [
         21,
@@ -272,6 +374,275 @@
         {
           "name": "expiry_unix",
           "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "distribute_monthly_rewards",
+      "discriminator": [
+        16,
+        197,
+        134,
+        63,
+        184,
+        204,
+        239,
+        92
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "leaderboard_commits",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  101,
+                  97,
+                  100,
+                  101,
+                  114,
+                  98,
+                  111,
+                  97,
+                  114,
+                  100,
+                  95,
+                  99,
+                  111,
+                  109,
+                  109,
+                  105,
+                  116,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "monthly_pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  111,
+                  110,
+                  116,
+                  104,
+                  108,
+                  121,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "recipient"
+        },
+        {
+          "name": "recipient_token",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "period_id",
+          "type": "u64"
+        },
+        {
+          "name": "position",
+          "type": "u8"
+        },
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "merkle_proof",
+          "type": {
+            "vec": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "distribute_weekly_rewards",
+      "discriminator": [
+        133,
+        171,
+        17,
+        234,
+        101,
+        17,
+        196,
+        5
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "leaderboard_commits",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  101,
+                  97,
+                  100,
+                  101,
+                  114,
+                  98,
+                  111,
+                  97,
+                  114,
+                  100,
+                  95,
+                  99,
+                  111,
+                  109,
+                  109,
+                  105,
+                  116,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "weekly_pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  119,
+                  101,
+                  101,
+                  107,
+                  108,
+                  121,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "recipient",
+          "docs": [
+            "(`recipient_token.owner == recipient.key()`), so the wallet account",
+            "itself isn't deserialized."
+          ]
+        },
+        {
+          "name": "recipient_token",
+          "docs": [
+            "Recipient's USDC ATA. Must be owned by `recipient` to bind the",
+            "merkle-leaf identity to the actual transfer target."
+          ],
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "period_id",
+          "type": "u64"
+        },
+        {
+          "name": "position",
+          "type": "u8"
+        },
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "merkle_proof",
+          "type": {
+            "vec": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
         }
       ]
     },
@@ -457,6 +828,169 @@
           }
         }
       ]
+    },
+    {
+      "name": "initialize_rewards_pools",
+      "discriminator": [
+        237,
+        181,
+        71,
+        163,
+        194,
+        7,
+        62,
+        174
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "fee_config",
+          "docs": [
+            "FeeConfig must exist before pools are initialized (binding check)."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "weekly_pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  119,
+                  101,
+                  101,
+                  107,
+                  108,
+                  121,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "monthly_pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  111,
+                  110,
+                  116,
+                  104,
+                  108,
+                  121,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "leaderboard_commits",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  101,
+                  97,
+                  100,
+                  101,
+                  114,
+                  98,
+                  111,
+                  97,
+                  114,
+                  100,
+                  95,
+                  99,
+                  111,
+                  109,
+                  109,
+                  105,
+                  116,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "usdc_mint",
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "rent",
+          "address": "SysvarRent111111111111111111111111111111111"
+        }
+      ],
+      "args": []
     },
     {
       "name": "mint_pair",
@@ -1599,6 +2133,19 @@
       ]
     },
     {
+      "name": "LeaderboardCommitments",
+      "discriminator": [
+        29,
+        245,
+        243,
+        175,
+        232,
+        174,
+        165,
+        122
+      ]
+    },
+    {
       "name": "MarketConfig",
       "discriminator": [
         119,
@@ -1949,6 +2496,141 @@
               "array": [
                 "u8",
                 64
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "LeaderboardCommitments",
+      "docs": [
+        "Global singleton ring buffer. Seed = [b\"leaderboard_commits\"].",
+        "",
+        "`next_slot` is the write head modulo `LEADERBOARD_COMMITMENT_CAPACITY`.",
+        "Distribute ixs lookup by linear scan over the 24 entries matching",
+        "(period_id, period_type) — at 24 i64 comparisons + 1 u8 comparison this",
+        "is negligible CU."
+      ],
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "config",
+            "type": "pubkey"
+          },
+          {
+            "name": "entries",
+            "type": {
+              "array": [
+                {
+                  "defined": {
+                    "name": "LeaderboardEntry"
+                  }
+                },
+                24
+              ]
+            }
+          },
+          {
+            "name": "next_slot",
+            "type": "u8"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "_reserved",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          },
+          {
+            "name": "_trailing_pad",
+            "type": {
+              "array": [
+                "u8",
+                6
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "LeaderboardEntry",
+      "docs": [
+        "LeaderboardCommitments uses `#[account(zero_copy)]` because the 24-entry",
+        "fixed-size array (~2.3 KB) would otherwise overrun the BPF 4096-byte",
+        "stack frame inside Anchor's macro-generated `try_deserialize_unchecked`",
+        "(kickoff §4.11). Zero-copy keeps the struct in mapped memory; access via",
+        "`AccountLoader<'info, LeaderboardCommitments>::load()` /",
+        "`load_mut()`.",
+        "",
+        "Field layout (repr(C)):",
+        "period_id            @ 0  (u64, align 8)",
+        "committed_at_unix    @ 8  (i64, align 8)",
+        "claimed_bitmap       @ 16 (u32, align 4)  — bit i set = position (i+1) claimed",
+        "period_type          @ 20 (u8)",
+        "merkle_root          @ 21 ([u8;32])",
+        "arweave_tx_id        @ 53 ([u8;48], first 43 = ASCII Arweave CID, last 5 = zero padding)",
+        "end                  @ 101 → padded to 104 (struct align 8)"
+      ],
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "period_id",
+            "type": "u64"
+          },
+          {
+            "name": "committed_at_unix",
+            "type": "i64"
+          },
+          {
+            "name": "claimed_bitmap",
+            "type": "u32"
+          },
+          {
+            "name": "period_type",
+            "type": "u8"
+          },
+          {
+            "name": "merkle_root",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "arweave_tx_id",
+            "type": {
+              "array": [
+                "u8",
+                48
+              ]
+            }
+          },
+          {
+            "name": "_trailing_pad",
+            "type": {
+              "array": [
+                "u8",
+                3
               ]
             }
           }

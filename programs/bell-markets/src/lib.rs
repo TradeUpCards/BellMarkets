@@ -21,9 +21,10 @@ pub mod errors;
 pub mod oracle;
 pub mod adapters;
 pub mod instructions;
+pub mod merkle;
 
 use instructions::*;
-use state::{Outcome, MAX_ALLOWED_STRIKES};
+use state::{Outcome, MAX_ALLOWED_STRIKES, ARWEAVE_TX_ID_LEN};
 
 // Program ID derived from keys/devnet-program-keypair.json (gitignored; also
 // mirrored at target/deploy/bell_markets-keypair.json where Anchor reads it
@@ -163,6 +164,58 @@ pub mod bell_markets {
             force_redeem_grace_secs,
             weekly_distribution_bps,
             monthly_distribution_bps,
+        )
+    }
+
+    pub fn initialize_rewards_pools(ctx: Context<InitializeRewardsPools>) -> Result<()> {
+        instructions::initialize_rewards_pools::handler(ctx)
+    }
+
+    pub fn commit_leaderboard_root(
+        ctx: Context<CommitLeaderboardRoot>,
+        period_id: u64,
+        period_type: u8,
+        merkle_root: [u8; 32],
+        arweave_tx_id: [u8; ARWEAVE_TX_ID_LEN],
+    ) -> Result<()> {
+        instructions::commit_leaderboard_root::handler(
+            ctx,
+            period_id,
+            period_type,
+            merkle_root,
+            arweave_tx_id,
+        )
+    }
+
+    pub fn distribute_weekly_rewards(
+        ctx: Context<DistributeWeeklyRewards>,
+        period_id: u64,
+        position: u8,
+        amount: u64,
+        merkle_proof: Vec<[u8; 32]>,
+    ) -> Result<()> {
+        instructions::distribute_weekly_rewards::handler(
+            ctx,
+            period_id,
+            position,
+            amount,
+            merkle_proof,
+        )
+    }
+
+    pub fn distribute_monthly_rewards(
+        ctx: Context<DistributeMonthlyRewards>,
+        period_id: u64,
+        position: u8,
+        amount: u64,
+        merkle_proof: Vec<[u8; 32]>,
+    ) -> Result<()> {
+        instructions::distribute_monthly_rewards::handler(
+            ctx,
+            period_id,
+            position,
+            amount,
+            merkle_proof,
         )
     }
 }

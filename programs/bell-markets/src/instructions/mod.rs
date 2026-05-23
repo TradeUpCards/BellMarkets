@@ -12,6 +12,10 @@ pub mod update_ticker_config;
 pub mod user_create_strike_market;
 pub mod initialize_fee_config;
 pub mod update_fee_config;
+pub mod initialize_rewards_pools;
+pub mod commit_leaderboard_root;
+pub mod distribute_weekly_rewards;
+pub mod distribute_monthly_rewards;
 
 pub use initialize_config::*;
 pub use create_strike_market::*;
@@ -27,3 +31,7 @@ pub use update_ticker_config::*;
 pub use user_create_strike_market::*;
 pub use initialize_fee_config::*;
 pub use update_fee_config::*;
+pub use initialize_rewards_pools::*;
+pub use commit_leaderboard_root::*;
+pub use distribute_weekly_rewards::*;
+pub use distribute_monthly_rewards::*;

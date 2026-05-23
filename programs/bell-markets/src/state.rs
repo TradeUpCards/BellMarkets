@@ -299,7 +299,104 @@ impl FeeConfig {
         + 64; // _reserved
 }
 
-// LeaderboardCommitments (DR-010) lives in P3 work — see commits after this
+// ─── DR-010 — Leaderboard commitments + reward pool constants ───────────────
+
+/// Rolling 24-entry ring buffer (12 weekly + 12 monthly = ~3mo lookback per
+/// period type at the standard cadence). Larger windows can be added later
+/// by reallocating (zero_copy account is realloc-friendly because writes go
+/// straight to mapped memory).
+pub const LEADERBOARD_COMMITMENT_CAPACITY: usize = 24;
+
+/// Arweave content IDs are base64url 43 ASCII chars. We use a 48-byte field
+/// in the on-chain LeaderboardEntry struct (Anchor's `#[zero_copy]` + bytemuck
+/// Pod impls require array sizes that fit common bytemuck blanket impls; 48
+/// is the next 8-byte-aligned size up from 43). The trailing 5 bytes are
+/// zero-padding and documented as such for off-chain consumers — they slice
+/// `[..43]` when displaying.
+pub const ARWEAVE_TX_ID_LEN: usize = 48;
+pub const ARWEAVE_TX_ID_ASCII_LEN: usize = 43;
+
+pub const PERIOD_TYPE_WEEKLY: u8 = 0;
+pub const PERIOD_TYPE_MONTHLY: u8 = 1;
+
+/// Top-N distribution slots per period type (matches `FeeConfig.weekly_distribution_bps`
+/// and `monthly_distribution_bps` array length).
+pub const DISTRIBUTION_SLOTS: usize = 10;
+
+/// Max merkle-proof depth accepted by `verify_merkle_proof`. Caps CU usage
+/// (each hash step = ~600 CU). log2(2^16) = 16 leaves headroom for any
+/// reasonable leaderboard size while bounding worst-case verify cost.
+pub const MERKLE_PROOF_MAX_DEPTH: usize = 16;
+
+/// LeaderboardCommitments uses `#[account(zero_copy)]` because the 24-entry
+/// fixed-size array (~2.3 KB) would otherwise overrun the BPF 4096-byte
+/// stack frame inside Anchor's macro-generated `try_deserialize_unchecked`
+/// (kickoff §4.11). Zero-copy keeps the struct in mapped memory; access via
+/// `AccountLoader<'info, LeaderboardCommitments>::load()` /
+/// `load_mut()`.
+///
+/// Field layout (repr(C)):
+///   period_id            @ 0  (u64, align 8)
+///   committed_at_unix    @ 8  (i64, align 8)
+///   claimed_bitmap       @ 16 (u32, align 4)  — bit i set = position (i+1) claimed
+///   period_type          @ 20 (u8)
+///   merkle_root          @ 21 ([u8;32])
+///   arweave_tx_id        @ 53 ([u8;48], first 43 = ASCII Arweave CID, last 5 = zero padding)
+///   end                  @ 101 → padded to 104 (struct align 8)
+// No #[derive(Default)] — Rust stdlib only impls Default for [T; N] up to N=32,
+// so the trailing fixed-size byte arrays would need a manual Default impl. We
+// don't need it: Anchor's `init` constraint allocates zero-initialized space
+// for zero-copy accounts, so every entry starts at all-zero bytes (which IS
+// a valid empty LeaderboardEntry — period_id=0, etc.).
+//
+// `_trailing_pad`: explicit because `#[zero_copy]` derives `bytemuck::Pod`,
+// which rejects structs with implicit alignment-trailing padding. Without
+// this field, the struct would size to 101 bytes but align-to-8 rounds up
+// to 104, leaving 3 bytes of implicit padding bytemuck refuses to accept.
+#[zero_copy]
+#[repr(C)]
+#[derive(Debug, PartialEq)]
+pub struct LeaderboardEntry {
+    pub period_id: u64,
+    pub committed_at_unix: i64,
+    pub claimed_bitmap: u32,
+    pub period_type: u8,
+    pub merkle_root: [u8; 32],
+    pub arweave_tx_id: [u8; ARWEAVE_TX_ID_LEN],
+    pub _trailing_pad: [u8; 3],
+}
+
+impl LeaderboardEntry {
+    /// 8 + 8 + 4 + 1 + 32 + 48 + 3 = 104 bytes (struct align 8 → no implicit pad).
+    pub const LEN: usize = 104;
+}
+
+/// Global singleton ring buffer. Seed = [b"leaderboard_commits"].
+///
+/// `next_slot` is the write head modulo `LEADERBOARD_COMMITMENT_CAPACITY`.
+/// Distribute ixs lookup by linear scan over the 24 entries matching
+/// (period_id, period_type) — at 24 i64 comparisons + 1 u8 comparison this
+/// is negligible CU.
+#[account(zero_copy)]
+#[repr(C)]
+pub struct LeaderboardCommitments {
+    pub config: Pubkey,
+    pub entries: [LeaderboardEntry; LEADERBOARD_COMMITMENT_CAPACITY],
+    pub next_slot: u8,
+    pub bump: u8,
+    pub _reserved: [u8; 64],
+    pub _trailing_pad: [u8; 6], // align outer struct to 8 (bytemuck::Pod requirement)
+}
+
+impl LeaderboardCommitments {
+    /// 32 + 104×24 + 1 + 1 + 64 + 6 = 2600 bytes (+ 8 disc = 2608 on-chain).
+    pub const LEN: usize = 32
+        + LeaderboardEntry::LEN * LEADERBOARD_COMMITMENT_CAPACITY
+        + 1  // next_slot
+        + 1  // bump
+        + 64 // _reserved
+        + 6; // _trailing_pad (align-to-8)
+}
 // one. It cannot be a standard `#[account]` struct because the 24-entry
 // fixed-size array (~2208 bytes payload) overruns the BPF 4096-byte stack
 // frame inside Anchor's macro-generated `try_deserialize_unchecked`

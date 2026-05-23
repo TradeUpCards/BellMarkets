@@ -104,6 +104,15 @@ pub(crate) fn apply_linear_decay(volume: u64, last_decay_unix: i64, now: i64) ->
 /// fee_total — avoids 1-base-unit accounting drift from triple integer
 /// division (which would otherwise round 3 × `fee_total/3` to `fee_total - 1`
 /// or `fee_total - 2`).
+///
+/// Defensive note: `saturating_sub` guards against a hypothetical bypassed
+/// invariant (platform_bps + weekly_bps > 10000). The real upstream guard is
+/// `validate_fee_params`'s sum-to-10000 check; this saturation only prevents
+/// a panic if that check were bypassed somehow. Worst case under bypass:
+/// monthly clamps to 0 while platform+weekly briefly exceed fee_total
+/// (overcharging the user). The on-chain SPL Token transfer would then
+/// fail (`Insufficient funds` on user_usdc) — a graceful revert, not a
+/// silent invariant break.
 pub(crate) fn split_fee(
     fee_total: u64,
     platform_bps: u16,
@@ -254,11 +263,27 @@ pub fn handler(ctx: Context<MintPair>, amount: u64) -> Result<()> {
         && ctx.accounts.strike_market.outcome == Outcome::Unsettled;
 
     // ── Compute effective fee_bps ────────────────────────────────────────
+    //
+    // Semantics (P2 audit fix): `mint_fee_bps` is the TIER-1 fee rate; lower
+    // tiers scale proportionally. Mathematically:
+    //
+    //     after_tier = tier_bps × mint_fee_bps / TIER_FEE_BPS_TIER1
+    //
+    // Canonical config (mint_fee_bps = 200): tier-1 pays 200, tier-2 pays 150,
+    // tier-3 pays 100 — matches DR-008 table exactly.
+    //
+    // Promo-mode config (mint_fee_bps = 100, DR-010 § Promo mode): tier-1
+    // pays 100, tier-2 pays 75, tier-3 pays 50 — tier discount preserved
+    // proportionally rather than collapsing to a single rate.
+    //
+    // mint_fee_bps == 0 short-circuits to 0 (fees off — Day-1 demo behavior).
     let effective_bps: u16 = if fee_bps_static == 0 {
         0
     } else {
         let tier_bps = tier_fee_bps(ctx.accounts.user_config.mint_volume_30d);
-        let after_tier = tier_bps.min(fee_bps_static);
+        let scaled = (tier_bps as u32).saturating_mul(fee_bps_static as u32)
+            / (TIER_FEE_BPS_TIER1 as u32);
+        let after_tier = scaled as u16;
         if creator_rebate_fires {
             fee_after_rebate(after_tier, creator_rebate_bps)
         } else {
@@ -525,6 +550,64 @@ mod tests {
         assert_eq!(w, 500);
         assert_eq!(m, 500);
         assert_eq!(p + w + m, 1000);
+    }
+
+    // ── tier scaling (P2 audit fix) ───────────────────────────────────
+
+    /// Helper mirroring the in-handler `effective_bps` computation. Lifted
+    /// here so the scaling formula can be property-tested independent of
+    /// the on-chain handler (which requires a full Context).
+    fn effective_bps_scaled(volume_30d: u64, mint_fee_bps: u16) -> u16 {
+        if mint_fee_bps == 0 { return 0; }
+        let tier = tier_fee_bps(volume_30d);
+        ((tier as u32).saturating_mul(mint_fee_bps as u32)
+            / (TIER_FEE_BPS_TIER1 as u32)) as u16
+    }
+
+    #[test]
+    fn tier_canonical_config_matches_dr008_table() {
+        // mint_fee_bps = 200 (DR-008 canonical) → tier rates are unchanged.
+        assert_eq!(effective_bps_scaled(0, 200), TIER_FEE_BPS_TIER1);                // 200
+        assert_eq!(effective_bps_scaled(TIER_BREAK_1K_USDC, 200), TIER_FEE_BPS_TIER2); // 150
+        assert_eq!(effective_bps_scaled(TIER_BREAK_10K_USDC, 200), TIER_FEE_BPS_TIER3); // 100
+    }
+
+    #[test]
+    fn tier_promo_mode_preserves_differentiation() {
+        // mint_fee_bps = 100 (DR-010 § Promo mode) → tier rates scale by 1/2.
+        assert_eq!(effective_bps_scaled(0, 100), 100);                          // 200 × 100 / 200
+        assert_eq!(effective_bps_scaled(TIER_BREAK_1K_USDC, 100), 75);          // 150 × 100 / 200
+        assert_eq!(effective_bps_scaled(TIER_BREAK_10K_USDC, 100), 50);         // 100 × 100 / 200
+    }
+
+    #[test]
+    fn tier_high_fee_preserves_differentiation() {
+        // mint_fee_bps = 400 (4% — hypothetical aggressive setting) → tier
+        // rates scale by 2. Verifies the scaling holds above the canonical
+        // tier-1 rate too.
+        assert_eq!(effective_bps_scaled(0, 400), 400);
+        assert_eq!(effective_bps_scaled(TIER_BREAK_1K_USDC, 400), 300);
+        assert_eq!(effective_bps_scaled(TIER_BREAK_10K_USDC, 400), 200);
+    }
+
+    #[test]
+    fn tier_fee_off_short_circuits() {
+        // mint_fee_bps = 0 → no fee regardless of tier.
+        assert_eq!(effective_bps_scaled(0, 0), 0);
+        assert_eq!(effective_bps_scaled(TIER_BREAK_10K_USDC * 100, 0), 0);
+    }
+
+    #[test]
+    fn tier_scaling_property_monotone_in_volume() {
+        // Property: at any fixed mint_fee_bps > 0, scaled fee decreases or
+        // stays equal as volume crosses tier boundaries.
+        for mint_fee_bps in [50u16, 100, 200, 300, 500, 1_000].iter().copied() {
+            let f_tier1 = effective_bps_scaled(0, mint_fee_bps);
+            let f_tier2 = effective_bps_scaled(TIER_BREAK_1K_USDC, mint_fee_bps);
+            let f_tier3 = effective_bps_scaled(TIER_BREAK_10K_USDC, mint_fee_bps);
+            assert!(f_tier1 >= f_tier2, "tier1 must be ≥ tier2 at mint_fee_bps={mint_fee_bps}");
+            assert!(f_tier2 >= f_tier3, "tier2 must be ≥ tier3 at mint_fee_bps={mint_fee_bps}");
+        }
     }
 
     #[test]
