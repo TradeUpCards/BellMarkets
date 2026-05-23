@@ -137,10 +137,11 @@ fi
 echo ""
 
 # ── Step 6: Edge cases (mock-level invariant proof set) ────────────────
-step "[6/6] 27 edge-case assertions"
-note "Sources: tests/eval/edge-cases.test.ts (I3 immutability, DR-002 sweep,"
+step "[6/6] Edge-case assertions"
+note "Active sources: tests/eval/edge-cases.test.ts (I3 immutability, DR-002 sweep,"
 note "redeem discipline, redeem_invalid, redeem_pair round-trip, pause, etc.)"
-pnpm --filter @bell-markets/tests test:eval 2>&1 | tail -3 | head -1
+note "Pre-merge scaffolds: tests/eval/dr005-dr011-scaffolding.test.ts (38 pending — wait Aria's IDL)"
+pnpm --filter @bell-markets/tests test:eval 2>&1 | grep -E "passing|pending|failing" | head -2
 echo ""
 
 ELAPSED=$(($(date +%s) - START_TS))
