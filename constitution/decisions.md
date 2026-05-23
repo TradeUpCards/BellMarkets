@@ -378,6 +378,59 @@ Per-market revenue at $10K mint volume / 95% redemption rate: A ~$190, B ~$200, 
 
 ---
 
+### DR-009 — CLOB strategy: integrate Phoenix v1 for MVP; revisit at scale
+
+**Date:** 2026-05-22 (Fri evening — extends DR-001)
+**Status:** Active — MVP commitment; future revisit triggered by scale + Model D outcome
+**Made by:** Cory (Tate-routed)
+
+**Context:** DR-001 chose Phoenix v1 integration over building our own CLOB primarily on time-budget grounds (1.5-day build savings). DR-008 surfaced a fee-capture concern: Phoenix trades bypass our `mint_pair`/`redeem` fee touchpoints entirely. The question: does the missed Phoenix-fee revenue justify building (or forking) our own CLOB?
+
+**Decision:** Stay with Phoenix v1 for MVP. Defer custom-CLOB consideration to v2+ scale milestones. Trigger to revisit: ($1M+ daily Phoenix volume) AND (Model D — per-market `fee_receiver` config — proves infeasible on Phoenix v1).
+
+**Revenue math (50-bps Phoenix venue fee, hypothetical):**
+
+| Daily volume | Annual fee captured | Cost-effective vs build? |
+|---|---|---|
+| $500K | ~$30K | NO (build cost dwarfs revenue) |
+| $1M | ~$60K | MARGINAL (4-8mo to recoup audit) |
+| $5M | ~$305K | YES (full audit recouped in <1yr) |
+| $50M | ~$3M | OBVIOUSLY YES (clear strategic priority) |
+
+**Build cost reality check:**
+- Initial build: 2-4 months focused engineering. Ellipsis Labs spent ~1.5 years on Phoenix v1 (admittedly broader feature set).
+- Audit: $50K-$200K (matching engines are top-risk audit category).
+- Liquidity bootstrap: zero day-1 traders + no integrator network (Jupiter routes through Phoenix v1, not us).
+- Ongoing maintenance: ~$30-50K/year.
+
+**Three escalation paths (in order of severity, choose based on what fails):**
+
+1. **Phoenix v1 + Model D venue fees** (current attempt): if Bram validates `fee_receiver` config, we capture Phoenix-trade fees with zero extra build. Keep all of Phoenix's audited matching + integrator network. Most-preferred outcome.
+
+2. **Phoenix v1 + no Model D** (fallback if D fails on v1): keep DR-001 + DR-008 mint-only fee. Lose Phoenix-trade fee layer. Acceptable below $1M daily volume.
+
+3. **Fork Phoenix v1** (revisit at scale): copy Phoenix v1's MIT-licensed source; add per-market `fee_receiver` + `set_fee_receiver` ix. Deploy as "BellPhoenix" replacement. ~1-2 weeks build + ~$10-30K audit (reduced because Phoenix's base is well-understood). Loses Phoenix's integrator network (Jupiter routing) — accept that trade for full fee capture.
+
+4. **Build from scratch** (never seriously considered): full custom matching engine. ~2-4 months + $50-200K audit + zero integrator network. Only ROI-positive at $5M+ daily volume; even then, fork is preferable.
+
+**Phoenix v2 watch:** Ellipsis Labs has hinted at Phoenix v2. If launched with native `fee_receiver` support, we migrate to v2 instead of forking v1. Bram monitors quarterly.
+
+**Trade-off:** We accept ~$60-300K/year in foregone Phoenix-trade fees at moderate scale ($1-5M daily volume) in exchange for: zero matching-engine maintenance burden; Phoenix's integrator network (Jupiter routes); audited matching logic we don't have to defend; faster iteration on our actual differentiation (binary options primitives, lifecycle, demo).
+
+**Consequences:**
+- **MVP through ~6 months post-launch:** Phoenix v1 integration as-is. DR-008 mint-fee captures most revenue.
+- **First 6-12 months at scale:** if Model D works, we're already capturing Phoenix trades passively. Skip fork entirely.
+- **12+ months at $5M+ daily volume:** assemble fork team if Model D didn't materialize. Or migrate to Phoenix v2 if launched.
+- **Documentation:** v2 planning doc references this DR. Engineering leads aware that "build our own CLOB" is a scale-triggered conversation, not an MVP question.
+
+**Alternatives considered:**
+- **Build custom CLOB for MVP:** rejected. Time + audit cost + zero liquidity + risks dwarf the 3-day demo's needs.
+- **Wait indefinitely for Phoenix v2:** rejected as default. Don't bet revenue on Phoenix's roadmap timing; ship Model D investigation + mint fees first.
+- **Use a different existing CLOB (Drift Spot, Serum, Manifest, etc.):** rejected. Phoenix is best-fit for our use case (pure FIFO order book; minimal abstractions; tested with our magic-prefix check). Switching for fee-capture reasons creates the same integrator-network gap as forking, without the time savings.
+- **Hybrid (Phoenix for tokens that need integrator routing, our own CLOB for tokens we won't list elsewhere):** rejected. Adds complexity without clear win at our scale.
+
+---
+
 > Aim for 5–15 active DRs over a project's life. Fewer and you're not
 > locking enough; more and the file becomes unscannable (rotate stable
 > ones into `specs/architecture.md` if they've become "just how the
