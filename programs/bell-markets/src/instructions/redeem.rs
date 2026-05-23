@@ -34,6 +34,7 @@ pub struct Redeem<'info> {
     #[account(
         mut,
         constraint = strike_market.outcome != Outcome::Unsettled @ BellMarketsError::NotSettled,
+        constraint = strike_market.config == config.key() @ BellMarketsError::ConfigMismatch,
     )]
     pub strike_market: Box<Account<'info, StrikeMarket>>,
 
