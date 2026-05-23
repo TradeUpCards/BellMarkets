@@ -1333,25 +1333,63 @@
   }
   .limit-meta strong { color: var(--accent); }
 
-  /* Submit button — gradient matching .connect-btn (Cory feedback: same style as wallet) */
+  /* Submit button — gradient matching .connect-btn + prominent YES/NO badge */
   .submit-btn.primary-cta {
-    width: 100%; padding: 14px;
+    width: 100%; padding: 12px 14px;
     background: var(--accent-gradient);
     color: var(--accent-fg);
     border: none;
     border-radius: 6px;
     font-family: 'IBM Plex Mono', monospace;
     font-weight: 700;
-    font-size: 13px; letter-spacing: 1px;
+    font-size: 13px; letter-spacing: 0.5px;
     text-transform: uppercase;
     cursor: pointer;
-    min-height: 48px;
+    min-height: 52px;
     transition: all 150ms;
     box-shadow: 0 2px 12px var(--accent-glow);
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    flex-wrap: wrap;
   }
   .submit-btn.primary-cta:hover {
     transform: translateY(-1px);
     box-shadow: 0 6px 18px var(--accent-glow);
+  }
+  /* Action label (BUY / SELL) */
+  .sb-action {
+    font-weight: 800;
+    font-size: 14px;
+    letter-spacing: 1px;
+  }
+  /* High-contrast YES/NO badge inside button (visual confirmation per Cory) */
+  .sb-outcome {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-weight: 800;
+    font-size: 13px;
+    letter-spacing: 1.5px;
+    border: 2px solid;
+  }
+  .sb-outcome.yes {
+    background: var(--yes);
+    color: #0a2010;
+    border-color: #15803d;
+    box-shadow: 0 0 12px rgba(74, 222, 128, 0.55);
+  }
+  .sb-outcome.no {
+    background: var(--no);
+    color: #2a0a0a;
+    border-color: #b91c1c;
+    box-shadow: 0 0 12px rgba(248, 113, 113, 0.55);
+  }
+  /* Detail (qty + price + total) — secondary weight */
+  .sb-detail {
+    font-weight: 600;
+    font-size: 11px;
+    opacity: 0.92;
+    letter-spacing: 0.5px;
   }
 
   /* Collapsible Order details below button (default closed) */
@@ -2749,7 +2787,11 @@
               </div>
             </div>
 
-            <button class="submit-btn primary-cta" data-submit-btn>BUY 200 YES @ $0.520 · $107.28 TOTAL</button>
+            <button class="submit-btn primary-cta" data-submit-btn>
+              <span class="sb-action" data-sb-action>BUY</span>
+              <span class="sb-outcome yes" data-sb-outcome>YES</span>
+              <span class="sb-detail" data-sb-detail>384 @ $0.520 · $107.28 TOTAL</span>
+            </button>
 
             <!-- Trade summary — collapsible, default closed, sits BELOW button (Cory feedback) -->
             <details class="trade-summary-wrap">
@@ -2999,6 +3041,9 @@
       const pos = positions[outcome];
 
       const submitBtn = card.querySelector('[data-submit-btn]');
+      const sbAction = card.querySelector('[data-sb-action]');
+      const sbOutcome = card.querySelector('[data-sb-outcome]');
+      const sbDetail = card.querySelector('[data-sb-detail]');
       const fieldLbl = card.querySelector('[data-field-amount-lbl]');
       const fieldAvail = card.querySelector('[data-field-available]');
       const inputAmt = card.querySelector('[data-input-amount]');
@@ -3039,7 +3084,13 @@
         fieldLbl.textContent = 'Amount';
         fieldAvail.textContent = fmt(usdcAvail) + ' avail';
         inputSuffix.textContent = 'USDC';
-        submitBtn.textContent = `BUY ${contracts.toFixed(0)} ${outcome.toUpperCase()} @ ${fmt(ask, 3)} · ${fmt(totalCost)} TOTAL`;
+        if (sbAction) sbAction.textContent = 'BUY';
+        if (sbOutcome) {
+          sbOutcome.textContent = outcome.toUpperCase();
+          sbOutcome.classList.toggle('yes', outcome === 'yes');
+          sbOutcome.classList.toggle('no', outcome === 'no');
+        }
+        if (sbDetail) sbDetail.textContent = `${contracts.toFixed(0)} @ ${fmt(ask, 3)} · ${fmt(totalCost)} TOTAL`;
 
         rowLblPrice.textContent = 'Avg. price';
         rowValPrice.textContent = fmt(ask, 3);
@@ -3074,7 +3125,13 @@
         fieldLbl.textContent = 'Contracts to sell';
         fieldAvail.textContent = `${pos.contracts} owned · avg ${fmt(pos.avgEntry, 2)}`;
         inputSuffix.textContent = outcome.toUpperCase();
-        submitBtn.textContent = `SELL ${sellCount} ${outcome.toUpperCase()} @ ${fmt(bid, 3)} · ${fmt(netProceeds)} RECEIVED`;
+        if (sbAction) sbAction.textContent = 'SELL';
+        if (sbOutcome) {
+          sbOutcome.textContent = outcome.toUpperCase();
+          sbOutcome.classList.toggle('yes', outcome === 'yes');
+          sbOutcome.classList.toggle('no', outcome === 'no');
+        }
+        if (sbDetail) sbDetail.textContent = `${sellCount} @ ${fmt(bid, 3)} · ${fmt(netProceeds)} RECEIVED`;
 
         rowLblPrice.textContent = 'Sell price (bid)';
         rowValPrice.textContent = fmt(bid, 3);
