@@ -187,17 +187,19 @@
   .wallet .addr { color: var(--text-muted); }
 
   /* ===== MARKET HEADER ===== */
-  /* Compressed vertical padding per Cory feedback (was 14px → 8px) */
+  /* Tighter padding + Pro card on right adds height; left side stays compact */
   .market-header {
     background: var(--panel); border-bottom: 1px solid var(--border);
-    padding: 8px 16px;
+    padding: 6px 12px;
   }
   .market-header-top {
     display: flex; align-items: center; justify-content: space-between;
     margin-bottom: 0;
+    gap: 12px;
   }
   .market-id {
-    display: flex; align-items: center; gap: 10px;
+    display: flex; align-items: center; gap: 8px;
+    flex-shrink: 0;
   }
   /* Smaller market-id-mark (40 → 32) */
   .market-id-mark {
@@ -425,76 +427,92 @@
     background: var(--panel); border: 1px solid var(--border);
     border-radius: 4px; overflow: hidden;
   }
+  /* Chart top bar — single compact row (Cory feedback: all controls inline at top) */
   .chart-h {
-    padding: 14px 18px;
+    padding: 8px 14px;
     border-bottom: 1px solid var(--border);
-    display: flex; justify-content: space-between; align-items: end;
+    display: flex; justify-content: space-between; align-items: center;
     background: linear-gradient(180deg, var(--accent-bg) 0%, transparent 100%);
+    gap: 12px;
+    flex-wrap: wrap;
   }
   .chart-headline {
-    display: flex; align-items: baseline; gap: 16px;
+    display: flex; align-items: baseline; gap: 10px;
+    flex-shrink: 0;
   }
+  /* Price compressed: 40 → 24, no glow shadow (cleaner) */
   .chart-price {
     font-family: 'IBM Plex Mono', monospace;
-    font-size: 40px; font-weight: 700; line-height: 1;
-    letter-spacing: -0.04em;
+    font-size: 24px; font-weight: 700; line-height: 1;
+    letter-spacing: -0.03em;
     color: var(--accent);
-    text-shadow: 0 0 20px var(--accent-glow);
   }
-  .chart-delta-wrap { display: flex; flex-direction: column; gap: 4px; }
   .chart-delta {
     font-family: 'IBM Plex Mono', monospace;
-    font-size: 14px; font-weight: 700;
+    font-size: 12px; font-weight: 700;
   }
   .chart-delta.up { color: var(--yes); }
-  .chart-sub {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 10px; color: var(--text-muted);
-    text-transform: uppercase; letter-spacing: 1px;
-  }
+  .chart-delta.down { color: var(--no); }
+  /* Quick-stats: inline horizontal row, label+val side-by-side */
   .chart-quick-stats {
-    display: flex; gap: 16px;
+    display: flex; gap: 14px;
     font-family: 'IBM Plex Mono', monospace; font-size: 11px;
-    margin-top: 12px;
+    margin: 0;
+    flex: 1;
+    justify-content: center;
+    flex-wrap: wrap;
   }
   .chart-quick-stats > div {
-    display: flex; flex-direction: column; gap: 2px;
+    display: flex; align-items: baseline; gap: 4px;
+    flex-direction: row;
   }
   .chart-quick-stats .lbl {
     font-size: 9px; color: var(--text-subtle);
-    text-transform: uppercase; letter-spacing: 1px;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    font-weight: 600;
   }
-  .chart-quick-stats .val { font-weight: 600; }
+  .chart-quick-stats .val {
+    font-weight: 700; color: var(--text-strong);
+    font-size: 11px;
+  }
   .chart-controls {
-    display: flex; gap: 4px;
+    display: flex; gap: 6px;
+    align-items: center;
+    flex-shrink: 0;
   }
   .chart-tabs {
     display: flex; background: var(--panel-2); padding: 2px;
     border-radius: 4px; border: 1px solid var(--border);
   }
   .chart-tab {
-    padding: 5px 10px; background: transparent; border: none;
+    padding: 4px 8px; background: transparent; border: none;
     color: var(--text-muted);
     font-family: 'IBM Plex Mono', monospace;
     font-size: 10px; font-weight: 600;
     border-radius: 3px; transition: all 150ms;
+    cursor: pointer;
   }
   .chart-tab.active { background: var(--accent); color: var(--accent-fg); }
   .chart-tab:hover:not(.active) { color: var(--text); }
   .chart-icons {
     display: flex; background: var(--panel-2); padding: 2px;
     border-radius: 4px; border: 1px solid var(--border);
+    gap: 1px;
   }
+  /* SVG-icon chart-type buttons (replaced ugly emoji) */
   .chart-icon-btn {
-    width: 24px; height: 24px;
+    width: 26px; height: 26px;
     background: transparent; border: none;
     color: var(--text-muted);
     border-radius: 3px;
     display: flex; align-items: center; justify-content: center;
-    font-size: 12px;
+    cursor: pointer;
+    transition: all 150ms;
+    padding: 0;
   }
+  .chart-icon-btn svg { width: 14px; height: 14px; }
   .chart-icon-btn.active { background: var(--panel); color: var(--accent); }
-  .chart-icon-btn:hover { color: var(--text); }
+  .chart-icon-btn:hover:not(.active) { color: var(--text); }
 
   .chart-viz {
     height: 440px; position: relative;
@@ -977,22 +995,46 @@
   ::-webkit-scrollbar-thumb { background: var(--panel-3); border-radius: 4px; border: 1px solid var(--bg); }
   ::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
 
-  /* ===== Chart watch button — sits in chart-controls (top right of chart) ===== */
+  /* Watch button — compact icon, sits inline with chart controls */
   .chart-watch-btn {
+    width: 30px; height: 30px;
     background: var(--panel-2);
     border: 1px solid var(--border);
-    color: var(--text);
-    padding: 5px 10px;
+    color: var(--text-muted);
     border-radius: 4px;
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 11px;
-    font-weight: 600;
+    font-size: 14px;
     cursor: pointer;
     transition: all 150ms;
-    margin-left: 4px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
   }
   .chart-watch-btn:hover { color: var(--amber); border-color: var(--amber); }
   .chart-watch-btn.watching { color: var(--amber); border-color: var(--amber); background: rgba(251, 191, 36, 0.10); }
+
+  /* Pro card in top-right of market header — compact-tall (not full sidebar) */
+  .pro-header-card {
+    width: 260px;
+    flex-shrink: 0;
+    padding: 8px 12px;
+    margin: 0;
+    text-decoration: none;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+  }
+  .pro-header-glow {
+    position: absolute; top: -25px; right: -25px;
+    width: 90px; height: 90px;
+    background: radial-gradient(circle, rgba(34, 211, 238, 0.20), transparent 60%);
+    pointer-events: none;
+  }
+  .pro-header-card .pro-rail-badge { margin-bottom: 2px; padding: 1px 7px; font-size: 8px; }
+  .pro-header-card .pro-rail-title { font-size: 12px; margin-bottom: 1px; }
+  .pro-header-card .pro-rail-sub { font-size: 10px; line-height: 1.3; margin-bottom: 6px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .pro-header-card .pro-rail-cta { padding: 5px 8px; font-size: 9px; min-height: 28px; }
 
   /* ===== Pro CTA inline card — DEPRECATED (Cory feedback: thin bar wrong shape).
      Kept in CSS in case markup is referenced elsewhere; HTML element removed. ===== */
@@ -1131,14 +1173,14 @@
   /* ===== COMPACT MARKET HEADER (Cory 2026-05-23 feedback): strike pills inline ===== */
   .strike-pills-inline {
     display: flex;
-    gap: 4px;
+    gap: 3px;
     align-items: center;
     flex: 1;
     justify-content: flex-start;
     max-width: 720px;
     overflow-x: auto;
-    padding: 0 0 0 4px;
-    margin-left: 4px;
+    padding: 0;
+    margin-left: 0;
   }
   .strike-pills-inline::-webkit-scrollbar { height: 0; }
   .strike-pills-inline .strike-pill { flex-shrink: 0; }
@@ -1588,10 +1630,10 @@
     /* Strike pills inline — hide on mobile; strike dropdown shows instead */
     .strike-pills-inline { display: none; }
     .strike-dropdown { display: block; width: 100%; margin-top: 6px; }
-    /* Inline Pro card — hide text on mobile, show compact badge+price only */
-    .pro-card-inline .pro-card-text { display: none; }
-    .pro-card-inline { padding: 6px 8px; gap: 8px; min-height: 34px; }
-    .pro-card-inline .pro-card-cta { padding-left: 6px; font-size: 9px; }
+    /* Pro header card stacks below market-id on mobile; goes full-width */
+    .market-header-top { flex-wrap: wrap; }
+    .pro-header-card { width: 100%; flex: 1 1 100%; padding: 8px 10px; margin-top: 6px; }
+    .pro-header-card .pro-rail-sub { -webkit-line-clamp: 1; }
     /* Old separate strike-row no longer exists, but keep CSS in case any HTML still references */
     .strike-row { padding: 8px 14px; gap: 6px; }
     .strike-pill { min-width: 60px; padding: 6px 8px; min-height: 44px; }
@@ -1632,15 +1674,14 @@
     /* Compact chart on mobile — reduce 440 → 200 to save 240px */
     .chart-viz { height: 200px; }
     .chart-card { border-radius: 0; border-left: none; border-right: none; }
-    .chart-h { padding: 10px 14px; flex-direction: column; align-items: stretch; gap: 8px; }
-    .chart-headline { gap: 10px; }
-    .chart-price { font-size: 26px; }
-    .chart-delta { font-size: 12px; }
-    .chart-sub { font-size: 9px; }
-    /* Mobile: hide chart's quick-stats row (Open/High/Low/VWAP/Spread/Bid-Ask)
-       and chart controls (timeframe + icons) above the fold; user can tap chart to expand */
+    /* Chart bar on mobile: keep price + delta + timespans; hide stats + icons + watch (deeper view via tap) */
+    .chart-h { padding: 6px 12px; gap: 8px; }
+    .chart-price { font-size: 22px; }
+    .chart-delta { font-size: 11px; }
     .chart-quick-stats { display: none; }
-    .chart-controls { display: none; }
+    .chart-icons { display: none; }
+    .chart-watch-btn { display: none; }
+    .chart-tabs .chart-tab { padding: 4px 6px; font-size: 9px; }
 
     /* Compact trade card */
     .trade-card { border-radius: 0; border-left: none; border-right: none; }
@@ -1772,7 +1813,14 @@
       <option>$720 · 14% YES</option>
       <option>$740 · 6% YES</option>
     </select>
-    <!-- Star/Watch moved to chart card top-right (Cory feedback) -->
+    <!-- Pro CTA card — TALL vertical card in top-right of market header (Cory feedback: not left rail, not skinny bar) -->
+    <a href="#pro" class="pro-rail-card pro-header-card" id="pro">
+      <span class="pro-header-glow" aria-hidden="true"></span>
+      <span class="pro-rail-badge"><span aria-hidden="true">✦</span> BELL PRO</span>
+      <div class="pro-rail-title">Today's META briefing</div>
+      <div class="pro-rail-sub">AI analysis · earnings · sector beta · 5d momentum on all 7 MAG7 tickers.</div>
+      <button class="pro-rail-cta">UNLOCK · 9 USDC/mo →</button>
+    </a>
   </div>
 </div>
 
@@ -1780,19 +1828,6 @@
 
   <!-- Compact left rail -->
   <aside class="left-rail">
-
-    <!-- Pro CTA card — tall vertical card per Cory feedback (the "make it like it was" one) -->
-    <div class="pro-rail-card" id="pro">
-      <span class="pro-rail-badge"><span aria-hidden="true">✦</span> BELL PRO</span>
-      <div class="pro-rail-title">Today's META briefing</div>
-      <div class="pro-rail-sub">
-        AI analysis of earnings proximity, sector beta, and 5-day momentum
-        for the −6% strike. Daily briefings on all 7 MAG7 tickers.
-      </div>
-      <button class="pro-rail-cta">
-        UNLOCK · 9 USDC/mo <span aria-hidden="true">→</span>
-      </button>
-    </div>
 
     <details class="rail-section" id="rail-tickers" open>
       <summary class="rail-section-h">
@@ -1922,24 +1957,23 @@
 
         <!-- Chart -->
         <div class="chart-card">
-          <div class="chart-h">
-            <div>
-              <div class="chart-headline">
-                <div class="chart-price mono">$0.520</div>
-                <div class="chart-delta-wrap">
-                  <span class="chart-delta up mono">+$0.04 · +8.3%</span>
-                  <span class="chart-sub">YES price · today</span>
-                </div>
-              </div>
-              <div class="chart-quick-stats">
-                <div><span class="lbl">Open</span><span class="val mono">0.480</span></div>
-                <div><span class="lbl">High</span><span class="val mono">0.545</span></div>
-                <div><span class="lbl">Low</span><span class="val mono">0.460</span></div>
-                <div><span class="lbl">VWAP</span><span class="val mono">0.504</span></div>
-                <div><span class="lbl">Spread</span><span class="val mono">0.04 · 7.7%</span></div>
-                <div><span class="lbl">Bid / Ask</span><span class="val mono">0.500 / 0.540</span></div>
-              </div>
+          <!-- Compact single-row chart top bar (Cory feedback: all controls inline, minimize vertical waste) -->
+          <div class="chart-h compact">
+            <!-- Price + delta -->
+            <div class="chart-headline">
+              <div class="chart-price mono">$0.520</div>
+              <span class="chart-delta up mono">+$0.04 · +8.3%</span>
             </div>
+            <!-- Stats inline (was its own row below; now in the same bar) -->
+            <div class="chart-quick-stats">
+              <div><span class="lbl">O</span><span class="val mono">0.480</span></div>
+              <div><span class="lbl">H</span><span class="val mono">0.545</span></div>
+              <div><span class="lbl">L</span><span class="val mono">0.460</span></div>
+              <div><span class="lbl">VWAP</span><span class="val mono">0.504</span></div>
+              <div><span class="lbl">Spread</span><span class="val mono">7.7%</span></div>
+              <div><span class="lbl">B/A</span><span class="val mono">0.500/0.540</span></div>
+            </div>
+            <!-- Right side: timespans + chart type icons (SVG, theme-matched) + watch -->
             <div class="chart-controls">
               <div class="chart-tabs">
                 <button class="chart-tab">1m</button>
@@ -1950,12 +1984,17 @@
                 <button class="chart-tab">1d</button>
               </div>
               <div class="chart-icons">
-                <button class="chart-icon-btn active" title="Line">📈</button>
-                <button class="chart-icon-btn" title="Candle">📊</button>
-                <button class="chart-icon-btn" title="Depth">📊</button>
+                <button class="chart-icon-btn active" title="Line chart" aria-label="Line chart">
+                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1,12 5,8 9,10 14,3"/></svg>
+                </button>
+                <button class="chart-icon-btn" title="Candle chart" aria-label="Candle chart">
+                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="6" width="3" height="6"/><line x1="4.5" y1="3" x2="4.5" y2="6"/><line x1="4.5" y1="12" x2="4.5" y2="14"/><rect x="10" y="4" width="3" height="7"/><line x1="11.5" y1="2" x2="11.5" y2="4"/><line x1="11.5" y1="11" x2="11.5" y2="13"/></svg>
+                </button>
+                <button class="chart-icon-btn" title="Depth chart" aria-label="Depth chart">
+                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M1,14 L1,9 L4,9 L4,6 L7,6 L7,4 L8,4 L8,6 L11,6 L11,9 L14,9 L14,14 Z"/></svg>
+                </button>
               </div>
-              <!-- Watch button moved here from market header (Cory feedback) -->
-              <button class="chart-watch-btn" title="Watch this market" aria-label="Watch this market">★ Watch</button>
+              <button class="chart-watch-btn" title="Watch this market" aria-label="Watch this market">★</button>
             </div>
           </div>
           <div class="chart-viz">
