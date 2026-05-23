@@ -915,51 +915,34 @@
   .ob-spread .last { font-weight: 800; color: var(--accent); font-size: 13px; }
   .ob-spread .spread { color: var(--text-muted); }
 
-  /* Order book — BOTH view (YES + NO side by side) */
+  /* Order book — BOTH view: YES section stacked on top of NO section
+     (Cory: "on top of each other like a normal order book view") */
   .ob-both {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
+    display: flex;
+    flex-direction: column;
     gap: 0;
   }
   .ob-both[hidden] { display: none; }
   .ob-card[data-view="both"] .ob-single { display: none; }
-  .ob-card[data-view="both"] .ob-both { display: grid; }
+  .ob-card[data-view="both"] .ob-both { display: flex; }
   .ob-both-col {
-    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border-strong);
   }
-  .ob-both-col:last-child { border-right: none; }
+  .ob-both-col:last-child { border-bottom: none; }
   .ob-both-h {
     background: var(--panel-2);
-    padding: 6px 10px;
+    padding: 6px 14px;
     font-family: 'IBM Plex Mono', monospace;
     font-size: 10px;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 1.5px;
     color: var(--text-strong);
-    text-align: center;
     border-bottom: 1px solid var(--border);
+    display: flex; align-items: center;
   }
-  /* Compact ob-row for BOTH view (2 cols: price + size, no total, no depth bar) */
-  .ob-both .ob-row.compact {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    padding: 3px 10px;
-    font-family: 'IBM Plex Mono', monospace; font-size: 10px;
-    position: relative;
-    cursor: pointer;
-  }
-  .ob-both .ob-row.compact .price { font-weight: 700; }
-  .ob-both .ob-row.compact .size { text-align: right; color: var(--text-muted); }
-  .ob-both .ob-row.compact.ask .price { color: var(--no); }
-  .ob-both .ob-row.compact.bid .price { color: var(--yes); }
-  .ob-both .ob-spread.compact {
-    background: var(--panel-2); padding: 5px 10px;
-    border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
-    display: flex; justify-content: center;
-    font-family: 'IBM Plex Mono', monospace; font-size: 11px;
-  }
-  .ob-both .ob-spread.compact .last { font-weight: 800; color: var(--accent); font-size: 11px; }
+  .ob-both-col:first-child .ob-both-h { color: var(--yes); }
+  .ob-both-col:nth-child(2) .ob-both-h { color: var(--no); }
 
   /* Recent trades */
   .trades-card {
@@ -1561,6 +1544,106 @@
   .summary-row.profit .v { color: var(--yes); }
   .summary-row.fee .v { color: var(--amber); }
   .summary-divider { height: 1px; background: var(--border); margin: 6px 0; }
+
+  /* ===== Tabbed Orders + Trades card (Cory feedback) ===== */
+  .orders-trades-card { display: flex; flex-direction: column; }
+  .orders-trades-h {
+    padding: 0 !important;
+    background: var(--panel-2);
+    border-bottom: 1px solid var(--border);
+  }
+  .orders-trades-tabs {
+    display: flex; width: 100%;
+  }
+  .otab {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 10px 14px;
+    cursor: pointer;
+    transition: all 100ms;
+    border-bottom: 2px solid transparent;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    min-height: 40px;
+  }
+  .otab:hover { color: var(--text); background: var(--row-hover); }
+  .otab.active { color: var(--text-strong); border-bottom-color: var(--accent); background: var(--panel); }
+  .otab-count {
+    background: var(--panel-3); color: var(--text-muted);
+    padding: 1px 6px; border-radius: 999px;
+    font-size: 9px; font-weight: 700;
+  }
+  .otab.active .otab-count { background: var(--accent-bg-strong); color: var(--accent); }
+  .otab-live {
+    width: 6px; height: 6px;
+    background: var(--yes); border-radius: 50%;
+    box-shadow: 0 0 6px var(--yes);
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+  .ot-content[hidden] { display: none; }
+  .ot-content.ot-scroll {
+    max-height: 320px;
+    overflow-y: auto;
+  }
+  .ot-footer {
+    padding: 8px 14px;
+    text-align: center;
+    border-top: 1px solid var(--border);
+  }
+  .ot-link {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    text-decoration: none;
+  }
+  /* Trade rows in tabbed view — 5-col grid with market shown */
+  .ot-content .trade-rows-h {
+    display: grid;
+    grid-template-columns: 56px 1fr 56px 56px 50px;
+    padding: 5px 14px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 9px;
+    color: var(--text-subtle); text-transform: uppercase; letter-spacing: 1px;
+    background: var(--panel-2);
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 1;
+  }
+  .ot-content .trade-rows-h > div { text-align: left; }
+  .ot-content .trade-rows-h > div:nth-child(3),
+  .ot-content .trade-rows-h > div:nth-child(4),
+  .ot-content .trade-rows-h > div:last-child { text-align: right; }
+  .trade-row-tab {
+    display: grid;
+    grid-template-columns: 56px 1fr 56px 56px 50px;
+    padding: 5px 14px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+    border-bottom: 1px solid var(--border);
+    align-items: center;
+  }
+  .trade-row-tab:last-child { border-bottom: none; }
+  .trade-row-tab:hover { background: var(--row-hover); }
+  .trade-row-tab .time { color: var(--text-subtle); font-size: 9px; }
+  .trade-row-tab .mkt { color: var(--text); font-weight: 600; font-size: 10px; }
+  .trade-row-tab .price { text-align: right; font-weight: 700; }
+  .trade-row-tab .price.up { color: var(--yes); }
+  .trade-row-tab .price.down { color: var(--no); }
+  .trade-row-tab .size { text-align: right; color: var(--text-muted); }
+  .trade-row-tab .side { text-align: right; font-weight: 700; font-size: 9px; }
+  .trade-row-tab .side.buy { color: var(--yes); }
+  .trade-row-tab .side.sell { color: var(--no); }
+
+  /* Show/hide tab content based on card data-tab */
+  .orders-trades-card[data-tab="orders"] .ot-content[data-ot-content="orders"] { display: block; }
+  .orders-trades-card[data-tab="orders"] .ot-content[data-ot-content="trades"] { display: none; }
+  .orders-trades-card[data-tab="trades"] .ot-content[data-ot-content="orders"] { display: none; }
+  .orders-trades-card[data-tab="trades"] .ot-content[data-ot-content="trades"] { display: block; }
 
   /* ===== CHERRY-PICKED FROM v8-alt: Open Orders panel ===== */
   .open-orders-card {
@@ -2260,30 +2343,63 @@
             </div>
           </div>
 
-          <!-- RIGHT: Open Orders (moved here from the right column) -->
-          <div class="info-card open-orders-card">
-            <div class="info-card-h">
-              <h3>Open orders</h3>
-              <span class="live-badge">2 active</span>
+          <!-- RIGHT: Tabbed Open Orders / Recent Trades (Cory feedback) -->
+          <div class="info-card orders-trades-card" data-tab="orders">
+            <div class="info-card-h orders-trades-h">
+              <div class="orders-trades-tabs" role="tablist">
+                <button class="otab active" data-ot-tab="orders" role="tab" aria-selected="true">
+                  Open orders <span class="otab-count">2</span>
+                </button>
+                <button class="otab" data-ot-tab="trades" role="tab" aria-selected="false">
+                  Recent trades <span class="otab-live" aria-label="live"></span>
+                </button>
+              </div>
             </div>
-            <div class="order-row-trade">
-              <span class="order-side-tag yes">YES</span>
-              <span class="order-detail-text">
-                META.680 · 50 @ <span class="px">$0.55</span><br>
-                <span class="fill-state">30/50 filled · 4m ago</span>
-              </span>
-              <button class="cancel-btn">CANCEL</button>
+
+            <!-- Orders tab content -->
+            <div class="ot-content" data-ot-content="orders">
+              <div class="order-row-trade">
+                <span class="order-side-tag yes">YES</span>
+                <span class="order-detail-text">
+                  META.680 · 50 @ <span class="px">$0.55</span><br>
+                  <span class="fill-state">30/50 filled · 4m ago</span>
+                </span>
+                <button class="cancel-btn">CANCEL</button>
+              </div>
+              <div class="order-row-trade">
+                <span class="order-side-tag no">NO</span>
+                <span class="order-detail-text">
+                  AAPL.230 · 100 @ <span class="px">$0.20</span><br>
+                  <span class="fill-state">pending · 12m ago</span>
+                </span>
+                <button class="cancel-btn">CANCEL</button>
+              </div>
+              <div class="ot-footer">
+                <a href="#" class="ot-link">View all orders →</a>
+              </div>
             </div>
-            <div class="order-row-trade">
-              <span class="order-side-tag no">NO</span>
-              <span class="order-detail-text">
-                AAPL.230 · 100 @ <span class="px">$0.20</span><br>
-                <span class="fill-state">pending · 12m ago</span>
-              </span>
-              <button class="cancel-btn">CANCEL</button>
-            </div>
-            <div style="padding: 10px 16px; text-align: center; border-top: 1px solid var(--border);">
-              <a href="#" style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--accent); text-transform: uppercase; letter-spacing: 0.5px;">View all orders →</a>
+
+            <!-- Trades tab content (scrollable) -->
+            <div class="ot-content ot-scroll" data-ot-content="trades" hidden>
+              <div class="trade-rows-h"><div>time</div><div>market</div><div>price</div><div>size</div><div>side</div></div>
+              <div class="trade-row-tab"><span class="time">14:46:31</span><span class="mkt">META.680</span><span class="price up mono">0.520</span><span class="size mono">200</span><span class="side buy">BUY</span></div>
+              <div class="trade-row-tab"><span class="time">14:46:18</span><span class="mkt">NVDA.1340</span><span class="price down mono">0.485</span><span class="size mono">125</span><span class="side sell">SELL</span></div>
+              <div class="trade-row-tab"><span class="time">14:46:11</span><span class="mkt">META.680</span><span class="price down mono">0.480</span><span class="size mono">500</span><span class="side sell">SELL</span></div>
+              <div class="trade-row-tab"><span class="time">14:45:54</span><span class="mkt">AAPL.230</span><span class="price up mono">0.420</span><span class="size mono">100</span><span class="side buy">BUY</span></div>
+              <div class="trade-row-tab"><span class="time">14:45:32</span><span class="mkt">META.680</span><span class="price up mono">0.510</span><span class="size mono">75</span><span class="side buy">BUY</span></div>
+              <div class="trade-row-tab"><span class="time">14:45:08</span><span class="mkt">META.680</span><span class="price down mono">0.500</span><span class="size mono">320</span><span class="side sell">SELL</span></div>
+              <div class="trade-row-tab"><span class="time">14:44:51</span><span class="mkt">NVDA.1340</span><span class="price up mono">0.518</span><span class="size mono">180</span><span class="side buy">BUY</span></div>
+              <div class="trade-row-tab"><span class="time">14:44:33</span><span class="mkt">META.680</span><span class="price down mono">0.490</span><span class="size mono">450</span><span class="side sell">SELL</span></div>
+              <div class="trade-row-tab"><span class="time">14:44:12</span><span class="mkt">AAPL.230</span><span class="price up mono">0.418</span><span class="size mono">90</span><span class="side buy">BUY</span></div>
+              <div class="trade-row-tab"><span class="time">14:43:48</span><span class="mkt">META.680</span><span class="price up mono">0.515</span><span class="size mono">300</span><span class="side buy">BUY</span></div>
+              <div class="trade-row-tab"><span class="time">14:43:21</span><span class="mkt">NVDA.1340</span><span class="price down mono">0.482</span><span class="size mono">220</span><span class="side sell">SELL</span></div>
+              <div class="trade-row-tab"><span class="time">14:42:58</span><span class="mkt">META.680</span><span class="price down mono">0.495</span><span class="size mono">410</span><span class="side sell">SELL</span></div>
+              <div class="trade-row-tab"><span class="time">14:42:34</span><span class="mkt">META.680</span><span class="price up mono">0.508</span><span class="size mono">155</span><span class="side buy">BUY</span></div>
+              <div class="trade-row-tab"><span class="time">14:42:11</span><span class="mkt">AAPL.230</span><span class="price up mono">0.422</span><span class="size mono">240</span><span class="side buy">BUY</span></div>
+              <div class="trade-row-tab"><span class="time">14:41:47</span><span class="mkt">META.680</span><span class="price down mono">0.503</span><span class="size mono">90</span><span class="side sell">SELL</span></div>
+              <div class="trade-row-tab"><span class="time">14:41:22</span><span class="mkt">NVDA.1340</span><span class="price up mono">0.521</span><span class="size mono">175</span><span class="side buy">BUY</span></div>
+              <div class="trade-row-tab"><span class="time">14:40:59</span><span class="mkt">META.680</span><span class="price up mono">0.512</span><span class="size mono">385</span><span class="side buy">BUY</span></div>
+              <div class="trade-row-tab"><span class="time">14:40:33</span><span class="mkt">META.680</span><span class="price down mono">0.498</span><span class="size mono">270</span><span class="side sell">SELL</span></div>
             </div>
           </div>
 
@@ -2416,14 +2532,14 @@
 
         <!-- Open Orders moved to info-grid-2 next to Your Position (Cory feedback 2026-05-23) -->
 
-        <!-- Order book -->
-        <div class="ob-card" data-view="yes">
+        <!-- Order book — BOTH view is default (Cory feedback) -->
+        <div class="ob-card" data-view="both">
           <div class="ob-h">
             <h3>Order book</h3>
             <div class="ob-pick" role="tablist">
-              <button class="active" data-ob-view="yes">YES</button>
+              <button data-ob-view="yes">YES</button>
               <button data-ob-view="no">NO</button>
-              <button data-ob-view="both">BOTH</button>
+              <button class="active" data-ob-view="both">BOTH</button>
             </div>
           </div>
 
@@ -2444,57 +2560,46 @@
             <div class="ob-row bid"><div class="depth-bar" style="width: 10%"></div><span class="price">0.485</span><span class="size">270</span><span class="total">2,100</span></div>
           </div>
 
-          <!-- BOTH VIEW (YES + NO side by side; mirror prices since YES + NO ≈ $1.00) -->
+          <!-- BOTH VIEW — vertically stacked (Cory: "on top of each other like a normal order book view") -->
           <div class="ob-both" hidden>
+            <!-- YES book -->
             <div class="ob-both-col">
               <div class="ob-both-h">YES</div>
-              <div class="ob-row ask compact"><span class="price">0.555</span><span class="size">490</span></div>
-              <div class="ob-row ask compact"><span class="price">0.550</span><span class="size">375</span></div>
-              <div class="ob-row ask compact"><span class="price">0.545</span><span class="size">722</span></div>
-              <div class="ob-row ask compact"><span class="price">0.540</span><span class="size">377</span></div>
-              <div class="ob-spread compact">
+              <div class="ob-rows-h"><div>price</div><div>size</div><div>total</div></div>
+              <div class="ob-row ask"><div class="depth-bar" style="width: 18%"></div><span class="price">0.555</span><span class="size">490</span><span class="total">1,964</span></div>
+              <div class="ob-row ask"><div class="depth-bar" style="width: 14%"></div><span class="price">0.550</span><span class="size">375</span><span class="total">1,474</span></div>
+              <div class="ob-row ask"><div class="depth-bar" style="width: 26%"></div><span class="price">0.545</span><span class="size">722</span><span class="total">1,099</span></div>
+              <div class="ob-row ask"><div class="depth-bar" style="width: 12%"></div><span class="price">0.540</span><span class="size">377</span><span class="total">377</span></div>
+              <div class="ob-spread">
                 <span class="last mono">$0.520 ↑</span>
+                <span class="spread mono">spread 0.040 · 7.7%</span>
               </div>
-              <div class="ob-row bid compact"><span class="price">0.500</span><span class="size">560</span></div>
-              <div class="ob-row bid compact"><span class="price">0.495</span><span class="size">440</span></div>
-              <div class="ob-row bid compact"><span class="price">0.490</span><span class="size">830</span></div>
-              <div class="ob-row bid compact"><span class="price">0.485</span><span class="size">270</span></div>
+              <div class="ob-row bid"><div class="depth-bar" style="width: 20%"></div><span class="price">0.500</span><span class="size">560</span><span class="total">560</span></div>
+              <div class="ob-row bid"><div class="depth-bar" style="width: 16%"></div><span class="price">0.495</span><span class="size">440</span><span class="total">1,000</span></div>
+              <div class="ob-row bid"><div class="depth-bar" style="width: 30%"></div><span class="price">0.490</span><span class="size">830</span><span class="total">1,830</span></div>
+              <div class="ob-row bid"><div class="depth-bar" style="width: 10%"></div><span class="price">0.485</span><span class="size">270</span><span class="total">2,100</span></div>
             </div>
+            <!-- NO book -->
             <div class="ob-both-col">
               <div class="ob-both-h">NO</div>
-              <div class="ob-row ask compact"><span class="price">0.515</span><span class="size">560</span></div>
-              <div class="ob-row ask compact"><span class="price">0.510</span><span class="size">440</span></div>
-              <div class="ob-row ask compact"><span class="price">0.505</span><span class="size">830</span></div>
-              <div class="ob-row ask compact"><span class="price">0.500</span><span class="size">270</span></div>
-              <div class="ob-spread compact">
+              <div class="ob-rows-h"><div>price</div><div>size</div><div>total</div></div>
+              <div class="ob-row ask"><div class="depth-bar" style="width: 20%"></div><span class="price">0.515</span><span class="size">560</span><span class="total">2,100</span></div>
+              <div class="ob-row ask"><div class="depth-bar" style="width: 16%"></div><span class="price">0.510</span><span class="size">440</span><span class="total">1,540</span></div>
+              <div class="ob-row ask"><div class="depth-bar" style="width: 30%"></div><span class="price">0.505</span><span class="size">830</span><span class="total">1,100</span></div>
+              <div class="ob-row ask"><div class="depth-bar" style="width: 10%"></div><span class="price">0.500</span><span class="size">270</span><span class="total">270</span></div>
+              <div class="ob-spread">
                 <span class="last mono">$0.480 ↓</span>
+                <span class="spread mono">spread 0.040 · 8.3%</span>
               </div>
-              <div class="ob-row bid compact"><span class="price">0.460</span><span class="size">490</span></div>
-              <div class="ob-row bid compact"><span class="price">0.455</span><span class="size">375</span></div>
-              <div class="ob-row bid compact"><span class="price">0.450</span><span class="size">722</span></div>
-              <div class="ob-row bid compact"><span class="price">0.445</span><span class="size">377</span></div>
+              <div class="ob-row bid"><div class="depth-bar" style="width: 18%"></div><span class="price">0.460</span><span class="size">490</span><span class="total">490</span></div>
+              <div class="ob-row bid"><div class="depth-bar" style="width: 14%"></div><span class="price">0.455</span><span class="size">375</span><span class="total">865</span></div>
+              <div class="ob-row bid"><div class="depth-bar" style="width: 26%"></div><span class="price">0.450</span><span class="size">722</span><span class="total">1,587</span></div>
+              <div class="ob-row bid"><div class="depth-bar" style="width: 12%"></div><span class="price">0.445</span><span class="size">377</span><span class="total">1,964</span></div>
             </div>
           </div>
         </div>
 
-        <!-- Recent trades -->
-        <div class="trades-card">
-          <div class="trades-h">
-            <h3>Recent trades</h3>
-            <span class="badge">live</span>
-          </div>
-          <div class="trade-rows-h">
-            <div>time</div><div>price</div><div>size</div><div>side</div>
-          </div>
-          <div class="trade-row"><span class="time">14:42:18</span><span class="price up mono">0.520</span><span class="size">200</span><span class="side buy">BUY</span></div>
-          <div class="trade-row"><span class="time">14:42:11</span><span class="price down mono">0.480</span><span class="size">500</span><span class="side sell">SELL</span></div>
-          <div class="trade-row"><span class="time">14:41:54</span><span class="price up mono">0.520</span><span class="size">100</span><span class="side buy">BUY</span></div>
-          <div class="trade-row"><span class="time">14:41:32</span><span class="price up mono">0.510</span><span class="size">75</span><span class="side buy">BUY</span></div>
-          <div class="trade-row"><span class="time">14:41:08</span><span class="price down mono">0.500</span><span class="size">320</span><span class="side sell">SELL</span></div>
-          <div class="trade-row"><span class="time">14:40:51</span><span class="price up mono">0.510</span><span class="size">180</span><span class="side buy">BUY</span></div>
-          <div class="trade-row"><span class="time">14:40:33</span><span class="price down mono">0.490</span><span class="size">450</span><span class="side sell">SELL</span></div>
-          <div class="trade-row"><span class="time">14:40:12</span><span class="price up mono">0.500</span><span class="size">90</span><span class="side buy">BUY</span></div>
-        </div>
+        <!-- Recent trades moved into tabbed Open Orders / Recent Trades card (Cory feedback) -->
 
       </aside>
 
@@ -2541,6 +2646,21 @@
   }
   (function() {
     try { const s = localStorage.getItem('bm-theme'); if (s === 'light') document.documentElement.setAttribute('data-theme', 'light'); } catch (e) {}
+  })();
+
+  // Orders / Trades tabs (in info-grid-2 right card)
+  (function() {
+    const card = document.querySelector('.orders-trades-card');
+    if (!card) return;
+    const tabs = card.querySelectorAll('.otab');
+    tabs.forEach(t => {
+      t.addEventListener('click', () => {
+        tabs.forEach(x => { x.classList.remove('active'); x.setAttribute('aria-selected', 'false'); });
+        t.classList.add('active');
+        t.setAttribute('aria-selected', 'true');
+        card.dataset.tab = t.dataset.otTab;
+      });
+    });
   })();
 
   // Order book view toggle — YES / NO / BOTH
