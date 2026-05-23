@@ -489,7 +489,15 @@ fee × monthly_pool_bps / 10_000     → monthly_rewards_pool PDA
 
 Under Option B, admin CANNOT manipulate distributions to wrong recipients — proof verification rejects unauthorized addresses. Stores ~24 roots (12 weeks + 12 months) in a `LeaderboardCommitments` PDA. Adds ~3 hr to total implementation (~10-11 hr total for #7 with Merkle).
 
-**LOCKED for MVP: Option B (Merkle commitment).** Aligns with non-custodial / verifiable thesis (DR-002, DR-005, DR-009). Distributions cryptographically verifiable from day 1; admin cannot manipulate recipient selection. Adds ~3 hr to baseline implementation (~10-11 hr total for #7).
+**LOCKED for MVP: Option B (Merkle commitment) + Arweave pinning for permanent verification.** Aligns with non-custodial / verifiable thesis (DR-002, DR-005, DR-009). Distributions cryptographically verifiable from day 1; admin cannot manipulate recipient selection. Bram's indexer uploads full leaderboard data to Arweave (decentralized permanent storage, ~$0.01/period) at each commit; on-chain `commit_leaderboard_root` includes both the 32-byte Merkle root AND the Arweave content ID. Anyone can fetch full leaderboard from Arweave forever + verify against on-chain root.
+
+**Verification model (now permanent):**
+1. **Proof verification:** any user with their Merkle proof can verify on-chain forever. Cheap cryptographic math.
+2. **Full re-verification:** fetch full leaderboard from Arweave (forever, free, public), reconstruct Merkle root, compare to on-chain commitment. Anyone, anytime.
+
+Trust narrative for interview: "Win-streak leaderboards are cryptographically verifiable. Merkle root committed on-chain per period; full leaderboard data permanently archived to Arweave. Anyone can fetch the data + reconstruct the proof + verify our distributions for any past period, free, forever."
+
+Adds ~3.5-4 hr to baseline implementation (~10.5-12 hr total for #7).
 
 **Implementation breakdown for Option B:**
 - Aria: WeeklyRewardsPool + MonthlyRewardsPool PDAs + LeaderboardCommitments PDA + commit_leaderboard_root ix + Merkle proof verification helper + distribute_weekly/monthly_rewards ixs (accept proof + verify) + fee-split logic in mint_pair + bps configuration fields + sum-to-10000 validation. **~3-4 hr.**
