@@ -1146,52 +1146,130 @@
     .market-stats { grid-template-columns: repeat(4, 1fr); }
   }
   @media (max-width: 768px) {
+    /* =========================================================================
+       MOBILE TRADE PAGE (Cory 2026-05-23 feedback):
+       Above the fold (~640px iPhone): market switcher + strike + chart + buy/sell
+       + open orders peek. Everything else moves below the fold.
+       ========================================================================= */
     body { padding-bottom: 60px; }
-    /* Header — hide search and nav (use bottom tabs + hamburger) */
-    .header-inner {
-      grid-template-columns: auto auto;
-      gap: 12px;
-      padding: 12px 16px;
-    }
-    .searchbar { display: none; }
-    .nav { display: none; }
-    .brand-divider { display: none; }
+
+    /* Hide top-status bar entirely on mobile — too noisy, info repeated elsewhere */
+    .top-status { display: none; }
+
+    /* Compact header */
+    .header-inner { grid-template-columns: auto auto; gap: 12px; padding: 10px 14px; }
+    .searchbar, .nav, .brand-divider { display: none; }
     .brand { gap: 0; }
-    .wallet { padding: 6px 8px; font-size: 11px; }
-    /* Top-status bar — wrap & compress */
-    .top-status {
-      gap: 12px;
-      padding: 6px 12px;
-      flex-wrap: wrap;
-      font-size: 9px;
+    .logo { font-size: 15px; }
+    .logo-mark { width: 24px; height: 24px; }
+    .session-module .session-time { display: none; }
+    .session-module { padding: 6px 10px; min-height: 36px; font-size: 11px; }
+    .icon-btn { width: 36px; height: 36px; }
+    .connect-btn { padding: 8px 10px; font-size: 12px; min-height: 36px; }
+    .connect-btn span:last-child { max-width: 70px; overflow: hidden; text-overflow: ellipsis; }
+
+    /* Compact market header — keep only ticker + price + change + switch */
+    .market-header { padding: 10px 14px; }
+    .market-header-top { margin-bottom: 8px; }
+    .market-id { gap: 10px; }
+    .market-id-mark { display: none; }
+    .market-id-title { font-size: 18px; }
+    .market-id-sub { font-size: 10px; gap: 6px; }
+    .market-id-sub .chip:not(.live) { display: none; }
+    .market-id-sub > span:not(.chip) { display: none; }
+    /* Market controls — compact horizontal scroll so ticker switching stays
+       above the fold per Cory feedback */
+    .market-header-top { flex-direction: column; align-items: stretch; gap: 8px; }
+    .market-controls {
+      display: flex;
+      width: 100%;
+      overflow-x: auto;
+      gap: 6px;
+      padding-bottom: 2px;
     }
-    /* Market header — stack title above controls */
-    .market-header-top {
-      flex-direction: column; align-items: flex-start; gap: 10px;
+    .market-controls::-webkit-scrollbar { height: 0; }
+    .market-controls .ctrl-btn { flex-shrink: 0; padding: 6px 10px; font-size: 11px; min-height: 36px; }
+    /* Stats grid: hide on mobile — info is in chart card */
+    .market-stats { display: none; }
+
+    /* Strike pills row stays scrollable, compact */
+    .strike-row { padding: 8px 14px; gap: 6px; }
+    .strike-pill { min-width: 60px; padding: 6px 8px; min-height: 44px; }
+    .strike-pill .px { font-size: 10px; }
+    .strike-pill .prob { font-size: 12px; }
+    .strike-row-label { font-size: 8px; }
+
+    /* =========================================================================
+       REORDER trade-grid: trade + chart above the fold, everything else below.
+       Using display:contents to flatten the column wrappers so we can order
+       individual cards.
+       ========================================================================= */
+    .layout { grid-template-columns: 1fr; }
+    .left-rail { display: none; }
+    .trade-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
     }
-    .market-id-title { font-size: 20px; }
-    .market-controls { width: 100%; overflow-x: auto; }
-    .market-stats { grid-template-columns: repeat(2, 1fr); }
-    /* Strike row — already scrollable */
-    .strike-pill { min-width: 64px; padding: 8px 10px; min-height: 48px; }
-    /* Chart — shorter on mobile */
-    .chart-viz { height: 280px; }
-    .chart-price { font-size: 32px; }
-    .chart-quick-stats {
-      display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+    .left-col, .right-col {
+      display: contents;
     }
-    .chart-h {
-      flex-direction: column; align-items: flex-start; gap: 12px;
-    }
-    /* Info grid — single column on mobile */
+    /* Mobile stacking order — above the fold first */
+    .chart-card { order: 1; }
+    .trade-card { order: 2; }
+    .open-orders-card { order: 3; }
+    /* Below the fold (in scroll-priority order) */
+    .info-grid-2 { order: 4; }
+    .ob-card { order: 5; }
+    .trades-card { order: 6; }
+    .left-col > .info-card:not(.chart-card) { order: 7; }
+
+    /* Compact chart on mobile — reduce 440 → 200 to save 240px */
+    .chart-viz { height: 200px; }
+    .chart-card { border-radius: 0; border-left: none; border-right: none; }
+    .chart-h { padding: 10px 14px; flex-direction: column; align-items: stretch; gap: 8px; }
+    .chart-headline { gap: 10px; }
+    .chart-price { font-size: 26px; }
+    .chart-delta { font-size: 12px; }
+    .chart-sub { font-size: 9px; }
+    /* Mobile: hide chart's quick-stats row (Open/High/Low/VWAP/Spread/Bid-Ask)
+       and chart controls (timeframe + icons) above the fold; user can tap chart to expand */
+    .chart-quick-stats { display: none; }
+    .chart-controls { display: none; }
+
+    /* Compact trade card */
+    .trade-card { border-radius: 0; border-left: none; border-right: none; }
+    .yes-no-toggle { padding: 10px 10px 0; }
+    .yn-tab { padding: 10px; min-height: 56px; }
+    .yn-tab .price { font-size: 18px; }
+    .yn-tab .sub { font-size: 8px; }
+    .trade-form { padding: 10px; }
+    .order-type-row { margin-bottom: 10px; }
+    .quick-amount { min-height: 38px; font-size: 11px; }
+    .input-wrap input { font-size: 16px; padding: 8px 0; }
+    /* Compress trade-summary on mobile — keep critical rows only above fold */
+    .trade-summary { padding: 10px; margin: 8px 0; font-size: 11px; }
+    .summary-row.hide-mobile { display: none; }
+    /* Slippage compressed */
+    .slip-row { padding: 8px; margin: 8px 0; }
+    .slip-head { font-size: 9px; }
+    .slip-ticks { font-size: 8px; }
+    .submit-btn { padding: 14px; font-size: 13px; min-height: 56px; }
+
+    /* Open orders peek — compact, only 2 rows max above fold (extras scroll) */
+    .open-orders-card { border-radius: 0; border-left: none; border-right: none; }
+    .open-orders-card .ob-h { padding: 8px 14px; }
+    .open-orders-card .ob-h h3 { font-size: 10px; }
+    .order-row-trade { padding: 8px 14px; }
+    .order-detail-text { font-size: 11px; }
+
+    /* Info-grid-2 (position + settlement) single column below fold */
     .info-grid-2 { grid-template-columns: 1fr; }
     .info-rows-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+
     /* Buttons — touch targets ≥44pt */
-    .yn-tab { min-height: 64px; }
-    .quick-amount { min-height: 44px; }
     .ctrl-btn { min-height: 40px; padding: 8px 12px; }
-    .strike-pill { min-height: 44px; }
-    .submit-btn { padding: 18px; font-size: 14px; }
+
     /* Show bottom tabs */
     .bottom-tabs { display: grid; }
     /* Hide desktop-only hotkey hint */
@@ -1580,9 +1658,11 @@
               </div>
             </div>
 
-            <!-- CHERRY-PICKED from v8-alt: row-by-row trade summary -->
+            <!-- CHERRY-PICKED from v8-alt: row-by-row trade summary
+                 Mobile hides Avg./Fee/Slippage rows to fit above the fold;
+                 desktop shows everything. hide-mobile is the marker class. -->
             <div class="trade-summary">
-              <div class="summary-row">
+              <div class="summary-row hide-mobile">
                 <span>Avg. price</span>
                 <span class="v">$0.520</span>
               </div>
@@ -1590,11 +1670,11 @@
                 <span>Cost</span>
                 <span class="v">$104.00</span>
               </div>
-              <div class="summary-row fee">
+              <div class="summary-row fee hide-mobile">
                 <span>Fee (Tier-1 · 2.00%)</span>
                 <span class="v">+$2.08</span>
               </div>
-              <div class="summary-row">
+              <div class="summary-row hide-mobile">
                 <span>Slippage est.</span>
                 <span class="v">+$1.20</span>
               </div>
