@@ -93,8 +93,45 @@
 
   /* TOC */
   .toc {
-    display: grid; grid-template-columns: repeat(5, 1fr);
-    gap: 12px; margin-bottom: 64px;
+    display: grid; grid-template-columns: repeat(7, 1fr);
+    gap: 10px; margin-bottom: 64px;
+  }
+  @media (max-width: 1100px) {
+    .toc { grid-template-columns: repeat(4, 1fr); }
+  }
+  .toc a.new-iter {
+    border-color: #fb923c;
+    background: linear-gradient(135deg, rgba(251, 146, 60, 0.08), var(--panel));
+  }
+  .toc a.new-iter .toc-num { color: #ea580c; }
+  .toc a.new-iter::after {
+    content: "NEW"; position: absolute; top: 6px; right: 8px;
+    background: #fb923c; color: #fff;
+    font-size: 9px; font-weight: 800; padding: 2px 6px;
+    border-radius: 3px; letter-spacing: 0.5px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .toc a { position: relative; }
+  .candidate.featured {
+    border-color: #fb923c;
+    box-shadow: 0 0 0 1px rgba(251, 146, 60, 0.3), 0 8px 32px rgba(251, 146, 60, 0.08);
+  }
+  .candidate.featured .candidate-h {
+    background: linear-gradient(135deg, rgba(251, 146, 60, 0.08), transparent 60%);
+    border-bottom: 1px solid rgba(251, 146, 60, 0.2);
+  }
+  .candidate.featured .candidate-num {
+    color: #ea580c;
+  }
+  .candidate-h {
+    position: relative;
+  }
+  .candidate.featured .candidate-h::before {
+    content: "FEEDBACK-DRIVEN"; position: absolute; top: 14px; right: 28px;
+    background: #fb923c; color: #fff;
+    font-size: 10px; font-weight: 800; padding: 4px 10px;
+    border-radius: 4px; letter-spacing: 1px;
+    font-family: 'JetBrains Mono', monospace;
   }
   .toc a {
     background: var(--panel); border: 1px solid var(--border);
@@ -228,9 +265,13 @@
   <div class="badge">design exploration</div>
   <h1>BellMarkets — Visual Direction Progression</h1>
   <p class="subtitle">
-    Five high-fidelity HTML mockups exploring distinct design philosophies for a non-custodial Solana
+    Seven high-fidelity HTML mockups exploring distinct design philosophies for a non-custodial Solana
     binary-options dApp. Each candidate is a coherent design system applied across the landing page and
-    trading terminal. Pick one as the foundation; combine elements if useful.
+    trading terminal. v1–v5 are the initial exploration; <strong style="color: #ea580c;">v6 and v7 are
+    feedback-driven redesigns</strong> incorporating layout corrections, polish elements, and "wow"
+    interactions per <code style="background: #f0f0ed; padding: 1px 6px; border-radius: 3px;
+    font-family: 'JetBrains Mono', monospace; font-size: 13px;">design-feedback-cory.md</code>.
+    Pick one as the foundation; combine elements if useful.
   </p>
 </header>
 
@@ -252,7 +293,22 @@
     <li><strong>v3 — Drift Protocol:</strong> Solana DeFi standard. Violet gradient + sticky bottom position monitor.</li>
     <li><strong>v4 — Bloomberg / dYdX:</strong> institutional terminal. 4-pane layout, IBM Plex Mono, cyan accent.</li>
     <li><strong>v5 — Linear:</strong> modern restrained. Sparkline-driven. Sharp orange. Most breathable.</li>
+    <li><strong style="color: #ea580c;">v6 — Pulse (NEW):</strong> Linear-orange aesthetic with modern degen polish.
+        Table-view markets with strike price+probability cards, animated movers carousel, Cmd-K palette,
+        gradient borders, pulse animations, hotkey hints. Settlement preview shows 3 scenarios (exit-now /
+        hold-yes-win / hold-yes-lose).</li>
+    <li><strong style="color: #ea580c;">v7 — Terminal (NEW):</strong> Bloomberg-cyan terminal density with
+        polished type. Persistent left rail navigation + color-coded probability matrix (7×7 heat-graded
+        grid) + top status bar. On-chain info card with 16 fields. IBM Plex Mono numerics. Same 3-scenario
+        settlement preview.</li>
   </ul>
+  <p style="margin-top: 16px; padding: 12px 16px; background: #fff5e6; border-left: 3px solid #fb923c;
+            border-radius: 4px; color: #1a1a1a;">
+    <strong>If you're choosing today:</strong> start with v6 and v7. They incorporate the layout
+    corrections (chart-dominant trade page, order book + trades on right, position + settlement below
+    chart), better market switching (search + Cmd-K + left rail), and richer interaction polish that
+    addressed the "too basic" feedback on v1–v5.
+  </p>
 </div>
 
 <!-- TOC -->
@@ -260,29 +316,147 @@
   <a href="v1-landing.html">
     <span class="toc-num">v1 / hyperliquid</span>
     <span class="toc-name">Max density</span>
-    <span class="toc-vibe">Yellow-green · mono-heavy</span>
+    <span class="toc-vibe">Yellow-green · mono</span>
   </a>
   <a href="v2-landing.html">
     <span class="toc-num">v2 / polymarket</span>
     <span class="toc-name">Approachable</span>
-    <span class="toc-vibe">Amber · probability-first</span>
+    <span class="toc-vibe">Amber · prob-first</span>
   </a>
   <a href="v3-landing.html">
     <span class="toc-num">v3 / drift</span>
     <span class="toc-name">Solana DeFi</span>
-    <span class="toc-vibe">Violet · sticky portfolio</span>
+    <span class="toc-vibe">Violet · sticky pos</span>
   </a>
   <a href="v4-landing.html">
     <span class="toc-num">v4 / bloomberg</span>
     <span class="toc-name">Institutional</span>
-    <span class="toc-vibe">Cyan · IBM Plex Mono</span>
+    <span class="toc-vibe">Cyan · Plex Mono</span>
   </a>
   <a href="v5-landing.html">
     <span class="toc-num">v5 / linear</span>
     <span class="toc-name">Modern restrained</span>
     <span class="toc-vibe">Orange · sparklines</span>
   </a>
+  <a href="v6-landing.html" class="new-iter">
+    <span class="toc-num">v6 / pulse</span>
+    <span class="toc-name">Degen polish</span>
+    <span class="toc-vibe">Orange · Cmd-K · glow</span>
+  </a>
+  <a href="v7-landing.html" class="new-iter">
+    <span class="toc-num">v7 / terminal</span>
+    <span class="toc-name">Polished terminal</span>
+    <span class="toc-vibe">Cyan · matrix · rail</span>
+  </a>
 </div>
+
+<!-- v6 (featured, feedback-driven) -->
+<div class="candidate featured">
+  <div class="candidate-h">
+    <div class="candidate-num">06 / PULSE</div>
+    <h2>Pulse<span class="sub">Linear-orange + modern degen polish</span></h2>
+    <div class="candidate-colors">
+      <div class="swatch" style="background: #0a0a0c;"></div>
+      <div class="swatch" style="background: #14141a;"></div>
+      <div class="swatch" style="background: #fb923c;"></div>
+      <div class="swatch" style="background: #22c55e;"></div>
+      <div class="swatch" style="background: #ef4444;"></div>
+    </div>
+  </div>
+  <div class="candidate-body">
+    <div class="candidate-row">
+      <div class="candidate-desc">
+        <h3>Vibe</h3>
+        <p>
+          Linear's modern restraint, dialed up for traders. Sharp orange accent over near-black with
+          subtle warm undertone. Gradient borders, glow pulses on live indicators, animated session
+          ribbon, shimmer effects. Cmd-K palette for instant market switching (also a persistent search
+          bar). Hotkey hint bar at bottom-right.
+        </p>
+        <p><strong>What's new vs v1–v5:</strong> table-view markets with strike PRICE+PROBABILITY cards
+        (heat-gradient backgrounds, ATM highlighted), per-strike vol breakdown, hover-elevate row animation
+        with left-edge accent stripe, trending movers carousel at top. Trade page is chart-dominant
+        (380px tall) with buy/sell + order book + recent trades stacked on the RIGHT, position +
+        settlement BELOW the chart. <strong>Settlement preview clarified</strong> — shows 3 scenarios
+        (exit-now / hold-yes-win / hold-yes-lose).</p>
+      </div>
+      <div class="candidate-dna">
+        <h3>DNA</h3>
+        <div class="dna-row"><span class="lbl">accent</span><span class="val" style="color: #fb923c;">#fb923c</span></div>
+        <div class="dna-row"><span class="lbl">body</span><span class="val">Geist Sans</span></div>
+        <div class="dna-row"><span class="lbl">numbers</span><span class="val">JetBrains Mono</span></div>
+        <div class="dna-row"><span class="lbl">density</span><span class="val">medium-high</span></div>
+        <div class="dna-row"><span class="lbl">trade page</span><span class="val">chart left + right rail</span></div>
+        <div class="dna-row"><span class="lbl">market switcher</span><span class="val">⌘K + search bar</span></div>
+        <div class="dna-row"><span class="lbl">signature</span><span class="val">glow pulse + movers carousel</span></div>
+        <div class="dna-row"><span class="lbl">settlement</span><span class="val">3 scenarios</span></div>
+      </div>
+    </div>
+    <div class="candidate-links">
+      <a href="v6-landing.html" class="link-btn">View landing →</a>
+      <a href="v6-trade.html" class="link-btn outline">View trade page →</a>
+    </div>
+  </div>
+</div>
+
+<!-- v7 (featured, feedback-driven) -->
+<div class="candidate featured">
+  <div class="candidate-h">
+    <div class="candidate-num">07 / TERMINAL</div>
+    <h2>Terminal<span class="sub">Bloomberg-cyan + polished density</span></h2>
+    <div class="candidate-colors">
+      <div class="swatch" style="background: #060810;"></div>
+      <div class="swatch" style="background: #0c1018;"></div>
+      <div class="swatch" style="background: #06b6d4;"></div>
+      <div class="swatch" style="background: #4ade80;"></div>
+      <div class="swatch" style="background: #f87171;"></div>
+    </div>
+  </div>
+  <div class="candidate-body">
+    <div class="candidate-row">
+      <div class="candidate-desc">
+        <h3>Vibe</h3>
+        <p>
+          Bloomberg DNA, refined. Cool cyan accent over true-black background. Bloomberg's signature
+          top status bar (CONN / LAT / PYTH / SLOT / PROG / CFG / SETTLE) retained, but the rest is
+          rewritten for breathing room: proper modern type hierarchy, IBM Plex Mono on numbers,
+          IBM Plex Sans on body, subtle background gradients.
+        </p>
+        <p><strong>What's new vs v1–v5:</strong> persistent LEFT RAIL on every page (filters + ticker
+        list + my-positions + watchlist) so market switching is always one click away. Landing features
+        a <strong>color-coded probability matrix</strong> (7 strikes × 7 tickers, heat-graded green→cyan
+        →red, ATM highlighted with accent box-shadow) — the "Bloomberg signature done right." Trade page
+        adds an on-chain info card with 16 fields. Same RIGHT-rail layout for buy/sell + order book +
+        recent trades; chart 440px tall on left. Settlement preview shows the same 3 scenarios.</p>
+      </div>
+      <div class="candidate-dna">
+        <h3>DNA</h3>
+        <div class="dna-row"><span class="lbl">accent</span><span class="val" style="color: #06b6d4;">#06b6d4</span></div>
+        <div class="dna-row"><span class="lbl">body</span><span class="val">IBM Plex Sans</span></div>
+        <div class="dna-row"><span class="lbl">numbers</span><span class="val">IBM Plex Mono</span></div>
+        <div class="dna-row"><span class="lbl">density</span><span class="val">high</span></div>
+        <div class="dna-row"><span class="lbl">trade page</span><span class="val">left rail + chart + right rail</span></div>
+        <div class="dna-row"><span class="lbl">market switcher</span><span class="val">left rail + ⌘K</span></div>
+        <div class="dna-row"><span class="lbl">signature</span><span class="val">probability matrix + status bar</span></div>
+        <div class="dna-row"><span class="lbl">settlement</span><span class="val">3 scenarios</span></div>
+      </div>
+    </div>
+    <div class="candidate-links">
+      <a href="v7-landing.html" class="link-btn">View landing →</a>
+      <a href="v7-trade.html" class="link-btn outline">View trade page →</a>
+    </div>
+  </div>
+</div>
+
+<h2 style="font-size: 14px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-muted);
+           margin: 16px 0 12px; padding-top: 24px; border-top: 1px solid var(--border);
+           font-weight: 700; display: flex; align-items: center; gap: 12px;">
+  Earlier exploration · v1–v5
+  <span style="font-size: 12px; color: var(--text-subtle); letter-spacing: 0;
+               text-transform: none; font-weight: 500;">
+    — initial 5 candidates before feedback. Kept for reference + element cherry-picking.
+  </span>
+</h2>
 
 <!-- v1 -->
 <div class="candidate">
@@ -496,7 +670,7 @@
 <!-- COMPARE -->
 <div class="compare-block">
   <h2>Side-by-side comparison</h2>
-  <p>View all 5 candidates simultaneously in narrow columns for direct visual comparison.</p>
+  <p>View all 7 candidates simultaneously in narrow columns for direct visual comparison. Scroll horizontally.</p>
   <div class="compare-links">
     <a href="compare-landing.html" class="link-btn">Compare all landings →</a>
     <a href="compare-trade.html" class="link-btn outline">Compare all trade pages →</a>
@@ -521,7 +695,7 @@
 </div>
 
 <footer>
-  Generated 2026-05-21 · BellMarkets · Apache 2.0
+  Generated 2026-05-21 · last updated 2026-05-22 (v6 + v7 added) · BellMarkets · Apache 2.0
 </footer>
 
 </div>
