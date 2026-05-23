@@ -144,6 +144,161 @@ The on-chain shape:
 
 ---
 
+### DR-005 — User-funded strike PDA creation (Meteora DLMM pattern)
+
+**Date:** 2026-05-22 (Fri evening — post-Day-4 + post-design iteration)
+**Status:** Active — implementation queued across Aria / Bram / Cleo / Drew
+**Made by:** Cory (Tate-routed)
+
+**Context:** The original architecture had Bram's morning cron eagerly create all 49 strike PDAs per day (7 tickers × 7 strikes — ATM + ±3/6/9%) using the platform-admin keypair. Working capital cost: ~$44/day. Locked rent at scale (stranded user balances): ~$5,500/year — see `.project/bell-markets/coordination/cory_questions_1_answers.md` §1 for the full cost analysis. After discussion, this is misaligned with the protocol's non-custodial thesis (DR-002 permissionless settle, POV-2 permissionless authority) — the platform shouldn't subsidize speculation when a per-user cost-shift pattern exists.
+
+**Decision:** **Platform funds ZERO strike PDAs.** First user to want to trade a strike pays ~$0.90 rent to create the StrikeMarket PDA + YES/NO mints + USDC vault. Pattern modeled on Meteora DLMM's bin-creation mechanism. The Anchor program retains all authority over created PDAs (mint authority, vault authority, settle authority); the user is only the **rent payer**, not a privileged role.
+
+A new permissionless instruction `user_create_strike_market(strike_price, expiry_unix)` is added. On-chain enforcement against malicious strikes:
+1. Strike must be within per-ticker `max_user_strike_deviation_bps` of current Pyth spot
+2. Strike must align to per-ticker `strike_tick_size` grid (no 100-micro-strike fragmentation)
+3. Expiry must be a recognized trading-day close
+4. Pyth oracle must pass staleness + confidence checks at create time
+
+Per-ticker config in a new `TickerConfig` PDA (one per Pyth feed) — admin-governable independently per ticker. Initial values per max historical earnings move:
+
+| Ticker | max_user_strike_deviation_bps | strike_tick_size (USD) |
+|---|---|---|
+| NVDA | 3000 (30%) | $5 |
+| META | 3000 (30%) | $5 |
+| TSLA | 3000 (30%) | $5 |
+| AMZN | 2000 (20%) | $2 |
+| AAPL | 1500 (15%) | $1 |
+| MSFT | 1500 (15%) | $1 |
+| GOOGL | 1500 (15%) | $1 |
+
+Bram's morning cron is **reduced** to maintaining the per-ticker `TickerConfig` PDA (deviation + tick size) and managing any earnings-eve cap expansions. No more eager PDA creation.
+
+**Trade-off:** We pay the cost that the first trader per strike sees a $0.90 friction added to their trade in exchange for: zero platform working capital exposure ($44/day → $0), zero recurring locked rent (~$5,500/year → $0), maximally non-custodial story for interview defense ("platform funds zero infrastructure"), and self-balancing strike inventory (strikes nobody wants never exist; strikes with demand spawn organically).
+
+**Consequences:**
+- **Aria's program:** adds 11th instruction `user_create_strike_market` + `TickerConfig` account + per-ticker check logic. Estimated ~3-4 hr work. Existing `create_strike_market` retained for admin-controlled scenarios but not used by Bram's cron.
+- **Bram's automation:** morning cron refactor — instead of 7-49 `create_strike_market` calls per day, it does ONE call per ticker per day to update `TickerConfig` (which strikes are allowed today, including any earnings-eve expansions). Earnings calendar logic — initially hardcoded MAG7 dates, later from Polygon.io / Yahoo Finance.
+- **Cleo's frontend:** UI now shows "Be the first — $0.90 to open this market" CTA when a strike PDA doesn't exist. The first-trade flow bundles `[user_create_strike_market, mint_pair, place_order]` into one atomic transaction (single wallet signature, single broadcast). Lazy state handling becomes a unified code path.
+- **Drew's quality suite:** add tests for `user_create_strike_market` (success + deviation-cap rejection + tick-alignment rejection), plus update `simulate-trading-day.mjs` to exercise the lazy-create path.
+- **First-trader UX:** $0.90 added to their first trade on any strike. For $100+ trades this is 0.9%. For small trades the strike likely shouldn't exist anyway. Self-balancing.
+- **Closed-rent recovery (when `force_redeem` + `close_settled_market` eventually fire in v2):** refunded rent flows to the `MarketConfig.treasury` (fee_collector) — consistent with Meteora's pattern. User "got" the venue they paid for; platform captures the recovered rent as compensation for ongoing protocol maintenance.
+
+**Alternatives considered:**
+- **Eager creation (status quo before this DR):** rejected. Platform funds ~$44/day + ~$5,500/year stranded; misaligned with non-custodial thesis. The hybrid "eager ATM + lazy wings" middle ground was also rejected as unnecessarily complex (per-strike eager/lazy logic in Bram's cron + Cleo's UI handling two states).
+- **Per-ticker admin-pre-defined whitelist (no spot-based cap):** rejected. Requires admin to maintain a curated list per ticker per day. The on-chain deviation cap is self-tuning (allows wider strikes when Pyth spot moves; tightens when stable). Less admin maintenance.
+- **Cranker bounty on closed-rent (Option C):** deferred. Platform-captures (Option B) is simpler for v2; bounty pattern can be added later if dust-cleanup becomes a real problem.
+
+---
+
+### DR-006 — Strike-grid evolution schedule (post-close anchor + AH/PM wild-swing checks)
+
+**Date:** 2026-05-22 (Fri evening — composes with DR-005)
+**Status:** Active — implementation queued for Bram
+**Made by:** Cory (Tate-routed)
+
+**Context:** With DR-005 locking user-funded creation, the question becomes: WHEN does Bram's cron update the per-ticker `TickerConfig` (allowed-strikes grid + deviation cap)? The previous cadence (single 8 AM ET morning run anchored on prev-close) has two known problems:
+1. Anchoring on prev-close misses overnight news (earnings, geopolitical, Fed) that shifts the spot 4-30% before market open
+2. Single morning run gives only ~6.5 hours of trading per market
+
+**Decision:** Bram's cron operates a **24-hour rolling strike-grid evolution** across three phases per trading cycle:
+
+**Phase 1 — Post-close anchor (4:05 PM ET):**
+After Bram's existing 4:05 PM settle cron finishes (`settle_market` calls for today's expired markets), the same cron writes tomorrow's per-ticker `TickerConfig`:
+- `cap_center` = today's official close price (from Pyth Hermes)
+- `allowed_strikes` = ATM ± 3/6/9% of cap_center, rounded to per-ticker `strike_tick_size`
+- `max_user_strike_deviation_bps` = per-ticker default (see DR-005 table)
+
+Tomorrow's markets are now openable by users (per DR-005 — they pay rent to actually create the PDA).
+
+**Phase 2 — AH wild-swing checks (4:30 PM - 8:00 PM ET, every 30 min):**
+Cron reads live Pyth Hermes spot for each ticker. If `|spot - cap_center| / cap_center > ticker_threshold`:
+- Update `cap_center` to current spot
+- Expand `allowed_strikes` to include strikes around new spot (without removing existing — users may already hold positions)
+- Per-ticker thresholds: NVDA/META/TSLA = 8%, AMZN = 6%, AAPL/MSFT/GOOGL = 4%
+
+**Phase 3 — Pre-market wild-swing checks (4:00 AM - 9:00 AM ET next day, every 30 min):**
+Same logic as Phase 2. Catches Asia/Europe overnight news + early-morning announcements.
+
+**9:00 AM ET cutoff:** No more updates between 9 AM and 4 PM ET (regular trading hours). The strike grid is fixed during the trading day.
+
+**Trade-off:** We pay the cost that on busy news days (earnings, Fed, geopolitical surprises), tomorrow's `TickerConfig` may be updated 5-10 times before market open in exchange for: trading window extends from ~6.5 hr to ~24 hr (4:30 PM today → 4:00 PM tomorrow); strikes stay properly centered through overnight news; users can spawn wider wings as the volatility profile evolves; platform never pre-commits rent to strikes that may not be relevant.
+
+**Consequences:**
+- **Bram's cron schedule:** ~19 cron fires per trading day instead of 1.
+  - 1× 4:05 PM ET (settle + anchor next day)
+  - 8× AH window every 30 min (4:30 → 8:00 PM ET)
+  - 10× PM window every 30 min (4:00 → 9:00 AM ET next day)
+- **Trigger.dev usage:** ~19 × 5 trading days × 4 weeks = 380 runs/month. Well within free tier (1,000 runs/month).
+- **Pyth Hermes API usage:** ~19 fires × 7 tickers = 133 reads/day. Free tier covers easily.
+- **On-chain writes:** Each cron fire may write `TickerConfig` updates if drift triggers; on quiet days, zero writes; on news days, up to 1-2 writes per ticker. Bram's existing platform-admin keypair signs all updates.
+- **`TickerConfig` schema:** new PDA per ticker per day (or a single ticker-keyed map in MarketConfig — Aria's design call). Fields: `cap_center`, `allowed_strikes` (small set), `max_dev_bps`, `tick_size`, `threshold_bps`, `last_updated_slot`, `updated_by_phase` (anchor/AH/PM).
+- **Existing 8 AM ET morning cron is REPLACED by Phase 3.** No more "prev close" anchor.
+- **Settlement cron (4:05 PM) extends to include "anchor next day" step.** Still runs once daily.
+- **Earnings calendar (deferred):** future v2.5 — let Bram's cron pre-expand `allowed_strikes` 24h before known MAG7 earnings dates without waiting for a wild-swing trigger. For MVP, the threshold-based detection catches earnings reactions automatically (NVDA AH at +5% → 8% threshold doesn't trigger yet; at +9% → triggers).
+
+**Alternatives considered:**
+- **Single 8 AM ET morning cron (current):** rejected. Misses overnight news; only 6.5 hr trading window.
+- **Single 4:05 PM ET post-close cron (no checks):** rejected. Strikes set at close don't catch AH news that happens between 4:05 PM and pre-market open.
+- **Continuous cron (every 5 min through AH/PM):** rejected. Excessive Trigger.dev usage (~50K runs/month — exceeds paid tiers); marginal benefit over 30-min cadence.
+- **Off-chain earnings-calendar pre-expansion only (no threshold checks):** rejected. Captures only KNOWN events; misses surprise geopolitical / Fed / unscheduled news. Threshold checks are reactive and cover the unknown-unknowns.
+
+---
+
+### DR-007 — Trading calendar (weekends + US equity holidays)
+
+**Date:** 2026-05-22 (Fri evening — composes with DR-005 + DR-006)
+**Status:** Active — implementation queued for Bram (off-chain) + light Aria validation (on-chain)
+**Made by:** Cory (Tate-routed)
+
+**Context:** Underlying stocks don't trade on weekends or US equity holidays (~9-10 full closures + 2-3 half-days per year). A market created at Friday's close that "expires Saturday" would have no Pyth close-price to settle against — Saturday's Pyth feed reflects no real trading. Settlement would either fail (oracle stale) or use the stale Friday close (incorrect — gives users an arbitrage window).
+
+User's correct intuition: "The strikes we open should not resolve until the next trading day."
+
+**Decision:** All strike expiries are anchored to the **next US equity trading day's 4:00 PM ET close**, where "next trading day" skips weekends + US equity holidays. Implementation owns:
+
+**Off-chain (Bram):**
+- Hardcoded US 2026 trading-day calendar in `services/automation/src/calendar.ts`:
+  - 9 full holidays: New Year's Day, MLK Day, Presidents Day, Good Friday, Memorial Day, Juneteenth, Independence Day, Labor Day, Thanksgiving, Christmas
+  - 3 early closes (1 PM ET): day after Thanksgiving, Christmas Eve, July 3 (if Wed)
+- Two helpers:
+  - `isTradingDay(date): boolean` — weekday AND not in holidays set
+  - `nextTradingDay(from: Date): Date` — skips weekends + holidays
+- Every cron entry-point gates with `if (!isTradingDay(today)) return;` — prevents Trigger.dev runs on Saturday/Sunday/holidays from doing anything
+- Phase 1 of DR-006 uses `nextTradingDay(today)` for `TickerConfig.expiry_unix` — never anchors to a non-trading day
+
+**On-chain (Aria — minimal):**
+- `create_strike_market` + `user_create_strike_market` validate `expiry_unix` is at exactly 4:00 PM ET (16:00 UTC adjusted for EST/EDT; on devnet assume EDT) AND is at most 7 calendar days in the future (catches typos but doesn't enforce holiday logic — that's Bram's responsibility)
+- No on-chain holiday calendar — calendars change yearly; on-chain config maintenance is heavier than worth
+
+**Cross-day timing example (Friday Memorial Day weekend):**
+
+| Time | Action |
+|---|---|
+| Friday 4:05 PM ET | Settle Thursday's markets. Anchor **Tuesday's** TickerConfig (skipping Mon Memorial Day) — `expiry_unix` = Tuesday 4 PM ET |
+| Friday 4:30 PM - 8:00 PM ET | AH wild-swing checks for Tuesday's anchor (standard AH session active) |
+| Saturday + Sunday + Monday | No cron firing (or no-op via `isTradingDay()` guard) |
+| Tuesday 4:00 AM - 9:00 AM ET | PM wild-swing checks for Tuesday's anchor |
+| Tuesday 9:30 AM ET | Market opens; Tuesday markets live for trading until 4 PM ET |
+| Tuesday 4:05 PM ET | Settle Tuesday's markets; anchor Wednesday's TickerConfig |
+
+**Trade-off:** We pay the maintenance cost of yearly holiday-calendar updates (Bram's hardcoded set needs annual refresh) in exchange for: correct settlement timing (settle against a real close, not a no-trade Sunday); cleaner UX (no "expired Saturday" markets that confuse users); compliance with how US equity markets actually work.
+
+**Consequences:**
+- **Bram's automation needs an annual calendar update.** For MVP: hardcode 2026 calendar (one-time, ~30 min). For v2: use `nyse-holidays` npm package or pull from Polygon.io free tier (~1 hr setup).
+- **The Phase 3 "PM check" window (4-9 AM) operates on the NEXT trading day's morning, not "tomorrow" calendar morning.** For a Friday → Tuesday market, PM checks fire 4-9 AM Tuesday, not Saturday/Sunday/Monday.
+- **Users see "expiry: Tuesday 4 PM ET" in the UI on Friday after-hours.** Cleo's frontend reads `TickerConfig.expiry_unix` and displays the human-readable date. Holiday awareness is automatic.
+- **Half-days (early-close 1 PM ET):** expire markets at 1 PM ET on those days. Bram's calendar tracks them; expiry is set accordingly.
+- **Edge case: late-Friday earnings announcement** (e.g., 5 PM ET) → AH check at 5:30 PM catches it → updates Tuesday's TickerConfig deviation cap → users can spawn appropriate strikes for the new spot. Works automatically.
+- **Edge case: weekend geopolitical event** (e.g., Sunday news) → no cron fires until Tuesday 4 AM PM check → by Tuesday 9 AM, Pyth pre-market spot reflects the news → cap_center updates → users spawn appropriate strikes before market open.
+
+**Alternatives considered:**
+- **No holiday handling (let markets create with `today + 1` expiry blindly):** rejected. Saturday/Sunday/holiday "expiries" have no real close to settle against; would either fail settlement or use stale Friday close (arbitrage exploit).
+- **On-chain holiday calendar in MarketConfig:** rejected. ~96 bytes of storage; admin maintenance (signed config updates yearly); on-chain logic complexity. Off-chain calendar is simpler and accurate.
+- **External calendar API at create-time (Polygon.io / Yahoo):** deferred to v2. Hardcoded list is fine for MVP and the year ahead.
+
+---
+
 > Aim for 5–15 active DRs over a project's life. Fewer and you're not
 > locking enough; more and the file becomes unscannable (rotate stable
 > ones into `specs/architecture.md` if they've become "just how the
