@@ -915,6 +915,52 @@
   .ob-spread .last { font-weight: 800; color: var(--accent); font-size: 13px; }
   .ob-spread .spread { color: var(--text-muted); }
 
+  /* Order book — BOTH view (YES + NO side by side) */
+  .ob-both {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+  }
+  .ob-both[hidden] { display: none; }
+  .ob-card[data-view="both"] .ob-single { display: none; }
+  .ob-card[data-view="both"] .ob-both { display: grid; }
+  .ob-both-col {
+    border-right: 1px solid var(--border);
+  }
+  .ob-both-col:last-child { border-right: none; }
+  .ob-both-h {
+    background: var(--panel-2);
+    padding: 6px 10px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-strong);
+    text-align: center;
+    border-bottom: 1px solid var(--border);
+  }
+  /* Compact ob-row for BOTH view (2 cols: price + size, no total, no depth bar) */
+  .ob-both .ob-row.compact {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    padding: 3px 10px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+    position: relative;
+    cursor: pointer;
+  }
+  .ob-both .ob-row.compact .price { font-weight: 700; }
+  .ob-both .ob-row.compact .size { text-align: right; color: var(--text-muted); }
+  .ob-both .ob-row.compact.ask .price { color: var(--no); }
+  .ob-both .ob-row.compact.bid .price { color: var(--yes); }
+  .ob-both .ob-spread.compact {
+    background: var(--panel-2); padding: 5px 10px;
+    border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+    display: flex; justify-content: center;
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+  }
+  .ob-both .ob-spread.compact .last { font-weight: 800; color: var(--accent); font-size: 11px; }
+
   /* Recent trades */
   .trades-card {
     background: var(--panel); border: 1px solid var(--border);
@@ -2289,27 +2335,64 @@
         <!-- Open Orders moved to info-grid-2 next to Your Position (Cory feedback 2026-05-23) -->
 
         <!-- Order book -->
-        <div class="ob-card">
+        <div class="ob-card" data-view="yes">
           <div class="ob-h">
             <h3>Order book</h3>
-            <div class="ob-pick">
-              <button class="active">YES</button>
-              <button>NO</button>
+            <div class="ob-pick" role="tablist">
+              <button class="active" data-ob-view="yes">YES</button>
+              <button data-ob-view="no">NO</button>
+              <button data-ob-view="both">BOTH</button>
             </div>
           </div>
-          <div class="ob-rows-h"><div>price</div><div>size</div><div>total</div></div>
-          <div class="ob-row ask"><div class="depth-bar" style="width: 18%"></div><span class="price">0.555</span><span class="size">490</span><span class="total">1,964</span></div>
-          <div class="ob-row ask"><div class="depth-bar" style="width: 14%"></div><span class="price">0.550</span><span class="size">375</span><span class="total">1,474</span></div>
-          <div class="ob-row ask"><div class="depth-bar" style="width: 26%"></div><span class="price">0.545</span><span class="size">722</span><span class="total">1,099</span></div>
-          <div class="ob-row ask"><div class="depth-bar" style="width: 12%"></div><span class="price">0.540</span><span class="size">377</span><span class="total">377</span></div>
-          <div class="ob-spread">
-            <span class="last mono">$0.520 ↑</span>
-            <span class="spread mono">spread 0.040 · 7.7%</span>
+
+          <!-- SINGLE-SIDE VIEW (YES or NO) -->
+          <div class="ob-single">
+            <div class="ob-rows-h"><div>price</div><div>size</div><div>total</div></div>
+            <div class="ob-row ask"><div class="depth-bar" style="width: 18%"></div><span class="price">0.555</span><span class="size">490</span><span class="total">1,964</span></div>
+            <div class="ob-row ask"><div class="depth-bar" style="width: 14%"></div><span class="price">0.550</span><span class="size">375</span><span class="total">1,474</span></div>
+            <div class="ob-row ask"><div class="depth-bar" style="width: 26%"></div><span class="price">0.545</span><span class="size">722</span><span class="total">1,099</span></div>
+            <div class="ob-row ask"><div class="depth-bar" style="width: 12%"></div><span class="price">0.540</span><span class="size">377</span><span class="total">377</span></div>
+            <div class="ob-spread">
+              <span class="last mono">$0.520 ↑</span>
+              <span class="spread mono">spread 0.040 · 7.7%</span>
+            </div>
+            <div class="ob-row bid"><div class="depth-bar" style="width: 20%"></div><span class="price">0.500</span><span class="size">560</span><span class="total">560</span></div>
+            <div class="ob-row bid"><div class="depth-bar" style="width: 16%"></div><span class="price">0.495</span><span class="size">440</span><span class="total">1,000</span></div>
+            <div class="ob-row bid"><div class="depth-bar" style="width: 30%"></div><span class="price">0.490</span><span class="size">830</span><span class="total">1,830</span></div>
+            <div class="ob-row bid"><div class="depth-bar" style="width: 10%"></div><span class="price">0.485</span><span class="size">270</span><span class="total">2,100</span></div>
           </div>
-          <div class="ob-row bid"><div class="depth-bar" style="width: 20%"></div><span class="price">0.500</span><span class="size">560</span><span class="total">560</span></div>
-          <div class="ob-row bid"><div class="depth-bar" style="width: 16%"></div><span class="price">0.495</span><span class="size">440</span><span class="total">1,000</span></div>
-          <div class="ob-row bid"><div class="depth-bar" style="width: 30%"></div><span class="price">0.490</span><span class="size">830</span><span class="total">1,830</span></div>
-          <div class="ob-row bid"><div class="depth-bar" style="width: 10%"></div><span class="price">0.485</span><span class="size">270</span><span class="total">2,100</span></div>
+
+          <!-- BOTH VIEW (YES + NO side by side; mirror prices since YES + NO ≈ $1.00) -->
+          <div class="ob-both" hidden>
+            <div class="ob-both-col">
+              <div class="ob-both-h">YES</div>
+              <div class="ob-row ask compact"><span class="price">0.555</span><span class="size">490</span></div>
+              <div class="ob-row ask compact"><span class="price">0.550</span><span class="size">375</span></div>
+              <div class="ob-row ask compact"><span class="price">0.545</span><span class="size">722</span></div>
+              <div class="ob-row ask compact"><span class="price">0.540</span><span class="size">377</span></div>
+              <div class="ob-spread compact">
+                <span class="last mono">$0.520 ↑</span>
+              </div>
+              <div class="ob-row bid compact"><span class="price">0.500</span><span class="size">560</span></div>
+              <div class="ob-row bid compact"><span class="price">0.495</span><span class="size">440</span></div>
+              <div class="ob-row bid compact"><span class="price">0.490</span><span class="size">830</span></div>
+              <div class="ob-row bid compact"><span class="price">0.485</span><span class="size">270</span></div>
+            </div>
+            <div class="ob-both-col">
+              <div class="ob-both-h">NO</div>
+              <div class="ob-row ask compact"><span class="price">0.515</span><span class="size">560</span></div>
+              <div class="ob-row ask compact"><span class="price">0.510</span><span class="size">440</span></div>
+              <div class="ob-row ask compact"><span class="price">0.505</span><span class="size">830</span></div>
+              <div class="ob-row ask compact"><span class="price">0.500</span><span class="size">270</span></div>
+              <div class="ob-spread compact">
+                <span class="last mono">$0.480 ↓</span>
+              </div>
+              <div class="ob-row bid compact"><span class="price">0.460</span><span class="size">490</span></div>
+              <div class="ob-row bid compact"><span class="price">0.455</span><span class="size">375</span></div>
+              <div class="ob-row bid compact"><span class="price">0.450</span><span class="size">722</span></div>
+              <div class="ob-row bid compact"><span class="price">0.445</span><span class="size">377</span></div>
+            </div>
+          </div>
         </div>
 
         <!-- Recent trades -->
@@ -2376,6 +2459,24 @@
   }
   (function() {
     try { const s = localStorage.getItem('bm-theme'); if (s === 'light') document.documentElement.setAttribute('data-theme', 'light'); } catch (e) {}
+  })();
+
+  // Order book view toggle — YES / NO / BOTH
+  (function() {
+    const card = document.querySelector('.ob-card');
+    if (!card) return;
+    const buttons = card.querySelectorAll('.ob-pick button');
+    buttons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        buttons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const view = btn.dataset.obView;
+        card.dataset.view = view;
+        // For YES vs NO swap, in production you'd also re-render rows with the
+        // opposite side's price data; the markup here is YES-data only for the
+        // single view. The BOTH view shows both pre-rendered.
+      });
+    });
   })();
 
   // Collapsible rail sections — persist open/closed state in localStorage
