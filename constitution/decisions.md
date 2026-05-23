@@ -556,6 +556,52 @@ Stored in `MarketConfig.weekly_distribution_bps: [u16; 10]` and `monthly_distrib
 
 ---
 
+### DR-011 — Earnings-calendar pre-expansion (proactive deviation-cap widening)
+
+**Date:** 2026-05-22 evening (composes with DR-006)
+**Status:** Active — implementation queued for Bram (off-chain) + minor Cleo UI
+**Made by:** Cory (Tate-routed)
+
+**Context:** DR-006 covers reactive wild-swing detection: Bram's cron expands `TickerConfig.max_user_strike_deviation_bps` if Pyth spot moves > ticker threshold during AH/PM windows. This catches earnings reactions ~30 min after they happen. Earnings windows are the highest-volume trading periods of any quarter (20-40% of daily volume in the first 30 min post-announcement). A 30-min lag between gap and tradeable strikes is meaningful user experience cost AND foregone fee revenue.
+
+**Decision:** Bram's automation maintains a hardcoded MAG7 earnings calendar. The day BEFORE each known earnings event, the cron pre-expands that ticker's deviation cap from default (e.g., NVDA 30%) to a wider value (e.g., 50%). Day after earnings, restore default.
+
+Implementation:
+- `services/automation/src/earnings-calendar.ts` — hardcoded JSON of MAG7 earnings dates for 2026:
+  - Apple, Microsoft, Google, Amazon, Meta: quarterly (Feb/May/Aug/Nov typical)
+  - NVIDIA: ~Feb 21, May 22, Aug 28, Nov 20
+  - Tesla: ~Jan 24, Apr 24, Jul 24, Oct 23
+  - Total ~28 events/year (7 tickers × 4 quarters)
+- New cron entry: 4:30 PM ET each trading day → check tomorrow's calendar → if earnings event scheduled, expand deviation cap via signed `update_ticker_config` ix
+- Cleanup cron: 4:30 PM ET day after earnings → restore default deviation cap
+- Cleo UI surfaces "📊 NVDA earnings tomorrow — wider strikes available" indicator (~15 min addition)
+
+Pre-expansion magnitudes (per-ticker, configurable):
+- High-vol tickers (NVDA, META, TSLA): default 30% → 50% on earnings-eve
+- Mid-vol tickers (AMZN): default 20% → 30%
+- Low-vol tickers (AAPL, MSFT, GOOGL): default 15% → 25%
+
+**Trade-off:** We pay annual calendar maintenance (~15 min/year manual update) and ~2 hr Bram implementation in exchange for: zero lag between earnings announcement and tradeable strikes; captures peak earnings volume / fee revenue; strong demo narrative (anticipatory strike expansion); user experience win on highest-impact trading moments.
+
+**Consequences:**
+- **Purely additive over DR-006.** If hardcoded calendar is wrong or stale, DR-006's reactive wild-swing detection still catches missed earnings within 30 min. Never breaks anything.
+- **Bram's automation:** new earnings-calendar.ts module + cron entries for pre-expansion + restoration. ~1-2 hr.
+- **Aria's program:** no changes — uses existing `update_ticker_config` admin-signed ix.
+- **Cleo's frontend:** optional UI badge showing earnings-eve status. ~15 min.
+- **Drew's tests:** pre-expansion + restoration logic + edge cases (calendar empty, earnings during half-day, etc.). ~15 min.
+- **Demo narrative win:** Drew's `simulate-trading-day.mjs` can include "earnings day" scenario showing immediate strike availability vs reactive lag.
+- **V2 path:** swap hardcoded calendar for API integration (Polygon.io / Yahoo Finance / Alpha Vantage). Auto-updates each quarter without manual intervention. ~1 hr upgrade.
+- **Calendar maintenance:** Bram reviews quarterly. If a date is missed, DR-006 catches it; we update the calendar next quarter.
+
+**Alternatives considered:**
+- **Skip pre-expansion (DR-006 reactive only):** rejected. 30-min lag during peak volume is meaningful UX + revenue cost.
+- **API-driven calendar from day 1:** deferred to v2. Hardcoded list is fine for MVP and saves API integration complexity (~1 hr extra) + handles rate limiting / API downtime concerns. Trade slight maintenance burden for reliability.
+- **On-chain earnings calendar:** rejected. Calendars change yearly; on-chain config maintenance is heavier than off-chain. Bram's hardcoded list with quarterly review is appropriate.
+- **Pre-expansion by larger margins (e.g., 30% → 100%):** rejected. Excessive cap widening would allow users to spawn nonsensical strikes (e.g., NVDA at $50 when spot is $1300). Tier-based 2× expansion is sufficient for historical earnings reactions.
+- **Per-event expansion magnitudes (different for each earnings call):** deferred. Default 2× expansion captures most cases; if specific events need more (e.g., post-IPO earnings, mega-cap mergers), v2 can add per-event overrides.
+
+---
+
 > Aim for 5–15 active DRs over a project's life. Fewer and you're not
 > locking enough; more and the file becomes unscannable (rotate stable
 > ones into `specs/architecture.md` if they've become "just how the
