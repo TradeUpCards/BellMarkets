@@ -1317,7 +1317,8 @@
   .trade-card.sell-empty .sell-empty-state { display: block; }
   /* Visibility based on order type */
   .trade-form[data-order-type="market"] .limit-only,
-  .trade-form[data-order-type="market"] .limit-price-field { display: none; }
+  .trade-form[data-order-type="market"] .limit-price-field,
+  .trade-form[data-order-type="market"] .limit-order-section { display: none; }
   .trade-form[data-order-type="limit"] .market-only { display: none; }
 
   /* Limit price meta line */
@@ -2656,7 +2657,8 @@
 
             <!-- ACTIVE form (hidden when sell-empty-state shows) -->
             <div class="trade-active-fields">
-              <div class="field">
+              <!-- MARKET amount field — replaced by Limit Order section when Limit tab active -->
+              <div class="field market-only">
                 <div class="field-label">
                   <span data-field-amount-lbl>Amount</span>
                   <span class="available" data-field-available>$123.45 avail</span>
@@ -2674,24 +2676,42 @@
               </div>
             </div>
 
-            <!-- LIMIT PRICE — shows only when Limit tab selected (CSS toggles via data-order-type) -->
-            <div class="field limit-price-field">
-              <div class="field-label">
-                <span>Limit price (YES)</span>
-                <span class="available">market $0.520</span>
+            <!-- LIMIT ORDER section — shown only on Limit tab. Replaces Amount field. -->
+            <div class="limit-order-section limit-only">
+              <div class="field">
+                <div class="field-label">
+                  <span>Limit price <span data-outcome-text>YES</span></span>
+                  <span class="available">market <span data-px-current>$0.520</span></span>
+                </div>
+                <div class="input-wrap">
+                  <input id="limit-price-input" value="0.500" placeholder="0.000" step="0.005" min="0.01" max="0.99">
+                  <span class="suffix">USDC</span>
+                </div>
+                <div class="quick-amounts">
+                  <button class="quick-amount" data-limit-px="market">market</button>
+                  <button class="quick-amount" data-limit-px="-0.01">−1¢</button>
+                  <button class="quick-amount" data-limit-px="-0.02">−2¢</button>
+                  <button class="quick-amount" data-limit-px="-0.05">−5¢</button>
+                </div>
               </div>
-              <div class="input-wrap">
-                <input value="0.500" placeholder="0.000" step="0.005" min="0.01" max="0.99">
-                <span class="suffix">USDC</span>
+              <div class="field" style="margin-top: 12px;">
+                <div class="field-label">
+                  <span>Quantity</span>
+                  <span class="available">$123.45 avail</span>
+                </div>
+                <div class="input-wrap">
+                  <input id="limit-qty-input" value="200" placeholder="0">
+                  <span class="suffix"><span data-outcome-text>YES</span></span>
+                </div>
+                <div class="quick-amounts">
+                  <button class="quick-amount" data-limit-qty="50">50</button>
+                  <button class="quick-amount" data-limit-qty="100">100</button>
+                  <button class="quick-amount" data-limit-qty="500">500</button>
+                  <button class="quick-amount" data-limit-qty="MAX">MAX</button>
+                </div>
               </div>
-              <div class="quick-amounts">
-                <button class="quick-amount">market</button>
-                <button class="quick-amount">−1¢</button>
-                <button class="quick-amount">−2¢</button>
-                <button class="quick-amount">−5¢</button>
-              </div>
-              <div class="limit-meta mono">
-                ↓ 4% below market · est. fill <strong>15-30s</strong> if price drops
+              <div class="limit-meta mono" id="limit-meta">
+                Order total: <strong id="limit-total">$100.00</strong> · ↓ 4% below market · est. fill <strong>15-30s</strong> if price drops
               </div>
             </div>
 
@@ -2892,7 +2912,7 @@
     try { const s = localStorage.getItem('bm-theme'); if (s === 'light') document.documentElement.setAttribute('data-theme', 'light'); } catch (e) {}
   })();
 
-  // Market / Limit order-type toggle
+  // Market / Limit order-type toggle + limit price/qty wiring
   (function() {
     const form = document.querySelector('.trade-form');
     if (!form) return;
@@ -2904,6 +2924,44 @@
         form.dataset.orderType = btn.dataset.order;
       });
     });
+
+    // Limit-order section: price/qty inputs + chips + computed total
+    const limitPx = document.getElementById('limit-price-input');
+    const limitQty = document.getElementById('limit-qty-input');
+    const limitTotal = document.getElementById('limit-total');
+    const MARKET_PX = 0.520;
+    function recomputeLimit() {
+      if (!limitPx || !limitQty || !limitTotal) return;
+      const px = parseFloat(limitPx.value) || 0;
+      const qty = parseFloat(limitQty.value) || 0;
+      limitTotal.textContent = '$' + (px * qty).toFixed(2);
+    }
+    if (limitPx) limitPx.addEventListener('input', recomputeLimit);
+    if (limitQty) limitQty.addEventListener('input', recomputeLimit);
+    // Limit price quick-adjusts (market / -1¢ / -2¢ / -5¢)
+    document.querySelectorAll('[data-limit-px]').forEach(b => {
+      b.addEventListener('click', () => {
+        const v = b.dataset.limitPx;
+        if (v === 'market') limitPx.value = MARKET_PX.toFixed(3);
+        else limitPx.value = (MARKET_PX + parseFloat(v)).toFixed(3);
+        recomputeLimit();
+      });
+    });
+    // Quantity quick-amounts
+    document.querySelectorAll('[data-limit-qty]').forEach(b => {
+      b.addEventListener('click', () => {
+        const v = b.dataset.limitQty;
+        if (v === 'MAX') {
+          // Use available USDC / limit price as approx
+          const px = parseFloat(limitPx.value) || MARKET_PX;
+          limitQty.value = Math.floor(123.45 / px);
+        } else {
+          limitQty.value = v;
+        }
+        recomputeLimit();
+      });
+    });
+    recomputeLimit();
   })();
 
   // Buy / Sell × YES / NO state machine — recomputes button text, summary, available
