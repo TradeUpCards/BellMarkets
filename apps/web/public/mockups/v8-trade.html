@@ -3097,6 +3097,9 @@
         rowLblCost.textContent = 'Cost';
         rowValCost.textContent = fmt(usdcAmt);
         rowValFee.textContent = fmtSigned(fee);
+        // Restore fee row visibility (might have been hidden by SELL state)
+        const feeRowBuy = rowValFee && rowValFee.closest('.summary-row');
+        if (feeRowBuy) feeRowBuy.style.display = '';
         if (rowSlippage) rowSlippage.style.display = '';
         rowLblPayout.textContent = `Max payout if ${outcome.toUpperCase()} wins`;
         rowValPayout.textContent = fmt(maxPayout);
@@ -3131,21 +3134,30 @@
           sbOutcome.classList.toggle('yes', outcome === 'yes');
           sbOutcome.classList.toggle('no', outcome === 'no');
         }
-        if (sbDetail) sbDetail.textContent = `${sellCount} @ ${fmt(bid, 3)} · ${fmt(netProceeds)} RECEIVED`;
+        // SELL has no protocol fee (per DR-008: mint-side fee only).
+        // Phoenix CLOB sells are no-fee in v1; recompute without fee.
+        const sellFee = 0;
+        const sellNetProceeds = grossProceeds; // no fee deduction
+        const sellCostPortion = pos.costBasis * (sellCount / pos.contracts);
+        const sellRealizedPnl = sellNetProceeds - sellCostPortion;
+        if (sbDetail) sbDetail.textContent = `${sellCount} @ ${fmt(bid, 3)} · ${fmt(sellNetProceeds)} RECEIVED`;
 
         rowLblPrice.textContent = 'Sell price (bid)';
         rowValPrice.textContent = fmt(bid, 3);
         rowLblCost.textContent = 'Gross proceeds';
         rowValCost.textContent = fmt(grossProceeds);
-        rowValFee.textContent = '−' + fmt(fee).substring(1);
+        // Hide fee row on SELL — DR-008 fee is mint-side only; Phoenix CLOB
+        // sells have no protocol fee (v1; pending Model D investigation).
+        const feeRow = rowValFee && rowValFee.closest('.summary-row');
+        if (feeRow) feeRow.style.display = 'none';
         if (rowSlippage) rowSlippage.style.display = 'none';
         rowLblPayout.textContent = 'Net you receive';
-        rowValPayout.textContent = fmt(netProceeds);
-        rowLblProfit.textContent = realizedPnl >= 0 ? 'Realized profit' : 'Realized loss';
-        rowValProfit.textContent = fmtSigned(realizedPnl);
-        rowProfit.classList.toggle('loss', realizedPnl < 0);
+        rowValPayout.textContent = fmt(sellNetProceeds);
+        rowLblProfit.textContent = sellRealizedPnl >= 0 ? 'Realized profit' : 'Realized loss';
+        rowValProfit.textContent = fmtSigned(sellRealizedPnl);
+        rowProfit.classList.toggle('loss', sellRealizedPnl < 0);
 
-        summaryHeadline.textContent = `Order details · Receive ${fmt(netProceeds)} · ${realizedPnl >= 0 ? 'Profit' : 'Loss'} ${fmtSigned(realizedPnl)}`;
+        summaryHeadline.textContent = `Order details · Receive ${fmt(sellNetProceeds)} · ${sellRealizedPnl >= 0 ? 'Profit' : 'Loss'} ${fmtSigned(sellRealizedPnl)}`;
       }
     }
 
