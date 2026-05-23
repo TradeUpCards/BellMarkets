@@ -150,11 +150,15 @@ describe("parseHeliusSettleWebhook — anchor event path", () => {
 });
 
 describe("parseHeliusSettleWebhook — fallback discriminator path", () => {
-  it("matches instructions whose data starts with the settle_market discriminator", () => {
+  it("matches instructions whose data starts with the settle_market discriminator", async () => {
     // Note: the fallback path returns yesMint/noMint as empty strings —
     // it CANNOT recover those without the anchor event. The "valid" return
     // here is purely so the caller knows the tx is a settle (so they can
     // enrich the mints via program.account.strikeMarket.fetch).
+    // Use the live-computed discriminator (sha256("global:settle_market")[..8])
+    // rather than a hardcoded placeholder so the test tracks any future
+    // rename automatically.
+    const { SETTLE_MARKET_DISCRIMINATOR_BASE58 } = await import("../../services/automation/src/indexer/helius-webhook.js");
     const tx: HeliusEnhancedTx = {
       signature: "tx-fallback",
       slot: 99,
@@ -162,7 +166,7 @@ describe("parseHeliusSettleWebhook — fallback discriminator path", () => {
         {
           programId: OUR_PROGRAM_ID,
           accounts: ["Settler", "Config", "StrikeMarket", "PythFeed", "Clock"],
-          data: "5xqRdYTPDDh" + "AAA", // discriminator prefix + garbage tail
+          data: SETTLE_MARKET_DISCRIMINATOR_BASE58 + "AAA", // discriminator + garbage tail
         },
       ],
     };
@@ -174,6 +178,117 @@ describe("parseHeliusSettleWebhook — fallback discriminator path", () => {
     // Fallback path = caller must enrich
     expect(events[0]!.yesMint).toBe("");
     expect(events[0]!.noMint).toBe("");
+  });
+});
+
+describe("recognizeBellMarketsIxs — observability over all 20 deploy-5 ixs", () => {
+  it("recognizes every ix by its computed discriminator", async () => {
+    const mod = await import("../../services/automation/src/indexer/helius-webhook.js");
+    const {
+      recognizeBellMarketsIxs,
+      BELL_MARKETS_IX_NAMES,
+      BELL_MARKETS_IX_DISCRIMINATORS,
+    } = mod;
+    for (const ixName of BELL_MARKETS_IX_NAMES) {
+      const tx: HeliusEnhancedTx = {
+        signature: `tx-${ixName}`,
+        slot: 1,
+        instructions: [
+          {
+            programId: OUR_PROGRAM_ID,
+            accounts: [],
+            data: BELL_MARKETS_IX_DISCRIMINATORS[ixName] + "GARBAGETAIL",
+          },
+        ],
+      };
+      const observed = recognizeBellMarketsIxs(tx, OUR_PROGRAM_ID);
+      expect(observed).toHaveLength(1);
+      expect(observed[0]).toMatchObject({ txSig: `tx-${ixName}`, ixName, slot: 1 });
+    }
+  });
+
+  it("ignores ixs from other programs", async () => {
+    const mod = await import("../../services/automation/src/indexer/helius-webhook.js");
+    const { recognizeBellMarketsIxs, BELL_MARKETS_IX_DISCRIMINATORS } = mod;
+    const tx: HeliusEnhancedTx = {
+      signature: "tx",
+      instructions: [
+        {
+          programId: OTHER_PROGRAM_ID,
+          accounts: [],
+          data: BELL_MARKETS_IX_DISCRIMINATORS.settle_market + "AAA",
+        },
+      ],
+    };
+    expect(recognizeBellMarketsIxs(tx, OUR_PROGRAM_ID)).toEqual([]);
+  });
+
+  it("returns empty array when no Bell Markets ix in the payload", async () => {
+    const mod = await import("../../services/automation/src/indexer/helius-webhook.js");
+    const { recognizeBellMarketsIxs } = mod;
+    const tx: HeliusEnhancedTx = {
+      signature: "tx",
+      instructions: [
+        {
+          programId: OUR_PROGRAM_ID,
+          accounts: [],
+          data: "thisIsNotAnyKnownIx",
+        },
+      ],
+    };
+    expect(recognizeBellMarketsIxs(tx, OUR_PROGRAM_ID)).toEqual([]);
+  });
+
+  it("counts multiple ixs per tx (Anchor allows multi-ix txs)", async () => {
+    const mod = await import("../../services/automation/src/indexer/helius-webhook.js");
+    const { recognizeBellMarketsIxs, BELL_MARKETS_IX_DISCRIMINATORS } = mod;
+    const tx: HeliusEnhancedTx = {
+      signature: "tx-multi",
+      slot: 7,
+      instructions: [
+        {
+          programId: OUR_PROGRAM_ID,
+          accounts: [],
+          data: BELL_MARKETS_IX_DISCRIMINATORS.mint_pair + "AAA",
+        },
+        {
+          programId: OUR_PROGRAM_ID,
+          accounts: [],
+          data: BELL_MARKETS_IX_DISCRIMINATORS.redeem_pair + "BBB",
+        },
+      ],
+    };
+    const observed = recognizeBellMarketsIxs(tx, OUR_PROGRAM_ID);
+    expect(observed).toHaveLength(2);
+    expect(observed.map((o) => o.ixName).sort()).toEqual(["mint_pair", "redeem_pair"]);
+  });
+});
+
+describe("BELL_MARKETS_IX_NAMES — coverage check", () => {
+  it("includes all 10 new deploy-5 ixs Tate flagged for indexing", async () => {
+    const mod = await import("../../services/automation/src/indexer/helius-webhook.js");
+    const { BELL_MARKETS_IX_NAMES } = mod;
+    const expected = [
+      "user_create_strike_market",
+      "update_ticker_config",
+      "initialize_fee_config",
+      "update_fee_config",
+      "initialize_rewards_pools",
+      "commit_leaderboard_root",
+      "distribute_weekly_rewards",
+      "distribute_monthly_rewards",
+      "force_redeem",
+      "close_settled_market",
+    ];
+    for (const name of expected) {
+      expect(BELL_MARKETS_IX_NAMES).toContain(name);
+    }
+  });
+
+  it("totals exactly 20 ixs (matches Aria's deploy-5 IDL ix_count)", async () => {
+    const mod = await import("../../services/automation/src/indexer/helius-webhook.js");
+    const { BELL_MARKETS_IX_NAMES } = mod;
+    expect(BELL_MARKETS_IX_NAMES).toHaveLength(20);
   });
 });
 

@@ -250,15 +250,133 @@ function pickStringOrNumber(
   return undefined;
 }
 
-// Base58 prefix of the Anchor discriminator for `settle_market`.
-// Derivation: sha256("global:settle_market")[..8] → bytes → base58.
-// We don't compute this at runtime to keep the parser dependency-free; if
-// Aria renames the instruction, recompute via:
-//   `bs58.encode(crypto.createHash("sha256").update("global:settle_market").digest().slice(0,8))`
-// and update this constant.
+// ── Anchor instruction discriminators ──────────────────────────────────────
 //
-// IMPORTANT: at the time of writing, Aria's IDL exposes `settle_market` at
-// this discriminator. Verify with `programs/bell-markets/idl/bell_markets.json`
-// instructions[].discriminator. If the array there is not the base58 below,
-// recompute.
-export const SETTLE_MARKET_DISCRIMINATOR_BASE58 = "5xqRdYTPDDh";
+// Computed at module load via `sha256("global:<snake_name>")[..8]` then
+// base58-encoded. Helius enhanced-tx `instructions[].data` is base58; we
+// prefix-match.
+//
+// IMPORTANT: when Aria renames or adds an instruction, just add the snake-
+// case name to BELL_MARKETS_IX_NAMES below — the discriminator regenerates
+// automatically on next module load. No copy-paste base58 to maintain.
+
+import { createHash } from "node:crypto";
+
+/** All 20 ix names from Aria's deploy-5 IDL. Keep in lockstep with
+ *  programs/bell-markets/src/lib.rs `#[program] mod` declarations. */
+export const BELL_MARKETS_IX_NAMES = [
+  "initialize_config",
+  "create_strike_market",
+  "add_strike",
+  "pause",
+  "admin_settle",
+  "settle_market",
+  "mint_pair",
+  "redeem",
+  "redeem_invalid",
+  "redeem_pair",
+  "user_create_strike_market",
+  "update_ticker_config",
+  "initialize_fee_config",
+  "update_fee_config",
+  "initialize_rewards_pools",
+  "commit_leaderboard_root",
+  "distribute_weekly_rewards",
+  "distribute_monthly_rewards",
+  "force_redeem",
+  "close_settled_market",
+] as const;
+
+export type BellMarketsIxName = (typeof BELL_MARKETS_IX_NAMES)[number];
+
+// Internal base58 alphabet — duplicated from merkle.ts to keep this module
+// independent. Both must stay in sync.
+const _BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+
+function bytesToBase58(bytes: Buffer): string {
+  let zeros = 0;
+  while (zeros < bytes.length && bytes[zeros] === 0) zeros++;
+  let digits: number[] = [];
+  for (let i = zeros; i < bytes.length; i++) {
+    let carry = bytes[i]!;
+    for (let j = 0; j < digits.length; j++) {
+      carry += digits[j]! * 256;
+      digits[j] = carry % 58;
+      carry = Math.floor(carry / 58);
+    }
+    while (carry > 0) {
+      digits.push(carry % 58);
+      carry = Math.floor(carry / 58);
+    }
+  }
+  let out = "1".repeat(zeros);
+  for (let i = digits.length - 1; i >= 0; i--) {
+    out += _BASE58_ALPHABET[digits[i]!];
+  }
+  return out;
+}
+
+/**
+ * Compute the Anchor discriminator for an ix name + return it base58-encoded.
+ * Helius's `instructions[].data` field is base58; we prefix-match against
+ * this value.
+ *
+ *   sha256("global:settle_market")[..8] → bytes → base58
+ */
+export function ixDiscriminatorBase58(ixSnakeName: string): string {
+  const full = createHash("sha256").update(`global:${ixSnakeName}`).digest();
+  return bytesToBase58(full.slice(0, 8));
+}
+
+/** All known Bell Markets ix discriminators, keyed by ix name. Lazy-init
+ *  at first access; safe under top-level await elsewhere. */
+export const BELL_MARKETS_IX_DISCRIMINATORS: Record<BellMarketsIxName, string> = Object.fromEntries(
+  BELL_MARKETS_IX_NAMES.map((name) => [name, ixDiscriminatorBase58(name)]),
+) as Record<BellMarketsIxName, string>;
+
+/** Reverse lookup: base58 prefix → ix name. */
+const _DISCRIMINATOR_TO_NAME = (() => {
+  const map = new Map<string, BellMarketsIxName>();
+  for (const name of BELL_MARKETS_IX_NAMES) {
+    map.set(BELL_MARKETS_IX_DISCRIMINATORS[name], name);
+  }
+  return map;
+})();
+
+/** Legacy export — kept for backward compat with prior settle-only callers. */
+export const SETTLE_MARKET_DISCRIMINATOR_BASE58 = BELL_MARKETS_IX_DISCRIMINATORS.settle_market;
+
+/**
+ * Walk a Helius payload and return the names of all Bell Markets ixs
+ * observed. Used for indexer observability (logging which ixs fired in
+ * any given batch) without parsing per-ix arguments.
+ *
+ * `programId` filter ensures we only count instructions targeting our
+ * program — webhooks can include cross-program activity.
+ */
+export function recognizeBellMarketsIxs(
+  payload: ReadonlyArray<HeliusEnhancedTx> | HeliusEnhancedTx,
+  programId: string,
+): Array<{ txSig: string; ixName: BellMarketsIxName; slot?: number }> {
+  const txs = Array.isArray(payload) ? payload : [payload];
+  const out: Array<{ txSig: string; ixName: BellMarketsIxName; slot?: number }> = [];
+  for (const tx of txs) {
+    for (const ix of tx.instructions ?? []) {
+      if (ix.programId !== programId) continue;
+      if (!ix.data) continue;
+      // Match by base58 prefix — Anchor's discriminator is the first 8
+      // bytes of the ix data buffer.
+      for (const [discriminator, ixName] of _DISCRIMINATOR_TO_NAME.entries()) {
+        if (ix.data.startsWith(discriminator)) {
+          out.push({
+            txSig: tx.signature,
+            ixName: ixName as BellMarketsIxName,
+            slot: tx.slot,
+          });
+          break;
+        }
+      }
+    }
+  }
+  return out;
+}
