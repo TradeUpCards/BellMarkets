@@ -345,7 +345,13 @@ Per-market revenue at $10K mint volume / 95% redemption rate: A ~$190, B ~$200, 
 **Decision:** **Mint-only fee model.** 2% (200 bps) charged on `mint_pair` to the user, paid in USDC, transferred to `MarketConfig.treasury` (fee_collector). No fee on `redeem`, `redeem_pair`, `redeem_invalid`, or `force_redeem` — fee already captured at mint time.
 
 **Three layered discounts:**
-1. **Creator rebate (per DR-005 alignment, UPGRADED):** First-trader-of-strike (the user who paid SOL rent to create the StrikeMarket PDA via `user_create_strike_market`) pays **0% fee on ALL mints into that strike until it settles** (typically a 24-hour window). Tracked via `StrikeMarket.creator: Pubkey` (set at create, immutable) + checking `outcome == Outcome::Unsettled` at mint time. Strong incentive for creators to actively trade their own markets, building order-book depth as de facto market makers. **Critical safeguard against tier gaming:** mints that receive the creator rebate do NOT update `user_config.mint_volume_30d` — otherwise a creator could mint $1500 free in 7 strikes to accelerate tier progression for ~$77 net gaming profit. Code: `if !creator_rebate_fires { user_config.mint_volume_30d += amount }`. Closes the attack vector while preserving the trade-free-in-your-strike incentive.
+1. **Creator rebate (per DR-005 alignment, UPGRADED + CONFIGURABLE):** First-trader-of-strike (the user who paid SOL rent to create the StrikeMarket PDA via `user_create_strike_market`) pays a discounted fee rate on **ALL mints into that strike until it settles** (typically a 24-hour window).
+   - **Rate controlled by `MarketConfig.creator_rebate_bps: u16`** — applied as fee multiplier. Default: **10000 (100% rebate = creator pays 0% fee)**. Admin can dial to any value via signed config update (e.g., 5000 = 50% rebate = creator pays half normal fees; 0 = no rebate).
+   - Effective fee for creator = `tier_fee_bps × (10000 - creator_rebate_bps) / 10000`
+   - Default behavior (10000): creator trades free in their strike. Strong incentive for active market-making.
+   - Tunable: at scale, admin can shift to 5000 or lower if economics demand it (no redeploy needed; signed config update).
+   - Tracked via `StrikeMarket.creator: Pubkey` (set at create, immutable) + checking `outcome == Outcome::Unsettled` at mint time.
+   - **Critical safeguard against tier gaming:** mints that receive ANY creator rebate (even partial) do NOT update `user_config.mint_volume_30d` — otherwise a creator could mint $1500 free/discounted in 7 strikes to accelerate tier progression for ~$77 net gaming profit. Code: `if !creator_rebate_fires { user_config.mint_volume_30d += amount }`. Closes the attack vector regardless of rebate magnitude.
 2. **30-day mint-volume tier discount:** Per-user `UserConfig` PDA tracks `mint_volume_30d` with linear decay. Three tiers:
    - $0-$1,000: 200 bps (2%)
    - $1,000-$10,000: 150 bps (1.5%)
