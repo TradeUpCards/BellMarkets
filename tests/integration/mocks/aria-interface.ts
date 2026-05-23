@@ -84,11 +84,57 @@ export interface StrikeMarket {
   settledAtUnix: bigint;               // i64; 0 if unsettled
   outcome: Outcome;
   adminOverrideEligibleAt: bigint;     // i64; expiry + adminOverrideDelaySecs
+  /** DR-005 / DR-008: pubkey that paid rent to create the strike PDA. Immutable post-create.
+   *  Drives DR-008 creator-rebate logic in mint_pair. Set by `user_create_strike_market`
+   *  (signer is creator) OR `create_strike_market` (admin signer; admin is creator). */
+  creator: Pubkey;
   bump: number;                        // u8
   yesMintBump: number;
   noMintBump: number;
   vaultBump: number;
   _reserved: Uint8Array;               // [u8; 64]
+}
+
+/** DR-005: per-ticker (per-Pyth-feed) config. PDA seeds: ["ticker_config", pythFeed]. */
+export interface TickerConfig {
+  pythFeed: Pubkey;
+  maxUserStrikeDeviationBps: number;  // u16; e.g., 1500 for AAPL = 15%
+  strikeTickSize: bigint;             // u64 micro-USDC; e.g., $1 = 1_000_000 for AAPL
+  capCenter: bigint;                  // i64 micro-USDC; reference spot for deviation check
+  thresholdBps: number;               // u16; wild-swing threshold (per DR-006)
+  lastUpdatedSlot: bigint;            // u64
+  bump: number;
+}
+
+/** DR-008: per-user volume tracker. PDA seeds: ["user_config", user]. */
+export interface UserConfig {
+  user: Pubkey;
+  mintVolume30d: bigint;              // u64 micro-USDC; rolling 30-day mint volume for tier
+  bump: number;
+}
+
+/** DR-008 / DR-010: separate global singleton (not appended to MarketConfig — sidesteps
+ *  destructive realloc on devnet). PDA seeds: ["fee_config"]. */
+export interface FeeConfig {
+  config: Pubkey;                     // back-pointer to MarketConfig PDA
+  mintFeeBps: number;                 // u16; 0 = mechanism disabled
+  platformRetainBps: number;          // u16; default 5000 (50%)
+  weeklyPoolBps: number;              // u16; default 2500 (25%)
+  monthlyPoolBps: number;             // u16; default 2500 (25%)
+  creatorRebateBps: number;           // u16; default 10000 (100% rebate = creator pays 0%)
+  forceRedeemGraceSecs: bigint;       // i64; default 30 days
+  weeklyDistributionBps: number[];    // [u16; 10]; default [2500, 1800, 1200, 1000, 800, 700, 600, 500, 500, 400]
+  monthlyDistributionBps: number[];   // [u16; 10]; same default
+  bump: number;
+}
+
+/** DR-010: stores Merkle roots for past leaderboard periods. PDA seeds: ["leaderboard_commitments"]. */
+export interface LeaderboardCommitment {
+  periodId: bigint;                   // u64
+  periodType: number;                 // u8; 0 = weekly, 1 = monthly
+  merkleRoot: Uint8Array;             // [u8; 32]
+  arweaveTxId: Uint8Array;            // [u8; 48]
+  committedAtSlot: bigint;
 }
 
 /** Off-chain view models (mirror specs/architecture.md §4). Not stored on chain. */
@@ -131,11 +177,27 @@ export interface AriaProgram {
   redeemInvalid(args: RedeemInvalidArgs): Promise<TxResult>; // Day-3: refund both sides for Invalid markets (post-settle)
   redeemPair(args: RedeemPairArgs): Promise<TxResult>;     // Day-4: inverse of mint_pair (pre-settle only)
 
+  // Day-5 new (DR-005 / DR-006 / DR-008 / DR-010)
+  userCreateStrikeMarket(args: UserCreateStrikeMarketArgs): Promise<TxResult & { marketId: Pubkey }>;  // DR-005 permissionless
+  updateTickerConfig(args: UpdateTickerConfigArgs): Promise<TxResult>;                                  // DR-006 admin
+  forceRedeem(args: ForceRedeemArgs): Promise<TxResult>;                                                // DR-005 admin escape valve
+  closeSettledMarket(args: CloseSettledMarketArgs): Promise<TxResult>;                                  // DR-005 permissionless rent recovery
+  initializeFeeConfig(args: InitializeFeeConfigArgs): Promise<TxResult>;                                // DR-008 admin setup
+  updateFeeConfig(args: UpdateFeeConfigArgs): Promise<TxResult>;                                        // DR-008 admin
+  initializeRewardsPools(args: InitializeRewardsPoolsArgs): Promise<TxResult>;                          // DR-010 admin setup
+  commitLeaderboardRoot(args: CommitLeaderboardRootArgs): Promise<TxResult>;                            // DR-010 admin
+  distributeWeeklyRewards(args: DistributeRewardsArgs): Promise<TxResult>;                              // DR-010 admin
+  distributeMonthlyRewards(args: DistributeRewardsArgs): Promise<TxResult>;                             // DR-010 admin
+
   // Read helpers
   fetchMarketConfig(): Promise<MarketConfig>;
   fetchStrikeMarket(marketId: Pubkey): Promise<StrikeMarket>;
   fetchUserPosition(marketId: Pubkey, wallet: Pubkey): Promise<UserPositionView>;
   fetchVaultBalance(marketId: Pubkey): Promise<UsdcMicros>;
+  fetchFeeConfig(): Promise<FeeConfig | null>;
+  fetchUserConfig(user: Pubkey): Promise<UserConfig>;
+  fetchTickerConfig(pythFeed: Pubkey): Promise<TickerConfig | null>;
+  fetchPoolBalances(): Promise<{ feeCollector: UsdcMicros; weekly: UsdcMicros; monthly: UsdcMicros }>;
 }
 
 export interface TxResult {
@@ -201,6 +263,81 @@ export interface RedeemPairArgs {
   amount: UsdcMicros;                   // burn `amount` YES + `amount` NO, receive `amount` USDC
 }
 
+// ─── Day-5 Args (DR-005/006/008/010) ──────────────────────────────────────
+
+export interface UserCreateStrikeMarketArgs {
+  user: Pubkey;                         // signer; pays SOL rent for the new PDA
+  underlyingPythFeed: Pubkey;
+  strikePrice: bigint;                  // i64; must align to TickerConfig.strikeTickSize
+  expiryUnix: bigint;                   // i64; must be future
+  phoenixMarket: Pubkey;
+  // Pyth gate at create time per DR-005 spec — mock supports pythBehavior via createMockAria opts.
+}
+
+export interface UpdateTickerConfigArgs {
+  admin: Pubkey;
+  pythFeed: Pubkey;
+  capCenter?: bigint;
+  maxUserStrikeDeviationBps?: number;
+  strikeTickSize?: bigint;
+  thresholdBps?: number;
+}
+
+export interface ForceRedeemArgs {
+  admin: Pubkey;                        // signer; only after settled_at + grace_secs
+  marketId: Pubkey;
+  user: Pubkey;                         // recipient (long-tail holder being force-redeemed)
+  amount: UsdcMicros;
+}
+
+export interface CloseSettledMarketArgs {
+  closer: Pubkey;                       // permissionless; any signer
+  marketId: Pubkey;
+}
+
+export interface InitializeFeeConfigArgs {
+  admin: Pubkey;                        // signer
+  mintFeeBps?: number;                  // default 0 (mechanism disabled until admin enables)
+  platformRetainBps?: number;           // default 5000
+  weeklyPoolBps?: number;               // default 2500
+  monthlyPoolBps?: number;              // default 2500
+  creatorRebateBps?: number;            // default 10000
+  forceRedeemGraceSecs?: bigint;        // default 30 days
+  weeklyDistributionBps?: number[];     // default per DR-010 table
+  monthlyDistributionBps?: number[];
+}
+
+export interface UpdateFeeConfigArgs {
+  admin: Pubkey;
+  mintFeeBps?: number;
+  platformRetainBps?: number;
+  weeklyPoolBps?: number;
+  monthlyPoolBps?: number;
+  creatorRebateBps?: number;
+  forceRedeemGraceSecs?: bigint;
+  weeklyDistributionBps?: number[];
+  monthlyDistributionBps?: number[];
+}
+
+export type InitializeRewardsPoolsArgs = { admin: Pubkey };
+
+export interface CommitLeaderboardRootArgs {
+  admin: Pubkey;
+  periodId: bigint;
+  periodType: 0 | 1;                    // 0 = weekly, 1 = monthly
+  merkleRoot: Uint8Array;               // [u8; 32]
+  arweaveTxId: Uint8Array;              // [u8; 48]
+}
+
+export interface DistributeRewardsArgs {
+  admin: Pubkey;
+  periodId: bigint;
+  recipient: Pubkey;
+  position: number;                     // u8; 0..9
+  amount: UsdcMicros;
+  merkleProof: Uint8Array[];            // each entry is [u8; 32]; verified against committed root
+}
+
 // ─── Mock implementation (offline; for simulation + offline tests) ─────────
 
 export interface MockState {
@@ -211,7 +348,29 @@ export interface MockState {
   blockTime: bigint;
   slot: bigint;
   txLog: Array<{ kind: string; details: unknown; blockTime: bigint }>;
+  // Day-5 state
+  feeConfig: FeeConfig | null;
+  userConfigs: Map<Pubkey, UserConfig>;
+  tickerConfigs: Map<Pubkey, TickerConfig>;
+  weeklyPool: UsdcMicros;
+  monthlyPool: UsdcMicros;
+  feeCollector: UsdcMicros;
+  leaderboardCommitments: Map<string /* `${periodType}:${periodId}` */, LeaderboardCommitment>;
+  distributionsClaimed: Set<string /* `${periodType}:${periodId}:${recipient}:${position}` */>;
+  /** Markets closed via close_settled_market — tracked so the mock can reject re-close. */
+  closedMarkets: Set<Pubkey>;
 }
+
+export const DEFAULT_FEE_CONFIG: Omit<FeeConfig, "config" | "bump"> = {
+  mintFeeBps: 0,                        // Disabled by default; admin enables via update.
+  platformRetainBps: 5000,
+  weeklyPoolBps: 2500,
+  monthlyPoolBps: 2500,
+  creatorRebateBps: 10000,              // 100% rebate = creator pays 0% fee
+  forceRedeemGraceSecs: 30n * 24n * 60n * 60n,    // 30 days
+  weeklyDistributionBps: [2500, 1800, 1200, 1000, 800, 700, 600, 500, 500, 400],
+  monthlyDistributionBps: [2500, 1800, 1200, 1000, 800, 700, 600, 500, 500, 400],
+};
 
 export interface MockOptions {
   pythBehavior?: "tight" | "wide" | "stale" | "notTrading";
@@ -220,6 +379,103 @@ export interface MockOptions {
 }
 
 export const ONE_USDC: UsdcMicros = 1_000_000n;
+
+/**
+ * Helper shared between distributeWeeklyRewards + distributeMonthlyRewards.
+ * Verifies admin + commitment exists + Merkle proof recomputes to committed root +
+ * idempotency (no double-claim per period/recipient/position).
+ *
+ * Mock Merkle verification: leaf = sha256(recipient || position || amount); proof is
+ * a Vec<[u8;32]> walked into root via sha256(leftConcatRight). Real on-chain handler
+ * uses the same primitive (sha256, sorted-pair concat). This is structurally close
+ * enough to catch tampering bugs without pulling in the real Merkle crate.
+ */
+function distributeRewardsImpl(
+  args: DistributeRewardsArgs,
+  periodType: 0 | 1,
+  state: MockState,
+  log: (kind: string, details: unknown) => void,
+  tx: () => TxResult,
+): TxResult {
+  if (!state.config) throw new Error("distributeRewards: config not initialized");
+  if (state.config.admin !== args.admin) throw new Error("distributeRewards: NotAdmin");
+  if (!state.feeConfig) throw new Error("distributeRewards: FeeConfigNotInitialized");
+  if (args.amount === 0n) throw new Error("distributeRewards: ZeroAmount");
+  if (args.position > 9) throw new Error("distributeRewards: InvalidPosition (0..9)");
+
+  const key = `${periodType}:${args.periodId}`;
+  const commitment = state.leaderboardCommitments.get(key);
+  if (!commitment) {
+    throw new Error(`distributeRewards: NoCommitmentForPeriod (period ${periodType}:${args.periodId} not committed)`);
+  }
+
+  // Idempotency: per period × recipient × position, only one claim allowed.
+  const claimKey = `${periodType}:${args.periodId}:${args.recipient}:${args.position}`;
+  if (state.distributionsClaimed.has(claimKey)) {
+    throw new Error(`distributeRewards: AlreadyClaimed`);
+  }
+
+  // Merkle proof verification (mock — recompute and compare).
+  // Leaf format mirrors what Bram's indexer would build:
+  //   leaf = sha256( recipient_pubkey_str || ":" || position || ":" || amount )
+  // Then walk proof up: at each step, hash(min(cur, sib) || max(cur, sib)) for sorted-pair.
+  const computed = mockMerkleVerify(args.recipient, args.position, args.amount, args.merkleProof, commitment.merkleRoot);
+  if (!computed) {
+    throw new Error("distributeRewards: InvalidProof");
+  }
+
+  // Distribute from the appropriate pool.
+  const poolBalance = periodType === 0 ? state.weeklyPool : state.monthlyPool;
+  if (poolBalance < args.amount) {
+    throw new Error(`distributeRewards: PoolUnderfunded (have=${poolBalance}, want=${args.amount})`);
+  }
+  if (periodType === 0) state.weeklyPool -= args.amount;
+  else state.monthlyPool -= args.amount;
+
+  state.distributionsClaimed.add(claimKey);
+  log(periodType === 0 ? "distributeWeeklyRewards" : "distributeMonthlyRewards", {
+    admin: args.admin, periodId: args.periodId, recipient: args.recipient, position: args.position, amount: args.amount,
+  });
+  return tx();
+}
+
+/**
+ * Mock Merkle verifier — Node-side hand-rolled sha256-tree using crypto.subtle.
+ * Returns true if the supplied proof walks the leaf to the committed root.
+ *
+ * Synchronous deterministic hash via `node:crypto`. Sorted-pair concatenation:
+ * at each step, hash(min(a,b) || max(a,b)). This matches Aria's on-chain
+ * `merkle.rs` verifier per DR-010 Option B.
+ */
+function mockMerkleVerify(
+  recipient: Pubkey,
+  position: number,
+  amount: UsdcMicros,
+  proof: Uint8Array[],
+  expectedRoot: Uint8Array,
+): boolean {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { createHash } = require("node:crypto") as typeof import("node:crypto");
+  const sha256 = (b: Uint8Array): Uint8Array => new Uint8Array(createHash("sha256").update(b).digest());
+
+  const leafStr = `${recipient}:${position}:${amount.toString()}`;
+  let cur = sha256(new TextEncoder().encode(leafStr));
+  for (const sib of proof) {
+    const [a, b] = compareBytes(cur, sib) < 0 ? [cur, sib] : [sib, cur];
+    const concat = new Uint8Array(a.length + b.length);
+    concat.set(a, 0);
+    concat.set(b, a.length);
+    cur = sha256(concat);
+  }
+  return compareBytes(cur, expectedRoot) === 0;
+}
+
+function compareBytes(a: Uint8Array, b: Uint8Array): number {
+  for (let i = 0; i < Math.min(a.length, b.length); i++) {
+    if (a[i] !== b[i]) return a[i] - b[i];
+  }
+  return a.length - b.length;
+}
 
 export function createMockAria(opts: MockOptions = {}): { program: AriaProgram; state: MockState } {
   const state: MockState = {
@@ -230,6 +486,15 @@ export function createMockAria(opts: MockOptions = {}): { program: AriaProgram; 
     blockTime: 0n,
     slot: 0n,
     txLog: [],
+    feeConfig: null,
+    userConfigs: new Map(),
+    tickerConfigs: new Map(),
+    weeklyPool: 0n,
+    monthlyPool: 0n,
+    feeCollector: 0n,
+    leaderboardCommitments: new Map(),
+    distributionsClaimed: new Set(),
+    closedMarkets: new Set(),
   };
 
   const posKey = (m: Pubkey, w: Pubkey): string => `${m}:${w}`;
@@ -298,12 +563,65 @@ export function createMockAria(opts: MockOptions = {}): { program: AriaProgram; 
         settledAtUnix: 0n,
         outcome: OUTCOME_UNSETTLED,
         adminOverrideEligibleAt: args.expiryUnix + state.config.adminOverrideDelaySecs,
+        creator: args.admin,             // DR-005/008: admin is creator when admin-created
         bump: 254, yesMintBump: 253, noMintBump: 252, vaultBump: 251,
         _reserved: new Uint8Array(64),
       };
       state.markets.set(marketId, market);
       state.vaults.set(marketId, 0n);
       log("createStrikeMarket", { admin: args.admin, marketId, strikePrice: args.strikePrice, expiryUnix: args.expiryUnix });
+      return { ...tx(), marketId };
+    },
+
+    async userCreateStrikeMarket(args) {
+      // DR-005: permissionless; user is creator + pays SOL rent.
+      if (!state.config) throw new Error("userCreateStrikeMarket: config not initialized");
+      if (state.config.paused) throw new Error("userCreateStrikeMarket: Paused");
+      if (args.strikePrice <= 0n) throw new Error("userCreateStrikeMarket: InvalidStrikePrice");
+      if (args.expiryUnix <= state.blockTime) throw new Error("userCreateStrikeMarket: ExpiryInPast");
+
+      const tc = state.tickerConfigs.get(args.underlyingPythFeed);
+      if (!tc) throw new Error(`userCreateStrikeMarket: TickerConfigNotFound (brand-new ticker — cron must write TickerConfig first per DR-005 + DR-006)`);
+
+      // Strike must align to tickerConfig.strikeTickSize grid.
+      if (args.strikePrice % tc.strikeTickSize !== 0n) {
+        throw new Error(`userCreateStrikeMarket: StrikeMisalignedTick (strike ${args.strikePrice} not aligned to tick ${tc.strikeTickSize})`);
+      }
+
+      // Strike must be within tc.maxUserStrikeDeviationBps of tc.capCenter.
+      const dev = args.strikePrice > tc.capCenter ? args.strikePrice - tc.capCenter : tc.capCenter - args.strikePrice;
+      const maxDev = (tc.capCenter * BigInt(tc.maxUserStrikeDeviationBps)) / 10_000n;
+      if (dev > maxDev) {
+        throw new Error(`userCreateStrikeMarket: StrikeBeyondDeviationCap (dev=${dev}, max=${maxDev})`);
+      }
+
+      // Pyth gate at create time (DR-005 §"Decision" bullet 4)
+      if (opts.pythBehavior === "stale") throw new Error("userCreateStrikeMarket: PythStale");
+      if (opts.pythBehavior === "wide") throw new Error("userCreateStrikeMarket: PythConfidenceTooWide");
+
+      const marketId: Pubkey = `mock-strike-${args.underlyingPythFeed}-${args.expiryUnix}-${args.strikePrice}`;
+      const market: StrikeMarket = {
+        config: "mock-config-pda",
+        underlyingPythFeed: args.underlyingPythFeed,
+        strikePrice: args.strikePrice,
+        expiryUnix: args.expiryUnix,
+        yesMint: `${marketId}-yes-mint`,
+        noMint:  `${marketId}-no-mint`,
+        usdcVault: `${marketId}-vault`,
+        phoenixMarket: args.phoenixMarket,
+        settlePrice: 0n,
+        settleConfidence: 0n,
+        settleSlot: 0n,
+        settledAtUnix: 0n,
+        outcome: OUTCOME_UNSETTLED,
+        adminOverrideEligibleAt: args.expiryUnix + state.config.adminOverrideDelaySecs,
+        creator: args.user,              // DR-005: user is creator, drives DR-008 rebate logic
+        bump: 254, yesMintBump: 253, noMintBump: 252, vaultBump: 251,
+        _reserved: new Uint8Array(64),
+      };
+      state.markets.set(marketId, market);
+      state.vaults.set(marketId, 0n);
+      log("userCreateStrikeMarket", { user: args.user, marketId, strikePrice: args.strikePrice, expiryUnix: args.expiryUnix });
       return { ...tx(), marketId };
     },
 
@@ -328,6 +646,46 @@ export function createMockAria(opts: MockOptions = {}): { program: AriaProgram; 
       if (!m) throw new Error(`mintPair: market ${args.marketId} not found`);
       requireUnsettled(m, "mintPair");
 
+      // DR-008 fee math. When FeeConfig.mintFeeBps == 0 (default), no fee — preserves
+      // Day-1..4 behavior for tests that don't initialize FeeConfig.
+      let fee = 0n;
+      let creatorRebateFires = false;
+      if (state.feeConfig && state.feeConfig.mintFeeBps > 0) {
+        const fc = state.feeConfig;
+        // Tier discount: per DR-008. Tier breakpoints in micro-USDC.
+        const userCfg = state.userConfigs.get(args.user) ?? {
+          user: args.user, mintVolume30d: 0n, bump: 254,
+        };
+        let tierBps: number;
+        if (userCfg.mintVolume30d < 1_000n * ONE_USDC)        tierBps = 200;
+        else if (userCfg.mintVolume30d < 10_000n * ONE_USDC)  tierBps = 150;
+        else                                                  tierBps = 100;
+
+        // Creator rebate (DR-008): if signer == strikeMarket.creator AND market is Unsettled.
+        const isCreator = m.creator === args.user;
+        creatorRebateFires = isCreator && outcomeKind(m.outcome) === "unsettled";
+        let effectiveBps = tierBps;
+        if (creatorRebateFires) {
+          effectiveBps = Math.floor((tierBps * (10000 - fc.creatorRebateBps)) / 10000);
+        }
+        fee = (args.amount * BigInt(effectiveBps)) / 10_000n;
+
+        // 3-way split (DR-010)
+        const platformShare = (fee * BigInt(fc.platformRetainBps)) / 10_000n;
+        const weeklyShare = (fee * BigInt(fc.weeklyPoolBps)) / 10_000n;
+        const monthlyShare = fee - platformShare - weeklyShare;        // remainder to avoid dust loss
+        state.feeCollector += platformShare;
+        state.weeklyPool += weeklyShare;
+        state.monthlyPool += monthlyShare;
+
+        // Gaming defense (DR-008): if creator rebate fired AT ALL, do NOT update mint_volume_30d.
+        if (!creatorRebateFires) {
+          userCfg.mintVolume30d += args.amount;
+          state.userConfigs.set(args.user, userCfg);
+        }
+      }
+
+      // Vault gets the principal (preserves $1 invariant); fee already siphoned above.
       state.vaults.set(args.marketId, (state.vaults.get(args.marketId) ?? 0n) + args.amount);
       const key = posKey(args.marketId, args.user);
       const cur = state.positions.get(key) ?? {
@@ -336,7 +694,7 @@ export function createMockAria(opts: MockOptions = {}): { program: AriaProgram; 
       cur.yesBalance += args.amount;
       cur.noBalance  += args.amount;
       state.positions.set(key, cur);
-      log("mintPair", { user: args.user, marketId: args.marketId, amount: args.amount });
+      log("mintPair", { user: args.user, marketId: args.marketId, amount: args.amount, fee, creatorRebateFires });
       return tx();
     },
 
@@ -474,6 +832,179 @@ export function createMockAria(opts: MockOptions = {}): { program: AriaProgram; 
 
       log("redeemInvalid", { user: args.user, marketId: args.marketId, amount: args.amount });
       return tx();
+    },
+
+    // ─── Day-5 new (DR-005 / DR-006 / DR-008 / DR-010) ───────────────────
+
+    async updateTickerConfig(args) {
+      if (!state.config) throw new Error("updateTickerConfig: config not initialized");
+      if (state.config.admin !== args.admin) throw new Error("updateTickerConfig: NotAdmin");
+      const existing = state.tickerConfigs.get(args.pythFeed);
+      const tc: TickerConfig = existing ?? {
+        pythFeed: args.pythFeed,
+        maxUserStrikeDeviationBps: 1500,
+        strikeTickSize: 1_000_000n,
+        capCenter: 0n,
+        thresholdBps: 400,
+        lastUpdatedSlot: 0n,
+        bump: 254,
+      };
+      if (args.capCenter !== undefined) tc.capCenter = args.capCenter;
+      if (args.maxUserStrikeDeviationBps !== undefined) tc.maxUserStrikeDeviationBps = args.maxUserStrikeDeviationBps;
+      if (args.strikeTickSize !== undefined) tc.strikeTickSize = args.strikeTickSize;
+      if (args.thresholdBps !== undefined) tc.thresholdBps = args.thresholdBps;
+      tc.lastUpdatedSlot = state.slot;
+      state.tickerConfigs.set(args.pythFeed, tc);
+      log("updateTickerConfig", { admin: args.admin, pythFeed: args.pythFeed });
+      return tx();
+    },
+
+    async forceRedeem(args) {
+      // DR-005 admin escape valve. Only after settled_at + grace_secs.
+      if (!state.config) throw new Error("forceRedeem: config not initialized");
+      if (state.config.admin !== args.admin) throw new Error("forceRedeem: NotAdmin");
+      if (state.config.paused) throw new Error("forceRedeem: Paused");
+      if (args.amount === 0n) throw new Error("forceRedeem: ZeroAmount");
+      const m = state.markets.get(args.marketId);
+      if (!m) throw new Error(`forceRedeem: market ${args.marketId} not found`);
+      if (outcomeKind(m.outcome) === "unsettled") throw new Error("forceRedeem: NotSettled");
+
+      const grace = state.feeConfig?.forceRedeemGraceSecs ?? DEFAULT_FEE_CONFIG.forceRedeemGraceSecs;
+      const eligibleAt = m.settledAtUnix + grace;
+      if (state.blockTime < eligibleAt) {
+        throw new Error(`forceRedeem: ForceRedeemTooEarly (eligible at ${eligibleAt}, now ${state.blockTime})`);
+      }
+
+      const key = posKey(args.marketId, args.user);
+      const pos = state.positions.get(key) ?? { marketId: args.marketId, wallet: args.user, yesBalance: 0n, noBalance: 0n };
+      // Admin can force-redeem regardless of which side won — pays out from vault.
+      state.vaults.set(args.marketId, (state.vaults.get(args.marketId) ?? 0n) - args.amount);
+      // Clear position (simulates burn-and-pay regardless of side).
+      const oc = outcomeKind(m.outcome);
+      if (oc === "yes") pos.yesBalance = pos.yesBalance > args.amount ? pos.yesBalance - args.amount : 0n;
+      else if (oc === "no") pos.noBalance = pos.noBalance > args.amount ? pos.noBalance - args.amount : 0n;
+      state.positions.set(key, pos);
+      log("forceRedeem", { admin: args.admin, marketId: args.marketId, user: args.user, amount: args.amount });
+      return tx();
+    },
+
+    async closeSettledMarket(args) {
+      // DR-005 permissionless rent recovery. Closes mints + vault.
+      if (!state.config) throw new Error("closeSettledMarket: config not initialized");
+      const m = state.markets.get(args.marketId);
+      if (!m) throw new Error(`closeSettledMarket: market ${args.marketId} not found`);
+      if (outcomeKind(m.outcome) === "unsettled") {
+        throw new Error("closeSettledMarket: NotSettled (would orphan pair holders)");
+      }
+      if (state.closedMarkets.has(args.marketId)) {
+        throw new Error("closeSettledMarket: AlreadyClosed");
+      }
+
+      // Pairs-outstanding check via vault balance (vault.amount == pairs_outstanding × $1).
+      const vault = state.vaults.get(args.marketId) ?? 0n;
+      if (vault > 0n) {
+        throw new Error(`closeSettledMarket: PairsStillOutstanding (vault=${vault})`);
+      }
+      // Recovered rent flows to treasury per DR-005 §"Closed-rent recovery."
+      const recoveredRent = 3n * 200_000n;  // mock: ~$0.60 total for yes_mint + no_mint + vault rent
+      state.feeCollector += recoveredRent;
+      state.closedMarkets.add(args.marketId);
+      log("closeSettledMarket", { closer: args.closer, marketId: args.marketId, recoveredRent });
+      return tx();
+    },
+
+    async initializeFeeConfig(args) {
+      if (!state.config) throw new Error("initializeFeeConfig: config not initialized");
+      if (state.config.admin !== args.admin) throw new Error("initializeFeeConfig: NotAdmin");
+      if (state.feeConfig) throw new Error("initializeFeeConfig: AlreadyInitialized");
+      state.feeConfig = {
+        config: "mock-config-pda",
+        mintFeeBps: args.mintFeeBps ?? DEFAULT_FEE_CONFIG.mintFeeBps,
+        platformRetainBps: args.platformRetainBps ?? DEFAULT_FEE_CONFIG.platformRetainBps,
+        weeklyPoolBps: args.weeklyPoolBps ?? DEFAULT_FEE_CONFIG.weeklyPoolBps,
+        monthlyPoolBps: args.monthlyPoolBps ?? DEFAULT_FEE_CONFIG.monthlyPoolBps,
+        creatorRebateBps: args.creatorRebateBps ?? DEFAULT_FEE_CONFIG.creatorRebateBps,
+        forceRedeemGraceSecs: args.forceRedeemGraceSecs ?? DEFAULT_FEE_CONFIG.forceRedeemGraceSecs,
+        weeklyDistributionBps: args.weeklyDistributionBps ?? [...DEFAULT_FEE_CONFIG.weeklyDistributionBps],
+        monthlyDistributionBps: args.monthlyDistributionBps ?? [...DEFAULT_FEE_CONFIG.monthlyDistributionBps],
+        bump: 254,
+      };
+      // Sum-validation (DR-010): platform + weekly + monthly must == 10_000.
+      const sum = state.feeConfig.platformRetainBps + state.feeConfig.weeklyPoolBps + state.feeConfig.monthlyPoolBps;
+      if (sum !== 10_000) {
+        state.feeConfig = null;
+        throw new Error(`initializeFeeConfig: FeeBpsSumMismatch (sum=${sum}, expected 10_000)`);
+      }
+      log("initializeFeeConfig", { admin: args.admin });
+      return tx();
+    },
+
+    async updateFeeConfig(args) {
+      if (!state.config) throw new Error("updateFeeConfig: config not initialized");
+      if (state.config.admin !== args.admin) throw new Error("updateFeeConfig: NotAdmin");
+      if (!state.feeConfig) throw new Error("updateFeeConfig: FeeConfigNotInitialized");
+      const fc = state.feeConfig;
+      if (args.mintFeeBps !== undefined) fc.mintFeeBps = args.mintFeeBps;
+      if (args.platformRetainBps !== undefined) fc.platformRetainBps = args.platformRetainBps;
+      if (args.weeklyPoolBps !== undefined) fc.weeklyPoolBps = args.weeklyPoolBps;
+      if (args.monthlyPoolBps !== undefined) fc.monthlyPoolBps = args.monthlyPoolBps;
+      if (args.creatorRebateBps !== undefined) fc.creatorRebateBps = args.creatorRebateBps;
+      if (args.forceRedeemGraceSecs !== undefined) fc.forceRedeemGraceSecs = args.forceRedeemGraceSecs;
+      if (args.weeklyDistributionBps !== undefined) fc.weeklyDistributionBps = [...args.weeklyDistributionBps];
+      if (args.monthlyDistributionBps !== undefined) fc.monthlyDistributionBps = [...args.monthlyDistributionBps];
+      // Sum-validation
+      const sum = fc.platformRetainBps + fc.weeklyPoolBps + fc.monthlyPoolBps;
+      if (sum !== 10_000) throw new Error(`updateFeeConfig: FeeBpsSumMismatch (sum=${sum})`);
+      log("updateFeeConfig", { admin: args.admin });
+      return tx();
+    },
+
+    async initializeRewardsPools(args) {
+      if (!state.config) throw new Error("initializeRewardsPools: config not initialized");
+      if (state.config.admin !== args.admin) throw new Error("initializeRewardsPools: NotAdmin");
+      // Mock: just confirm pool counters are at 0 (they already are by init).
+      log("initializeRewardsPools", { admin: args.admin });
+      return tx();
+    },
+
+    async commitLeaderboardRoot(args) {
+      if (!state.config) throw new Error("commitLeaderboardRoot: config not initialized");
+      if (state.config.admin !== args.admin) throw new Error("commitLeaderboardRoot: NotAdmin");
+      if (args.merkleRoot.length !== 32) throw new Error("commitLeaderboardRoot: InvalidRootLength");
+      if (args.arweaveTxId.length !== 48) throw new Error("commitLeaderboardRoot: InvalidArweaveIdLength");
+      if (args.periodType !== 0 && args.periodType !== 1) throw new Error("commitLeaderboardRoot: InvalidPeriodType");
+      const key = `${args.periodType}:${args.periodId}`;
+      if (state.leaderboardCommitments.has(key)) throw new Error("commitLeaderboardRoot: PeriodAlreadyCommitted");
+      state.leaderboardCommitments.set(key, {
+        periodId: args.periodId,
+        periodType: args.periodType,
+        merkleRoot: args.merkleRoot,
+        arweaveTxId: args.arweaveTxId,
+        committedAtSlot: state.slot,
+      });
+      log("commitLeaderboardRoot", { admin: args.admin, periodId: args.periodId, periodType: args.periodType });
+      return tx();
+    },
+
+    async distributeWeeklyRewards(args) {
+      return distributeRewardsImpl(args, /* periodType */ 0, state, log, tx);
+    },
+
+    async distributeMonthlyRewards(args) {
+      return distributeRewardsImpl(args, /* periodType */ 1, state, log, tx);
+    },
+
+    async fetchFeeConfig() {
+      return state.feeConfig;
+    },
+    async fetchUserConfig(user) {
+      return state.userConfigs.get(user) ?? { user, mintVolume30d: 0n, bump: 254 };
+    },
+    async fetchTickerConfig(pythFeed) {
+      return state.tickerConfigs.get(pythFeed) ?? null;
+    },
+    async fetchPoolBalances() {
+      return { feeCollector: state.feeCollector, weekly: state.weeklyPool, monthly: state.monthlyPool };
     },
 
     async fetchMarketConfig() {

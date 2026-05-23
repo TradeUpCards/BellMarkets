@@ -1,286 +1,505 @@
-// dr005-dr011-scaffolding.test.ts — pre-merge test scaffolding for the 7 new
-// instructions queued in DR-005 / DR-006 / DR-007 / DR-008 / DR-010 / DR-011.
+// dr005-dr011-scaffolding.test.ts — coverage for the 10 new instructions Aria
+// shipped in the Day-5 merge (DR-005 / DR-006 / DR-008 / DR-010 / DR-011).
 //
-// Status (2026-05-23 Day-5): all tests are `it.skip(...)` — Aria has NOT yet
-// pushed the IDL refresh with the new instructions to main. When she does:
-//   1. Update tests/integration/mocks/aria-interface.ts to add the new methods
-//      (per the DR specs below + the actual emitted IDL).
-//   2. Remove the `.skip` on each test below.
-//   3. Fill in the body referencing the new mock methods.
-//
-// Why a separate file: keeps tests/eval/edge-cases.test.ts pass-count
-// signal clean ("27 passing, 2 pending" stays meaningful). Once these
-// land, this file's pass count is the Day-5+ coverage delta.
+// Status (2026-05-23 Day-5 post-merge): 27 mock-side tests ACTIVE.
+// 11 Bram-side tests (DR-007 trading calendar + DR-011 earnings calendar)
+// remain `it.skip` because their helpers live in `services/automation/`
+// (Bram's territory) and aren't yet exported as importable modules from
+// his workspace. When Bram publishes calendar.ts + earnings-calendar.ts,
+// flip the skip on each and fill in the import.
 //
 // Source DRs:
-//   DR-005 — user_create_strike_market + TickerConfig + UserConfig
+//   DR-005 — user_create_strike_market + TickerConfig + UserConfig + force_redeem + close_settled_market
 //   DR-006 — update_ticker_config + 24h rolling strike-grid
-//   DR-007 — trading calendar helpers (isTradingDay / getCloseTime / nextTradingDay)
-//   DR-008 — mint_pair fee math + tier discounts + creator rebate
-//   DR-010 — commit_leaderboard_root + distribute_weekly_rewards + distribute_monthly_rewards
-//   DR-011 — earnings-calendar pre-expansion (Bram-side; Drew tests calendar lookup)
-//
-// Cross-ref dispatch: per Tate's 2026-05-23 work order priority 3.
+//   DR-007 — trading calendar helpers (Bram-side)
+//   DR-008 — mint_pair fee math + tier discounts + creator rebate + initialize_fee_config + update_fee_config
+//   DR-010 — commit_leaderboard_root + distribute_weekly_rewards + distribute_monthly_rewards + Merkle verify
+//   DR-011 — earnings-calendar pre-expansion (Bram-side)
 
 import { expect } from "chai";
-// NOTE: imports commented out — uncomment after mock reconciliation lands.
-// import {
-//   createMockAria, ONE_USDC, OUTCOME_INVALID, OUTCOME_YES, type Pubkey,
-// } from "../integration/mocks/aria-interface";
+import { createHash } from "node:crypto";
+import {
+  createMockAria, ONE_USDC, OUTCOME_INVALID, OUTCOME_YES,
+  DEFAULT_FEE_CONFIG, type Pubkey, type MockState, type AriaProgram,
+} from "../integration/mocks/aria-interface";
 
 const ADMIN  = "admin-pubkey";
 const USER   = "user-pubkey";
 const USER2  = "user2-pubkey";
 const PYTH   = "pyth-aapl-feed-mock";
+const PHOENIX = "phoenix-aapl-fifo-market-mock";
+const USDC_MINT = "usdc-mint-mock";
+const TREASURY  = "treasury-mock";
 
-// Match DR-005 table for AAPL: 15% deviation, $1 tick.
-const TICKER_AAPL_MAX_DEV_BPS = 1500;
-const TICKER_AAPL_TICK_USD    = 1_000_000n;            // $1 in micro-USDC
+const DEFAULT_INIT = {
+  admin: ADMIN, usdcMint: USDC_MINT, treasury: TREASURY,
+  priceStalenessSecs: 300n, priceConfidenceBps: 50, adminOverrideDelaySecs: 3600n,
+};
+
+// AAPL-tuned per DR-005 §"Decision" table.
+const AAPL_MAX_DEV_BPS = 1500;          // 15%
+const AAPL_TICK = ONE_USDC;             // $1 micro-USDC
+const AAPL_SPOT = 200_000_000n;         // $200
+
+/** Setup: init config, set TickerConfig for AAPL (centered at $200, 15% dev, $1 tick). */
+async function setupWithTickerConfig(opts: Parameters<typeof createMockAria>[0] = {}): Promise<{ program: AriaProgram; state: MockState }> {
+  const { program, state } = createMockAria(opts);
+  state.blockTime = 1_000_000n;
+  state.slot = 250_000_000n;
+  await program.initializeConfig(DEFAULT_INIT);
+  await program.updateTickerConfig({
+    admin: ADMIN, pythFeed: PYTH,
+    capCenter: AAPL_SPOT,
+    maxUserStrikeDeviationBps: AAPL_MAX_DEV_BPS,
+    strikeTickSize: AAPL_TICK,
+    thresholdBps: 400,
+  });
+  return { program, state };
+}
+
+// ─── DR-005 — user_create_strike_market (permissionless, user-funded) ────
 
 describe("DR-005 — user_create_strike_market (permissionless, user-funded)", () => {
-  it.skip("succeeds with strike within ±max_dev_bps of Pyth spot + aligned to tick", async () => {
-    // Setup: TickerConfig for AAPL exists with cap_center = $200, max_dev = 1500bps ($30 range).
-    // User calls user_create_strike_market(strike_price = $210 = 210_000_000, expiry = next trading day close).
-    // Expected: succeeds. StrikeMarket PDA created; user is creator (StrikeMarket.creator = user).
-    //
-    // Source: DR-005 §"Decision" bullets 1-4 (on-chain enforcement).
-    // TODO when mock + IDL land.
+  it("succeeds with strike within ±max_dev_bps of Pyth spot + aligned to tick", async () => {
+    const { program } = await setupWithTickerConfig();
+    const STRIKE = 210_000_000n;        // $210 — within $30 band of $200 spot
+    const res = await program.userCreateStrikeMarket({
+      user: USER, underlyingPythFeed: PYTH, strikePrice: STRIKE,
+      expiryUnix: 1_001_000n, phoenixMarket: PHOENIX,
+    });
+    expect(res.signature).to.match(/^mock-/);
+    const m = await program.fetchStrikeMarket(res.marketId);
+    expect(m.creator).to.equal(USER);   // DR-005 + DR-008: creator field for rebate logic
+    expect(m.strikePrice).to.equal(STRIKE);
   });
 
-  it.skip("rejects strike beyond max_user_strike_deviation_bps (out-of-cap)", async () => {
-    // Setup: TickerConfig cap_center = $200, max_dev = 1500bps. User tries strike = $250 (out of $170-$230 band).
-    // Expected: reverts with StrikeBeyondDeviationCap (or whichever Aria names it).
-    // TODO.
+  it("rejects strike beyond max_user_strike_deviation_bps (out-of-cap)", async () => {
+    const { program } = await setupWithTickerConfig();
+    const STRIKE = 250_000_000n;        // $250 — outside $170-$230 band (capCenter ± 15%)
+    try {
+      await program.userCreateStrikeMarket({
+        user: USER, underlyingPythFeed: PYTH, strikePrice: STRIKE,
+        expiryUnix: 1_001_000n, phoenixMarket: PHOENIX,
+      });
+      expect.fail("expected StrikeBeyondDeviationCap");
+    } catch (e) {
+      expect((e as Error).message).to.match(/StrikeBeyondDeviationCap/);
+    }
   });
 
-  it.skip("rejects strike not aligned to strike_tick_size grid (misaligned tick)", async () => {
-    // Setup: TickerConfig tick_size = $1. User tries strike = $200.50.
-    // Expected: reverts with StrikeMisalignedTick. Prevents 100-micro-strike fragmentation per DR-005.
-    // TODO.
+  it("rejects strike not aligned to strike_tick_size grid (misaligned tick)", async () => {
+    const { program } = await setupWithTickerConfig();
+    const STRIKE = 200_500_000n;        // $200.50 — not aligned to $1 tick
+    try {
+      await program.userCreateStrikeMarket({
+        user: USER, underlyingPythFeed: PYTH, strikePrice: STRIKE,
+        expiryUnix: 1_001_000n, phoenixMarket: PHOENIX,
+      });
+      expect.fail("expected StrikeMisalignedTick");
+    } catch (e) {
+      expect((e as Error).message).to.match(/StrikeMisalignedTick/);
+    }
   });
 
-  it.skip("rejects when Pyth feed fails staleness / confidence check at create time", async () => {
-    // DR-005 §"Decision" bullet 4: same Pyth gates as settle_market apply at create.
-    // TODO with pythBehavior: 'stale' option.
+  it("rejects when Pyth feed fails staleness check at create time", async () => {
+    const { program } = await setupWithTickerConfig({ pythBehavior: "stale" });
+    try {
+      await program.userCreateStrikeMarket({
+        user: USER, underlyingPythFeed: PYTH, strikePrice: 200_000_000n,
+        expiryUnix: 1_001_000n, phoenixMarket: PHOENIX,
+      });
+      expect.fail("expected PythStale");
+    } catch (e) {
+      expect((e as Error).message).to.match(/PythStale/);
+    }
   });
 
-  it.skip("sets StrikeMarket.creator = user pubkey; immutable thereafter", async () => {
-    // DR-005: creator field used by DR-008 fee logic. Once written, must not be mutable.
-    // TODO: read StrikeMarket.creator post-create; assert equals user; verify no setter ix exists in IDL.
-  });
-});
-
-describe("DR-008 — mint_pair fee math (2% with tier discount + creator rebate)", () => {
-  // Per DR-008 §"Three layered discounts":
-  //   Tier 1 ($0-$1000):     200 bps (2%)
-  //   Tier 2 ($1000-$10000): 150 bps (1.5%)
-  //   Tier 3 ($10000+):      100 bps (1%)
-
-  it.skip("tier boundary: $999 mint pays 200 bps (tier 1)", async () => {
-    // Setup: UserConfig.mint_volume_30d = $999 micro-USDC. User mints $1 pair.
-    // Expected: fee = 2_000 micro-USDC (200 bps × $1). New mint_volume_30d = $1000.
-    // TODO.
-  });
-
-  it.skip("tier boundary: $1000 mint pays 150 bps (tier 2 — first dollar at $1000 mark)", async () => {
-    // Setup: UserConfig.mint_volume_30d = $1000. User mints $1.
-    // Expected: fee = 1_500 micro-USDC (150 bps).
-    // TODO.
-  });
-
-  it.skip("tier boundary: $9999 mint stays in tier 2 (150 bps)", async () => {
-    // Setup: UserConfig.mint_volume_30d = $9999. Mints $1. Fee = 1_500 mu.
-    // TODO.
-  });
-
-  it.skip("tier boundary: $10000 mint pays 100 bps (tier 3)", async () => {
-    // Setup: UserConfig.mint_volume_30d = $10000. Mints $1. Fee = 1_000 mu.
-    // TODO.
-  });
-
-  it.skip("creator rebate: creator==user && outcome==Unsettled → pays creator_rebate-adjusted fee", async () => {
-    // Per DR-008: creator pays tier_fee × (10000 - creator_rebate_bps) / 10000.
-    // Default creator_rebate_bps = 10000 → creator pays 0% fee on all mints into their strike pre-settle.
-    // Setup: USER created StrikeMarket via user_create_strike_market. USER mints $100 pair.
-    // Expected: fee = 0 (default rebate). USDC vault gets exactly $100 (no fee skim).
-    // TODO.
-  });
-
-  it.skip("creator rebate: does NOT update mint_volume_30d (gaming defense)", async () => {
-    // Per DR-008: "Critical safeguard against tier gaming." Creator's mint into their own strike
-    // skips the volume increment so they can't accelerate tier progression for free.
-    // Setup: USER creates strike + mints $1500 → UserConfig.mint_volume_30d MUST remain at $0.
-    // TODO.
-  });
-
-  it.skip("non-creator mints into creator's strike: pays normal tier fee + updates mint_volume_30d", async () => {
-    // Cross-check the creator-rebate isn't accidentally global.
-    // Setup: USER creates strike. USER2 mints $1 → USER2's UserConfig.mint_volume_30d += $1, USER2 pays 200 bps.
-    // TODO.
-  });
-
-  it.skip("fee splits correctly: platform_retain_bps + weekly_pool_bps + monthly_pool_bps = total fee", async () => {
-    // Per DR-010 §"Default funding split": 50% retain, 25% weekly, 25% monthly.
-    // Setup: User mints $100 at tier 1 → fee = $2. Expected splits: $1 → fee_collector, $0.50 → weekly_pool, $0.50 → monthly_pool.
-    // Verify each PDA balance delta + sum equals fee.
-    // TODO.
-  });
-
-  it.skip("fee split sum validation: rejects MarketConfig update where bps don't sum to 10_000", async () => {
-    // Per DR-010 §"Sum must equal 10,000 (enforced on-chain)".
-    // Setup: try to update_market_config with split bps that sum to e.g., 9500 or 10500.
-    // Expected: reverts with InvalidSplit (or whichever Aria names it).
-    // TODO.
-  });
-
-  it.skip("$1 USDC invariant holds with fees active: vault.amount == pairs_outstanding × $1 exactly", async () => {
-    // The most important property — fee math must NOT pollute the vault.
-    // Setup: 10 users mint various amounts with fees on. After all mints + redeems, vault should be exactly $0 (drained).
-    // TODO. Currently asserted in simulate-trading-day.mjs Phase 5 I1, which assumes fee=0; revisit when fees active.
+  it("sets StrikeMarket.creator = user pubkey (DR-008 fee logic depends on this)", async () => {
+    const { program } = await setupWithTickerConfig();
+    const res = await program.userCreateStrikeMarket({
+      user: USER, underlyingPythFeed: PYTH, strikePrice: 200_000_000n,
+      expiryUnix: 1_001_000n, phoenixMarket: PHOENIX,
+    });
+    const m = await program.fetchStrikeMarket(res.marketId);
+    expect(m.creator).to.equal(USER);
+    // No setter ix exists for creator — verified by absence in AriaProgram interface.
   });
 });
 
-describe("DR-005 — force_redeem (admin escape valve after settle + grace)", () => {
-  it.skip("rejects before settled_at + grace_secs (too early)", async () => {
-    // Setup: market settled at t, grace = 30 days. Try force_redeem at t + 7 days.
-    // Expected: reverts with ForceRedeemTooEarly (or similar).
-    // TODO.
+// ─── DR-008 — mint_pair fee math (2% with tier discount + creator rebate) ─
+
+describe("DR-008 — mint_pair fee math", () => {
+  /** Setup with active fee config (2% mint fee, default split + rebate). */
+  async function setupWithFeeActive(): Promise<{ program: AriaProgram; state: MockState; marketId: Pubkey }> {
+    const { program, state } = await setupWithTickerConfig();
+    await program.initializeFeeConfig({
+      admin: ADMIN,
+      mintFeeBps: 200,        // 2% — enable the fee mechanism
+      // other fields stay defaults
+    });
+    const res = await program.userCreateStrikeMarket({
+      user: ADMIN, underlyingPythFeed: PYTH, strikePrice: 200_000_000n,
+      expiryUnix: 1_001_000n, phoenixMarket: PHOENIX,
+    });
+    return { program, state, marketId: res.marketId };
+  }
+
+  it("tier 1 ($0-$999): pays 200 bps", async () => {
+    const { program, marketId } = await setupWithFeeActive();
+    // USER has $0 mint_volume_30d → tier 1
+    await program.mintPair({ user: USER, marketId, amount: 999n * ONE_USDC });
+    const pools = await program.fetchPoolBalances();
+    // Fee = 999 × 0.02 = 19.98 USDC. Default split 50/25/25.
+    const fee = (999n * ONE_USDC * 200n) / 10_000n;
+    expect(pools.feeCollector + pools.weekly + pools.monthly).to.equal(fee);
+    const userCfg = await program.fetchUserConfig(USER);
+    expect(userCfg.mintVolume30d).to.equal(999n * ONE_USDC);
   });
 
-  it.skip("succeeds after grace; transfers USDC to user_pubkey on behalf of long-tail holder", async () => {
-    // Setup: market settled, 30 days pass, user hasn't redeemed. Admin calls force_redeem(user_pubkey, amount).
-    // Expected: vault → user_usdc transfer succeeds; user_winning_token burned.
-    // TODO.
+  it("tier boundary: at $1000 mint_volume_30d, NEXT mint pays 150 bps (tier 2)", async () => {
+    const { program, marketId } = await setupWithFeeActive();
+    // Build to exactly $1000 first
+    await program.mintPair({ user: USER, marketId, amount: 1000n * ONE_USDC });
+    const beforeFee = (await program.fetchPoolBalances());
+    const beforeTotal = beforeFee.feeCollector + beforeFee.weekly + beforeFee.monthly;
+    // Now mint $1 more — should be at tier 2 (150 bps)
+    await program.mintPair({ user: USER, marketId, amount: 1n * ONE_USDC });
+    const afterFee = (await program.fetchPoolBalances());
+    const afterDelta = (afterFee.feeCollector + afterFee.weekly + afterFee.monthly) - beforeTotal;
+    expect(afterDelta).to.equal((1n * ONE_USDC * 150n) / 10_000n);
   });
 
-  it.skip("rejects when caller is not admin", async () => {
-    // Source: admin-only path. Non-admin signer must revert NotAdmin.
-    // TODO.
+  it("tier 2 ($1000-$9999): pays 150 bps", async () => {
+    const { program, marketId } = await setupWithFeeActive();
+    await program.mintPair({ user: USER, marketId, amount: 5000n * ONE_USDC });
+    const before = await program.fetchPoolBalances();
+    const beforeTotal = before.feeCollector + before.weekly + before.monthly;
+    await program.mintPair({ user: USER, marketId, amount: 100n * ONE_USDC });
+    const after = await program.fetchPoolBalances();
+    const delta = (after.feeCollector + after.weekly + after.monthly) - beforeTotal;
+    expect(delta).to.equal((100n * ONE_USDC * 150n) / 10_000n);
+  });
+
+  it("tier 3 ($10000+): pays 100 bps", async () => {
+    const { program, marketId } = await setupWithFeeActive();
+    await program.mintPair({ user: USER, marketId, amount: 10_000n * ONE_USDC });
+    const before = await program.fetchPoolBalances();
+    const beforeTotal = before.feeCollector + before.weekly + before.monthly;
+    await program.mintPair({ user: USER, marketId, amount: 100n * ONE_USDC });
+    const after = await program.fetchPoolBalances();
+    const delta = (after.feeCollector + after.weekly + after.monthly) - beforeTotal;
+    expect(delta).to.equal((100n * ONE_USDC * 100n) / 10_000n);
+  });
+
+  it("creator rebate: creator==user && Unsettled → effective fee is 0 (default 100% rebate)", async () => {
+    const { program, marketId } = await setupWithFeeActive();
+    // Market was created by ADMIN above. Now ADMIN mints → creator rebate fires.
+    const before = await program.fetchPoolBalances();
+    await program.mintPair({ user: ADMIN, marketId, amount: 100n * ONE_USDC });
+    const after = await program.fetchPoolBalances();
+    // Default creator_rebate_bps = 10000 → creator pays 0%
+    expect(after.feeCollector + after.weekly + after.monthly).to.equal(before.feeCollector + before.weekly + before.monthly);
+  });
+
+  it("creator rebate: does NOT update mint_volume_30d (gaming defense per DR-008)", async () => {
+    const { program, marketId } = await setupWithFeeActive();
+    // ADMIN created market; ADMIN mints $1500 → rebate fires; mint_volume_30d must NOT increment
+    await program.mintPair({ user: ADMIN, marketId, amount: 1500n * ONE_USDC });
+    const adminCfg = await program.fetchUserConfig(ADMIN);
+    expect(adminCfg.mintVolume30d).to.equal(0n);
+  });
+
+  it("non-creator mints into creator's strike: pays normal tier fee + updates mint_volume_30d", async () => {
+    const { program, marketId } = await setupWithFeeActive();
+    // USER (not creator) mints $100 → tier 1 (200 bps), volume updates.
+    await program.mintPair({ user: USER, marketId, amount: 100n * ONE_USDC });
+    const userCfg = await program.fetchUserConfig(USER);
+    expect(userCfg.mintVolume30d).to.equal(100n * ONE_USDC);
+    const pools = await program.fetchPoolBalances();
+    expect(pools.feeCollector + pools.weekly + pools.monthly).to.equal((100n * ONE_USDC * 200n) / 10_000n);
+  });
+
+  it("fee splits correctly: platform (50%) + weekly (25%) + monthly (25%) = total fee", async () => {
+    const { program, marketId } = await setupWithFeeActive();
+    await program.mintPair({ user: USER, marketId, amount: 100n * ONE_USDC });
+    const pools = await program.fetchPoolBalances();
+    const totalFee = (100n * ONE_USDC * 200n) / 10_000n;       // $2 micro-USDC = 2_000_000
+    expect(pools.feeCollector).to.equal(totalFee / 2n);         // 50%
+    expect(pools.weekly).to.equal(totalFee / 4n);                // 25%
+    expect(pools.monthly).to.equal(totalFee - pools.feeCollector - pools.weekly);  // remainder = 25%
+  });
+
+  it("initializeFeeConfig rejects bps sum != 10000 (FeeBpsSumMismatch)", async () => {
+    const { program } = await setupWithTickerConfig();
+    try {
+      await program.initializeFeeConfig({
+        admin: ADMIN, platformRetainBps: 4000, weeklyPoolBps: 2500, monthlyPoolBps: 2500,  // sums to 9000
+      });
+      expect.fail("expected FeeBpsSumMismatch");
+    } catch (e) {
+      expect((e as Error).message).to.match(/FeeBpsSumMismatch/);
+    }
+  });
+
+  it("$1 USDC invariant holds with fees active: vault stays exactly amount × pairs_minted (fees go to separate pools)", async () => {
+    const { program, marketId } = await setupWithFeeActive();
+    await program.mintPair({ user: USER,  marketId, amount: 100n * ONE_USDC });
+    await program.mintPair({ user: USER2, marketId, amount: 50n  * ONE_USDC });
+    // Vault should be exactly $150 — fees went to separate fee_collector/weekly/monthly pools.
+    const vault = await program.fetchVaultBalance(marketId);
+    expect(vault).to.equal(150n * ONE_USDC);
+    const pools = await program.fetchPoolBalances();
+    const expectedFees = (100n * ONE_USDC * 200n + 50n * ONE_USDC * 200n) / 10_000n;
+    expect(pools.feeCollector + pools.weekly + pools.monthly).to.equal(expectedFees);
   });
 });
 
-describe("DR-005 — close_settled_market (rent recovery via permissionless close)", () => {
-  it.skip("rejects when pairs_outstanding > 0 (would orphan user funds)", async () => {
-    // Setup: market settled, 5 pairs of winning side still un-redeemed. Try close.
-    // Expected: reverts with PairsStillOutstanding (or similar).
-    // TODO.
+// ─── DR-005 — force_redeem (admin escape valve after settle + grace) ─────
+
+describe("DR-005 — force_redeem", () => {
+  async function setupSettled(): Promise<{ program: AriaProgram; state: MockState; marketId: Pubkey }> {
+    const { program, state } = await setupWithTickerConfig();
+    const res = await program.userCreateStrikeMarket({
+      user: USER, underlyingPythFeed: PYTH, strikePrice: 200_000_000n,
+      expiryUnix: state.blockTime + 60n, phoenixMarket: PHOENIX,
+    });
+    await program.mintPair({ user: USER, marketId: res.marketId, amount: ONE_USDC });
+    state.blockTime += 70n;
+    await program.settleMarket({ settler: USER, marketId: res.marketId });
+    return { program, state, marketId: res.marketId };
+  }
+
+  it("rejects before settled_at + grace_secs (ForceRedeemTooEarly)", async () => {
+    const { program, marketId } = await setupSettled();
+    // Default grace = 30 days; we're just past expiry, so still too early.
+    try {
+      await program.forceRedeem({ admin: ADMIN, marketId, user: USER, amount: ONE_USDC });
+      expect.fail("expected ForceRedeemTooEarly");
+    } catch (e) {
+      expect((e as Error).message).to.match(/ForceRedeemTooEarly/);
+    }
   });
 
-  it.skip("succeeds when pairs_outstanding == 0; closes YES mint + NO mint + vault; refunds rent to treasury", async () => {
-    // Per DR-005 §"Closed-rent recovery": refunded rent flows to MarketConfig.treasury (fee_collector).
-    // Setup: all users have redeemed; vault empty; pairs_outstanding == 0. Anyone calls close_settled_market.
-    // Expected: succeeds; treasury balance increases by sum of (yes_mint rent + no_mint rent + vault rent).
-    // TODO.
+  it("succeeds after grace; transfers USDC out of vault", async () => {
+    const { program, state, marketId } = await setupSettled();
+    const grace = DEFAULT_FEE_CONFIG.forceRedeemGraceSecs;
+    state.blockTime += grace + 1n;
+    const before = await program.fetchVaultBalance(marketId);
+    await program.forceRedeem({ admin: ADMIN, marketId, user: USER, amount: ONE_USDC });
+    const after = await program.fetchVaultBalance(marketId);
+    expect(after).to.equal(before - ONE_USDC);
   });
 
-  it.skip("rejects when called on Unsettled market", async () => {
-    // Sanity: close before settle would orphan pair holders.
-    // TODO.
+  it("rejects non-admin caller (NotAdmin)", async () => {
+    const { program, state, marketId } = await setupSettled();
+    state.blockTime += DEFAULT_FEE_CONFIG.forceRedeemGraceSecs + 1n;
+    try {
+      await program.forceRedeem({ admin: USER, marketId, user: USER, amount: ONE_USDC });
+      expect.fail("expected NotAdmin");
+    } catch (e) {
+      expect((e as Error).message).to.match(/NotAdmin/);
+    }
   });
 });
+
+// ─── DR-005 — close_settled_market (rent recovery) ───────────────────────
+
+describe("DR-005 — close_settled_market", () => {
+  it("rejects when pairs_outstanding > 0 (PairsStillOutstanding)", async () => {
+    const { program, state } = await setupWithTickerConfig();
+    const res = await program.userCreateStrikeMarket({
+      user: USER, underlyingPythFeed: PYTH, strikePrice: 200_000_000n,
+      expiryUnix: state.blockTime + 60n, phoenixMarket: PHOENIX,
+    });
+    await program.mintPair({ user: USER, marketId: res.marketId, amount: ONE_USDC });
+    state.blockTime += 70n;
+    await program.settleMarket({ settler: USER, marketId: res.marketId });
+    // Vault still has $1 (USER hasn't redeemed). Close should reject.
+    try {
+      await program.closeSettledMarket({ closer: USER, marketId: res.marketId });
+      expect.fail("expected PairsStillOutstanding");
+    } catch (e) {
+      expect((e as Error).message).to.match(/PairsStillOutstanding/);
+    }
+  });
+
+  it("succeeds when pairs_outstanding == 0; recovered rent flows to treasury (fee_collector)", async () => {
+    const { program, state } = await setupWithTickerConfig();
+    const res = await program.userCreateStrikeMarket({
+      user: USER, underlyingPythFeed: PYTH, strikePrice: 200_000_000n,
+      expiryUnix: state.blockTime + 60n, phoenixMarket: PHOENIX,
+    });
+    await program.mintPair({ user: USER, marketId: res.marketId, amount: ONE_USDC });
+    state.blockTime += 70n;
+    await program.settleMarket({ settler: USER, marketId: res.marketId });
+    await program.redeem({ user: USER, marketId: res.marketId, amount: ONE_USDC });
+    expect(await program.fetchVaultBalance(res.marketId)).to.equal(0n);
+    const before = (await program.fetchPoolBalances()).feeCollector;
+    await program.closeSettledMarket({ closer: USER, marketId: res.marketId });   // permissionless
+    const after = (await program.fetchPoolBalances()).feeCollector;
+    expect(after > before).to.equal(true);   // chai doesn't compare BigInt with greaterThan
+  });
+
+  it("rejects when called on Unsettled market (NotSettled)", async () => {
+    const { program, state } = await setupWithTickerConfig();
+    const res = await program.userCreateStrikeMarket({
+      user: USER, underlyingPythFeed: PYTH, strikePrice: 200_000_000n,
+      expiryUnix: state.blockTime + 60n, phoenixMarket: PHOENIX,
+    });
+    try {
+      await program.closeSettledMarket({ closer: USER, marketId: res.marketId });
+      expect.fail("expected NotSettled");
+    } catch (e) {
+      expect((e as Error).message).to.match(/NotSettled/);
+    }
+  });
+});
+
+// ─── DR-010 — commit_leaderboard_root + distribute_*_rewards (Merkle) ────
 
 describe("DR-010 — commit_leaderboard_root + distribute_*_rewards (Merkle-verifiable)", () => {
-  it.skip("commit_leaderboard_root: admin-only; rejects non-admin signer", async () => {
-    // TODO.
+  /** Helper: setup with fee config + some pool balance to distribute from.
+   *  Mints from USER2 (NOT the creator) to avoid creator rebate zeroing the fee. */
+  async function setupWithPoolFunds(): Promise<{ program: AriaProgram; state: MockState }> {
+    const { program, state } = await setupWithTickerConfig();
+    await program.initializeFeeConfig({ admin: ADMIN, mintFeeBps: 200 });
+    const res = await program.userCreateStrikeMarket({
+      user: USER, underlyingPythFeed: PYTH, strikePrice: 200_000_000n,
+      expiryUnix: state.blockTime + 60n, phoenixMarket: PHOENIX,
+    });
+    // USER2 (NOT creator) mints $10000 → tier 1 200bps fee = $200; split 50/25/25 → $50 weekly + $50 monthly.
+    await program.mintPair({ user: USER2, marketId: res.marketId, amount: 10_000n * ONE_USDC });
+    return { program, state };
+  }
+
+  /** Build a one-leaf Merkle tree (single-recipient). Root = leaf hash; proof = []. */
+  function singleLeafProof(recipient: Pubkey, position: number, amount: bigint): { root: Uint8Array; proof: Uint8Array[] } {
+    const leafStr = `${recipient}:${position}:${amount.toString()}`;
+    const root = new Uint8Array(createHash("sha256").update(leafStr).digest());
+    return { root, proof: [] };
+  }
+
+  it("commit_leaderboard_root: rejects non-admin (NotAdmin)", async () => {
+    const { program } = await setupWithPoolFunds();
+    const { root } = singleLeafProof(USER, 0, 100n);
+    try {
+      await program.commitLeaderboardRoot({
+        admin: USER, periodId: 1n, periodType: 0,
+        merkleRoot: root, arweaveTxId: new Uint8Array(48),
+      });
+      expect.fail("expected NotAdmin");
+    } catch (e) {
+      expect((e as Error).message).to.match(/NotAdmin/);
+    }
   });
 
-  it.skip("commit_leaderboard_root: stores 32-byte root + Arweave CID in LeaderboardCommitments PDA", async () => {
-    // Per DR-010 §"LOCKED for MVP: Option B (Merkle commitment) + Arweave pinning"
-    // TODO.
+  it("commit_leaderboard_root: stores commitment in LeaderboardCommitments PDA", async () => {
+    const { program, state } = await setupWithPoolFunds();
+    const { root } = singleLeafProof(USER, 0, 100n);
+    await program.commitLeaderboardRoot({
+      admin: ADMIN, periodId: 42n, periodType: 0,
+      merkleRoot: root, arweaveTxId: new Uint8Array(48),
+    });
+    expect(state.leaderboardCommitments.size).to.equal(1);
+    const stored = state.leaderboardCommitments.get("0:42");
+    expect(stored).to.exist;
+    expect(stored!.periodId).to.equal(42n);
+    expect(stored!.periodType).to.equal(0);
   });
 
-  it.skip("distribute_weekly_rewards: rejects when merkle_proof doesn't verify against committed root", async () => {
-    // Source: DR-010 §"Verification model".
-    // Setup: commit_leaderboard_root(period=42, root=R). Call distribute_weekly_rewards with a tampered proof.
-    // Expected: reverts with InvalidProof.
-    // TODO.
+  it("distribute_weekly_rewards: rejects when merkle_proof doesn't verify against committed root", async () => {
+    const { program } = await setupWithPoolFunds();
+    const { root } = singleLeafProof(USER, 0, 100n);
+    await program.commitLeaderboardRoot({
+      admin: ADMIN, periodId: 1n, periodType: 0, merkleRoot: root, arweaveTxId: new Uint8Array(48),
+    });
+    // Try to distribute to a DIFFERENT recipient — proof for original recipient should not match.
+    try {
+      await program.distributeWeeklyRewards({
+        admin: ADMIN, periodId: 1n, recipient: USER2, position: 0, amount: 100n, merkleProof: [],
+      });
+      expect.fail("expected InvalidProof");
+    } catch (e) {
+      expect((e as Error).message).to.match(/InvalidProof/);
+    }
   });
 
-  it.skip("distribute_weekly_rewards: succeeds with valid proof; transfers from WeeklyRewardsPool to recipient", async () => {
-    // Setup: commit root for period 42 that includes leaf(USER, streak=7, position=1). Call distribute with valid proof.
-    // Expected: WeeklyRewardsPool → USER USDC transfer succeeds. Recipient gets weekly_distribution_bps[0] / 10000 × pool size.
-    // TODO.
+  it("distribute_weekly_rewards: succeeds with valid proof; transfers from weekly pool", async () => {
+    const { program, state } = await setupWithPoolFunds();
+    const distAmount = 10n * ONE_USDC;
+    const { root, proof } = singleLeafProof(USER, 0, distAmount);
+    await program.commitLeaderboardRoot({
+      admin: ADMIN, periodId: 1n, periodType: 0, merkleRoot: root, arweaveTxId: new Uint8Array(48),
+    });
+    const before = state.weeklyPool;
+    expect(before > distAmount).to.equal(true);  // pool has enough (chai BigInt)
+    await program.distributeWeeklyRewards({
+      admin: ADMIN, periodId: 1n, recipient: USER, position: 0, amount: distAmount, merkleProof: proof,
+    });
+    expect(state.weeklyPool).to.equal(before - distAmount);
   });
 
-  it.skip("distribute_weekly_rewards: rejects re-distribution to same recipient/position (idempotency)", async () => {
-    // Source: prevents double-pay if admin or anyone re-broadcasts the same distribution tx.
-    // TODO.
+  it("distribute_weekly_rewards: rejects re-distribution to same recipient/position (AlreadyClaimed)", async () => {
+    const { program } = await setupWithPoolFunds();
+    const { root, proof } = singleLeafProof(USER, 0, 10n * ONE_USDC);
+    await program.commitLeaderboardRoot({
+      admin: ADMIN, periodId: 1n, periodType: 0, merkleRoot: root, arweaveTxId: new Uint8Array(48),
+    });
+    await program.distributeWeeklyRewards({
+      admin: ADMIN, periodId: 1n, recipient: USER, position: 0, amount: 10n * ONE_USDC, merkleProof: proof,
+    });
+    try {
+      await program.distributeWeeklyRewards({
+        admin: ADMIN, periodId: 1n, recipient: USER, position: 0, amount: 10n * ONE_USDC, merkleProof: proof,
+      });
+      expect.fail("expected AlreadyClaimed");
+    } catch (e) {
+      expect((e as Error).message).to.match(/AlreadyClaimed/);
+    }
   });
 
-  it.skip("distribute_monthly_rewards: same shape as weekly but on monthly pool + monthly_distribution_bps", async () => {
-    // TODO.
+  it("distribute_monthly_rewards: same shape as weekly but operates on monthly pool", async () => {
+    const { program, state } = await setupWithPoolFunds();
+    const distAmount = 10n * ONE_USDC;
+    const { root, proof } = singleLeafProof(USER, 0, distAmount);
+    await program.commitLeaderboardRoot({
+      admin: ADMIN, periodId: 1n, periodType: 1, merkleRoot: root, arweaveTxId: new Uint8Array(48),
+    });
+    const beforeWeekly = state.weeklyPool;
+    const beforeMonthly = state.monthlyPool;
+    await program.distributeMonthlyRewards({
+      admin: ADMIN, periodId: 1n, recipient: USER, position: 0, amount: distAmount, merkleProof: proof,
+    });
+    expect(state.weeklyPool).to.equal(beforeWeekly);          // weekly unchanged
+    expect(state.monthlyPool).to.equal(beforeMonthly - distAmount);  // monthly drained
   });
 });
 
-describe("DR-007 — trading calendar (off-chain helpers; Bram owns implementation; Drew tests)", () => {
-  // Trading calendar helpers live in services/automation/src/calendar.ts (Bram's territory).
-  // Drew imports + tests the helpers from here. Tests are at-the-boundary, not deep-internal.
+// ─── DR-007 — trading calendar (Bram-side; pending Bram's calendar.ts publish) ───
 
-  it.skip("isTradingDay: returns false for Saturday + Sunday", async () => {
-    // const { isTradingDay } = await import("@bell-markets/automation/calendar");
-    // expect(isTradingDay(new Date("2026-05-23"))).to.equal(false);  // Saturday
-    // expect(isTradingDay(new Date("2026-05-24"))).to.equal(false);  // Sunday
-    // TODO when calendar module is published from automation workspace.
-  });
-
-  it.skip("isTradingDay: returns false for US full holidays (e.g., Memorial Day 2026-05-25)", async () => {
-    // expect(isTradingDay(new Date("2026-05-25"))).to.equal(false);
-    // expect(isTradingDay(new Date("2026-07-04"))).to.equal(false);   // Independence Day
-    // expect(isTradingDay(new Date("2026-11-26"))).to.equal(false);   // Thanksgiving
-    // TODO.
-  });
-
-  it.skip("isTradingDay: returns TRUE for half-days (e.g., July 3, day after Thanksgiving)", async () => {
-    // Per DR-007: half-days ARE trading days; close time is 1 PM ET instead of 4 PM ET.
-    // TODO.
-  });
-
-  it.skip("getCloseTime: returns 16:00 ET for regular trading days", async () => {
-    // TODO.
-  });
-
-  it.skip("getCloseTime: returns 13:00 ET for half-days (e.g., 2026-11-27 day after Thanksgiving)", async () => {
-    // TODO.
-  });
-
-  it.skip("nextTradingDay: skips weekends + full holidays; KEEPS half-days", async () => {
-    // From Friday before Memorial Day weekend → returns Tuesday (skipping Sat/Sun/Mon).
-    // From day before Thanksgiving → returns half-day (NOT skipping it).
-    // TODO.
-  });
+describe("DR-007 — trading calendar (skipped: Bram-side helpers not yet exported)", () => {
+  it.skip("isTradingDay: returns false for Saturday + Sunday", async () => undefined);
+  it.skip("isTradingDay: returns false for US full holidays (e.g., Memorial Day 2026-05-25)", async () => undefined);
+  it.skip("isTradingDay: returns TRUE for half-days", async () => undefined);
+  it.skip("getCloseTime: returns 16:00 ET for regular trading days", async () => undefined);
+  it.skip("getCloseTime: returns 13:00 ET for half-days", async () => undefined);
+  it.skip("nextTradingDay: skips weekends + full holidays; KEEPS half-days", async () => undefined);
 });
 
-describe("DR-011 — earnings-calendar pre-expansion (Bram-side; Drew tests pre-expand + restore logic)", () => {
-  it.skip("isEarningsTomorrow: returns true day before known MAG7 earnings (e.g., NVDA Aug 28)", async () => {
-    // const { isEarningsTomorrow } = await import("@bell-markets/automation/earnings-calendar");
-    // expect(isEarningsTomorrow("NVDA", new Date("2026-08-27"))).to.equal(true);
-    // TODO.
-  });
+// ─── DR-011 — earnings-calendar pre-expansion (Bram-side) ───
 
-  it.skip("preExpansionMagnitude: returns ticker-specific expanded cap for known tickers", async () => {
-    // Per DR-011: high-vol NVDA/META/TSLA → 30%→50%, mid AMZN → 20%→30%, low → 15%→25%.
-    // TODO.
-  });
-
-  it.skip("post-earnings restore: returns ticker to default cap day-after earnings", async () => {
-    // TODO.
-  });
-
-  it.skip("earnings-during-half-day edge case: pre-expansion still fires; expiry anchors to 13:00 ET", async () => {
-    // Composes DR-007 + DR-011. Half-day with earnings tomorrow.
-    // TODO.
-  });
-
-  it.skip("empty calendar (post-cleanup or new year): isEarningsTomorrow returns false; no crash", async () => {
-    // Edge case for calendar-rollover periods.
-    // TODO.
-  });
+describe("DR-011 — earnings-calendar pre-expansion (skipped: Bram-side helpers not yet exported)", () => {
+  it.skip("isEarningsTomorrow: returns true day before known MAG7 earnings", async () => undefined);
+  it.skip("preExpansionMagnitude: returns ticker-specific expanded cap", async () => undefined);
+  it.skip("post-earnings restore: returns ticker to default cap", async () => undefined);
+  it.skip("earnings-during-half-day edge case", async () => undefined);
+  it.skip("empty calendar: isEarningsTomorrow returns false; no crash", async () => undefined);
 });
 
-// Sanity check: this file should load without errors even pre-merge.
+// Sanity heartbeat — confirms file loads cleanly post-merge.
 describe("scaffolding meta", () => {
-  it("file loads cleanly + chai is importable + skip count is the expected scaffolding total", () => {
-    expect(typeof expect).to.equal("function");
-    // Acts as a heartbeat — confirms the test file itself isn't broken while everything inside is skipped.
+  it("file loads + mock + DEFAULT_FEE_CONFIG importable", () => {
+    expect(DEFAULT_FEE_CONFIG.creatorRebateBps).to.equal(10000);
+    expect(typeof createMockAria).to.equal("function");
   });
 });
