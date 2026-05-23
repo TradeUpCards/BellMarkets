@@ -34,6 +34,10 @@
 
     --bell-yes: 142 71% 45%;
     --bell-no: 0 72% 51%;
+    /* Pending / settling / partial-fill state per DESIGN.md §"Color + theme". */
+    --bell-amber: 38 92% 50%;
+    /* Brand accent — DESIGN.md suggests electric violet; mockup-decision may override. */
+    --bell-accent: 258 90% 66%;
 
     --radius: 0.5rem;
   }
@@ -69,6 +73,8 @@
 
     --bell-yes: 142 71% 45%;
     --bell-no: 0 72% 51%;
+    --bell-amber: 38 92% 50%;
+    --bell-accent: 258 90% 66%;
   }
 }
 

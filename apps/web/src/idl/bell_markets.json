@@ -1,1 +1,1268 @@
-{}
+{
+  "address": "599h7VznYR4CxyrG5nQbhR13qtRuwPcbnNr5QqbkS7uV",
+  "metadata": {
+    "name": "bell_markets",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "BellMarkets — binary outcome contracts on daily MAG7 stock prices, settled on-chain via Pyth at 4PM ET."
+  },
+  "instructions": [
+    {
+      "name": "add_strike",
+      "discriminator": [
+        226,
+        190,
+        94,
+        4,
+        5,
+        106,
+        15,
+        120
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "admin_settle",
+      "discriminator": [
+        138,
+        218,
+        221,
+        118,
+        96,
+        220,
+        75,
+        11
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "strike_market",
+          "writable": true
+        },
+        {
+          "name": "clock",
+          "address": "SysvarC1ock11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "forced_outcome",
+          "type": {
+            "defined": {
+              "name": "Outcome"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "create_strike_market",
+      "discriminator": [
+        21,
+        162,
+        50,
+        119,
+        68,
+        218,
+        221,
+        35
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "strike_market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  114,
+                  105,
+                  107,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "underlying_pyth_feed"
+              },
+              {
+                "kind": "arg",
+                "path": "expiry_unix"
+              },
+              {
+                "kind": "arg",
+                "path": "strike_price"
+              }
+            ]
+          }
+        },
+        {
+          "name": "underlying_pyth_feed",
+          "docs": [
+            "in oracle::parse_pyth_price. At creation we only bind its pubkey into",
+            "the market state."
+          ]
+        },
+        {
+          "name": "yes_mint",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  121,
+                  101,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "strike_market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "no_mint",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  110,
+                  111
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "strike_market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "usdc_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "strike_market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "usdc_mint",
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "phoenix_market",
+          "docs": [
+            "the handler via verify_phoenix_market. Per kickoff §4.12, this must",
+            "remain UncheckedAccount (Phoenix is not an Anchor program; Account<T>",
+            "would fail the discriminator check)."
+          ]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "rent",
+          "address": "SysvarRent111111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "strike_price",
+          "type": "i64"
+        },
+        {
+          "name": "expiry_unix",
+          "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "initialize_config",
+      "discriminator": [
+        208,
+        127,
+        21,
+        1,
+        194,
+        190,
+        196,
+        70
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "usdc_mint"
+        },
+        {
+          "name": "treasury",
+          "docs": [
+            "only stores the pubkey for downstream payout flows."
+          ]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "rent",
+          "address": "SysvarRent111111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "price_staleness_secs",
+          "type": "i64"
+        },
+        {
+          "name": "price_confidence_bps",
+          "type": "u16"
+        },
+        {
+          "name": "admin_override_delay_secs",
+          "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "mint_pair",
+      "discriminator": [
+        19,
+        149,
+        94,
+        110,
+        181,
+        186,
+        33,
+        107
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "strike_market",
+          "writable": true
+        },
+        {
+          "name": "user_usdc",
+          "writable": true
+        },
+        {
+          "name": "usdc_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "strike_market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "yes_mint",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  121,
+                  101,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "strike_market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "no_mint",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  110,
+                  111
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "strike_market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_yes",
+          "writable": true
+        },
+        {
+          "name": "user_no",
+          "writable": true
+        },
+        {
+          "name": "usdc_mint",
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "pause",
+      "discriminator": [
+        211,
+        22,
+        221,
+        251,
+        74,
+        121,
+        193,
+        47
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "paused",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "redeem",
+      "discriminator": [
+        184,
+        12,
+        86,
+        149,
+        70,
+        196,
+        97,
+        225
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "strike_market",
+          "writable": true
+        },
+        {
+          "name": "winning_mint",
+          "docs": [
+            "The mint corresponding to the user's winning side. The handler",
+            "enforces `winning_mint == strike_market.yes_mint` (if outcome == Yes)",
+            "or `== strike_market.no_mint` (if outcome == No)."
+          ],
+          "writable": true
+        },
+        {
+          "name": "user_winning_token",
+          "writable": true
+        },
+        {
+          "name": "usdc_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "strike_market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_usdc",
+          "writable": true
+        },
+        {
+          "name": "usdc_mint",
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "redeem_invalid",
+      "discriminator": [
+        150,
+        181,
+        48,
+        26,
+        6,
+        200,
+        95,
+        141
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "strike_market",
+          "writable": true
+        },
+        {
+          "name": "yes_mint",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  121,
+                  101,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "strike_market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "no_mint",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  110,
+                  111
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "strike_market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_yes",
+          "writable": true
+        },
+        {
+          "name": "user_no",
+          "writable": true
+        },
+        {
+          "name": "usdc_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "strike_market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_usdc",
+          "writable": true
+        },
+        {
+          "name": "usdc_mint",
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "redeem_pair",
+      "discriminator": [
+        157,
+        102,
+        125,
+        192,
+        31,
+        48,
+        165,
+        114
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "strike_market",
+          "writable": true
+        },
+        {
+          "name": "yes_mint",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  121,
+                  101,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "strike_market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "no_mint",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  110,
+                  111
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "strike_market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_yes",
+          "writable": true
+        },
+        {
+          "name": "user_no",
+          "writable": true
+        },
+        {
+          "name": "usdc_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "strike_market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_usdc",
+          "writable": true
+        },
+        {
+          "name": "usdc_mint",
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "settle_market",
+      "discriminator": [
+        193,
+        153,
+        95,
+        216,
+        166,
+        6,
+        144,
+        217
+      ],
+      "accounts": [
+        {
+          "name": "settler",
+          "docs": [
+            "Fee payer. NOT validated against admin — settle is permissionless."
+          ],
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "strike_market",
+          "writable": true
+        },
+        {
+          "name": "underlying_pyth_feed",
+          "docs": [
+            "1. key match against strike_market.underlying_pyth_feed",
+            "2. parse_pyth_price magic/version/atype/status checks"
+          ]
+        },
+        {
+          "name": "clock",
+          "address": "SysvarC1ock11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "MarketConfig",
+      "discriminator": [
+        119,
+        255,
+        200,
+        88,
+        252,
+        82,
+        128,
+        24
+      ]
+    },
+    {
+      "name": "StrikeMarket",
+      "discriminator": [
+        109,
+        109,
+        58,
+        228,
+        193,
+        219,
+        99,
+        7
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "Paused",
+      "msg": "Program is paused; mutating instruction refused."
+    },
+    {
+      "code": 6001,
+      "name": "NotAdmin",
+      "msg": "Caller is not the admin recorded in MarketConfig."
+    },
+    {
+      "code": 6002,
+      "name": "AlreadySettled",
+      "msg": "Market is already settled; second settlement refused."
+    },
+    {
+      "code": 6003,
+      "name": "NotExpired",
+      "msg": "Market is not yet expired; settlement refused."
+    },
+    {
+      "code": 6004,
+      "name": "NotSettled",
+      "msg": "Market is not settled; redeem refused until settlement is final."
+    },
+    {
+      "code": 6005,
+      "name": "PythBadMagic",
+      "msg": "Pyth account magic mismatch; account is not a Pyth price account."
+    },
+    {
+      "code": 6006,
+      "name": "PythBadVersion",
+      "msg": "Pyth account version unsupported by vendored parser."
+    },
+    {
+      "code": 6007,
+      "name": "PythWrongAccountType",
+      "msg": "Pyth account type is not the expected price-account type."
+    },
+    {
+      "code": 6008,
+      "name": "PythNotTrading",
+      "msg": "Pyth price status is not Trading; refusing to settle on a halted feed."
+    },
+    {
+      "code": 6009,
+      "name": "PythStale",
+      "msg": "Pyth publish slot is older than MarketConfig.price_staleness_secs."
+    },
+    {
+      "code": 6010,
+      "name": "PythConfidenceTooWide",
+      "msg": "Pyth confidence interval exceeds MarketConfig.price_confidence_bps."
+    },
+    {
+      "code": 6011,
+      "name": "PythFeedMismatch",
+      "msg": "Pyth feed for this market does not match the strike's underlying_pyth_feed."
+    },
+    {
+      "code": 6012,
+      "name": "PhoenixBadMagic",
+      "msg": "Phoenix market account magic mismatch; refusing CPI to unverified market."
+    },
+    {
+      "code": 6013,
+      "name": "PhoenixAccountTooSmall",
+      "msg": "Phoenix market account is too small to be a valid market header."
+    },
+    {
+      "code": 6014,
+      "name": "InvalidOutcomeForRedeem",
+      "msg": "Outcome cannot be Unsettled at redemption time."
+    },
+    {
+      "code": 6015,
+      "name": "ZeroAmount",
+      "msg": "Burn amount must be > 0."
+    },
+    {
+      "code": 6016,
+      "name": "UsdcMintMismatch",
+      "msg": "USDC mint on Accounts does not match MarketConfig.usdc_mint."
+    },
+    {
+      "code": 6017,
+      "name": "StrikeListFull",
+      "msg": "Strike list is full; cannot add another strike to this market."
+    },
+    {
+      "code": 6018,
+      "name": "StrikeAlreadyExists",
+      "msg": "Strike already exists at this price for this (underlying, expiry)."
+    },
+    {
+      "code": 6019,
+      "name": "AdminOverrideTooEarly",
+      "msg": "Admin override window has not opened yet — wait at least admin_override_delay_secs after expiry."
+    },
+    {
+      "code": 6020,
+      "name": "MathOverflow",
+      "msg": "Math overflow (checked)."
+    },
+    {
+      "code": 6021,
+      "name": "InvalidConfigParam",
+      "msg": "InitializeConfig param out of allowed bounds (see instruction MAX_* constants)."
+    },
+    {
+      "code": 6022,
+      "name": "InvalidStrikePrice",
+      "msg": "Strike price must be > 0."
+    },
+    {
+      "code": 6023,
+      "name": "ExpiryInPast",
+      "msg": "Expiry timestamp is in the past."
+    },
+    {
+      "code": 6024,
+      "name": "ForcedOutcomeUnsettled",
+      "msg": "admin_settle forced_outcome must be Yes / No / Invalid (not Unsettled)."
+    },
+    {
+      "code": 6025,
+      "name": "ConfigMismatch",
+      "msg": "strike_market.config does not match the supplied config account."
+    }
+  ],
+  "types": [
+    {
+      "name": "MarketConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "usdc_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury",
+            "type": "pubkey"
+          },
+          {
+            "name": "price_staleness_secs",
+            "type": "i64"
+          },
+          {
+            "name": "price_confidence_bps",
+            "type": "u16"
+          },
+          {
+            "name": "admin_override_delay_secs",
+            "type": "i64"
+          },
+          {
+            "name": "paused",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "_reserved",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Outcome",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Unsettled"
+          },
+          {
+            "name": "Yes"
+          },
+          {
+            "name": "No"
+          },
+          {
+            "name": "Invalid"
+          }
+        ]
+      }
+    },
+    {
+      "name": "StrikeMarket",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "config",
+            "type": "pubkey"
+          },
+          {
+            "name": "underlying_pyth_feed",
+            "type": "pubkey"
+          },
+          {
+            "name": "strike_price",
+            "type": "i64"
+          },
+          {
+            "name": "expiry_unix",
+            "type": "i64"
+          },
+          {
+            "name": "yes_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "no_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "usdc_vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "phoenix_market",
+            "type": "pubkey"
+          },
+          {
+            "name": "settle_price",
+            "type": "i64"
+          },
+          {
+            "name": "settle_confidence",
+            "type": "u64"
+          },
+          {
+            "name": "settle_slot",
+            "type": "u64"
+          },
+          {
+            "name": "settled_at_unix",
+            "type": "i64"
+          },
+          {
+            "name": "outcome",
+            "type": {
+              "defined": {
+                "name": "Outcome"
+              }
+            }
+          },
+          {
+            "name": "admin_override_eligible_at",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "yes_mint_bump",
+            "type": "u8"
+          },
+          {
+            "name": "no_mint_bump",
+            "type": "u8"
+          },
+          {
+            "name": "vault_bump",
+            "type": "u8"
+          },
+          {
+            "name": "_reserved",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
