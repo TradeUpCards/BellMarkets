@@ -108,3 +108,72 @@ export {
 } from "./earnings-calendar.js";
 export { runEarningsCronOnce } from "./earnings-evolution.js";
 export type { EarningsCronDeps, EarningsCronOutcome, EarningsActionOutcome } from "./earnings-evolution.js";
+
+// DR-010 — win-streak indexer
+export { getSqlClient, setSqlClientForTesting, IndexerDbError } from "./db/client.js";
+export type { SqlClient } from "./db/client.js";
+export * from "./db/types.js";
+export {
+  insertSettleEvent,
+  insertUserMarketHold,
+  applyResultToUserStreak,
+  getUserStreak,
+  topNLeaderboard,
+  insertSnapshot,
+  insertDistribution,
+  getSettleEventByTxSig,
+  getHoldsForSettleEvent,
+} from "./db/queries.js";
+export {
+  determineResult,
+  handleSettleEvent,
+} from "./indexer/settle-event-handler.js";
+export type {
+  TokenHolder,
+  FetchTokenHoldersFn,
+  HandleSettleEventInput,
+  HandleSettleEventDeps,
+  HandleSettleEventResult,
+} from "./indexer/settle-event-handler.js";
+export {
+  hashLeaf,
+  buildLeaderboardMerkleTree,
+  verifyLeafProof,
+} from "./indexer/merkle.js";
+export type { LeaderboardLeaf, LeaderboardMerkleTree } from "./indexer/merkle.js";
+export {
+  isoWeekInfo,
+  isoWeekId,
+  weeklyPeriodStartUtc,
+  weeklyPeriodEndUtc,
+  monthlyPeriodId,
+  monthlyPeriodStartUtc,
+  monthlyPeriodEndUtc,
+  lastFridayOfMonth,
+  isLastTradingFridayOfMonth,
+  periodForDate,
+} from "./indexer/periods.js";
+export type { PeriodInfo } from "./indexer/periods.js";
+export { uploadLeaderboardToArweave, ArweaveError } from "./indexer/arweave.js";
+export type { ArweaveUploadResult, ArweaveDeps } from "./indexer/arweave.js";
+export {
+  DEFAULT_DISTRIBUTION_BPS,
+  runDistributeForPeriod,
+  applyDeterministicTiebreaker,
+} from "./indexer/distribute.js";
+export type {
+  DistributeForPeriodDeps,
+  DistributeOutcome,
+  CommitLeaderboardRootFn,
+  CommitLeaderboardRootInput,
+  CommitLeaderboardRootResult,
+  DistributeRewardsFn,
+  DistributeRewardsInput,
+  DistributeRewardsResult,
+  ReadPoolBalanceFn,
+} from "./indexer/distribute.js";
+export {
+  parseHeliusSettleWebhook,
+  SETTLE_MARKET_DISCRIMINATOR_BASE58,
+} from "./indexer/helius-webhook.js";
+export type { HeliusEnhancedTx, ParsedSettleEvent } from "./indexer/helius-webhook.js";
