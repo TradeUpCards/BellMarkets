@@ -20,7 +20,8 @@ import { expect } from "chai";
 import { createHash } from "node:crypto";
 import {
   createMockAria, ONE_USDC, OUTCOME_INVALID, OUTCOME_YES,
-  DEFAULT_FEE_CONFIG, type Pubkey, type MockState, type AriaProgram,
+  DEFAULT_FEE_CONFIG, mockMerkleLeaf, mockMerkleVerifyProof,
+  type Pubkey, type MockState, type AriaProgram,
 } from "../integration/mocks/aria-interface";
 
 const ADMIN  = "admin-pubkey";
@@ -191,6 +192,39 @@ describe("DR-008 — mint_pair fee math", () => {
     expect(delta).to.equal((100n * ONE_USDC * 100n) / 10_000n);
   });
 
+  it("tier boundary: at exactly $10000 - 1 micro-USDC, NEXT mint pays 150 (tier 2), not 100 (tier 3)", async () => {
+    // Sonnet audit asked for an exact-$10K boundary test. This proves the breakpoint
+    // is `< 10_000 * ONE_USDC` (strict-less), not `<= 10_000 * ONE_USDC` (would map
+    // exactly-$10K to tier 2 instead of tier 3).
+    const { program, marketId } = await setupWithFeeActive();
+    await program.mintPair({ user: USER, marketId, amount: 10_000n * ONE_USDC - 1n });
+    const before = await program.fetchPoolBalances();
+    const beforeTotal = before.feeCollector + before.weekly + before.monthly;
+    // At mintVolume30d = 9_999_999_999, next mint is still tier 2 (150 bps)
+    await program.mintPair({ user: USER, marketId, amount: 100n * ONE_USDC });
+    const after = await program.fetchPoolBalances();
+    const delta = (after.feeCollector + after.weekly + after.monthly) - beforeTotal;
+    expect(delta).to.equal((100n * ONE_USDC * 150n) / 10_000n);
+  });
+
+  it("tier scaling with promo mode: mint_fee_bps=100 → tier 1 pays 100 bps, not 200 (sonnet-audit-3)", async () => {
+    // Verifies the fix for Sonnet audit P0: previously mock used raw tier_bps
+    // regardless of mint_fee_bps, which only matched Rust at canonical mint_fee_bps=200.
+    // With mint_fee_bps=100 (promo mode), effective tier should HALVE.
+    const { program, state } = await setupWithTickerConfig();
+    await program.initializeFeeConfig({
+      admin: ADMIN, mintFeeBps: 100,         // PROMO: half normal fee
+    });
+    const res = await program.userCreateStrikeMarket({
+      user: ADMIN, underlyingPythFeed: PYTH, strikePrice: 200_000_000n,
+      expiryUnix: state.blockTime + 60n, phoenixMarket: PHOENIX,
+    });
+    await program.mintPair({ user: USER, marketId: res.marketId, amount: 100n * ONE_USDC });
+    const pools = await program.fetchPoolBalances();
+    // Tier 1 raw = 200; scaled by mint_fee_bps/200 = 100/200 = 0.5 → effective = 100 bps
+    expect(pools.feeCollector + pools.weekly + pools.monthly).to.equal((100n * ONE_USDC * 100n) / 10_000n);
+  });
+
   it("creator rebate: creator==user && Unsettled → effective fee is 0 (default 100% rebate)", async () => {
     const { program, marketId } = await setupWithFeeActive();
     // Market was created by ADMIN above. Now ADMIN mints → creator rebate fires.
@@ -300,6 +334,24 @@ describe("DR-005 — force_redeem", () => {
       expect((e as Error).message).to.match(/NotAdmin/);
     }
   });
+
+  it("BOUNDARY: rejects at exactly settled_at + grace_secs (Rust uses strict > per sonnet-audit-3)", async () => {
+    const { program, state, marketId } = await setupSettled();
+    const grace = DEFAULT_FEE_CONFIG.forceRedeemGraceSecs;
+    // Time-travel to EXACTLY settled_at + grace. Rust: rejects (now > settled_at + grace).
+    // Previous mock used `<` allowing this through; fix makes it `<=` rejecting.
+    const market = await program.fetchStrikeMarket(marketId);
+    state.blockTime = market.settledAtUnix + grace;
+    try {
+      await program.forceRedeem({ admin: ADMIN, marketId, user: USER, amount: ONE_USDC });
+      expect.fail("expected ForceRedeemTooEarly at exactly settledAt + grace");
+    } catch (e) {
+      expect((e as Error).message).to.match(/ForceRedeemTooEarly/);
+    }
+    // Advance ONE more second → should now succeed.
+    state.blockTime += 1n;
+    await program.forceRedeem({ admin: ADMIN, marketId, user: USER, amount: ONE_USDC });   // no throw
+  });
 });
 
 // ─── DR-005 — close_settled_market (rent recovery) ───────────────────────
@@ -372,16 +424,36 @@ describe("DR-010 — commit_leaderboard_root + distribute_*_rewards (Merkle-veri
     return { program, state };
   }
 
-  /** Build a one-leaf Merkle tree (single-recipient). Root = leaf hash; proof = []. */
-  function singleLeafProof(recipient: Pubkey, position: number, amount: bigint): { root: Uint8Array; proof: Uint8Array[] } {
-    const leafStr = `${recipient}:${position}:${amount.toString()}`;
-    const root = new Uint8Array(createHash("sha256").update(leafStr).digest());
-    return { root, proof: [] };
+  /** Build a one-leaf Merkle tree (single-recipient). Root = leaf hash; proof = [].
+   *  Uses mockMerkleLeaf so the format matches what distributeRewardsImpl verifies against. */
+  function singleLeafProof(
+    recipient: Pubkey, position: number, periodId: bigint, periodType: 0 | 1, amount: bigint,
+  ): { root: Uint8Array; proof: Uint8Array[] } {
+    return { root: mockMerkleLeaf(recipient, position, periodId, periodType, amount), proof: [] };
+  }
+
+  /** Build a 2-leaf tree. Returns root + proof for `target` (the leaf at index `targetIdx`).
+   *  Exercises the proof-walking loop in distributeRewardsImpl (single-leaf test leaves it dead). */
+  function twoLeafProof(
+    leaves: Array<{ recipient: Pubkey; position: number; periodId: bigint; periodType: 0 | 1; amount: bigint }>,
+    targetIdx: 0 | 1,
+  ): { root: Uint8Array; proof: Uint8Array[] } {
+    const hashes = leaves.map((l) => mockMerkleLeaf(l.recipient, l.position, l.periodId, l.periodType, l.amount));
+    // Sorted-pair concat at the only internal node
+    const [a, b] = (() => {
+      let cmp = 0;
+      for (let i = 0; i < 32; i++) { if (hashes[0][i] !== hashes[1][i]) { cmp = hashes[0][i] - hashes[1][i]; break; } }
+      return cmp < 0 ? [hashes[0], hashes[1]] : [hashes[1], hashes[0]];
+    })();
+    const concat = new Uint8Array(64); concat.set(a, 0); concat.set(b, 32);
+    const root = new Uint8Array(createHash("sha256").update(concat).digest());
+    const proof = [hashes[targetIdx === 0 ? 1 : 0]];        // sibling is the OTHER leaf
+    return { root, proof };
   }
 
   it("commit_leaderboard_root: rejects non-admin (NotAdmin)", async () => {
     const { program } = await setupWithPoolFunds();
-    const { root } = singleLeafProof(USER, 0, 100n);
+    const { root } = singleLeafProof(USER, 1, 1n, 0, 100n);
     try {
       await program.commitLeaderboardRoot({
         admin: USER, periodId: 1n, periodType: 0,
@@ -395,7 +467,7 @@ describe("DR-010 — commit_leaderboard_root + distribute_*_rewards (Merkle-veri
 
   it("commit_leaderboard_root: stores commitment in LeaderboardCommitments PDA", async () => {
     const { program, state } = await setupWithPoolFunds();
-    const { root } = singleLeafProof(USER, 0, 100n);
+    const { root } = singleLeafProof(USER, 1, 42n, 0, 100n);
     await program.commitLeaderboardRoot({
       admin: ADMIN, periodId: 42n, periodType: 0,
       merkleRoot: root, arweaveTxId: new Uint8Array(48),
@@ -409,14 +481,13 @@ describe("DR-010 — commit_leaderboard_root + distribute_*_rewards (Merkle-veri
 
   it("distribute_weekly_rewards: rejects when merkle_proof doesn't verify against committed root", async () => {
     const { program } = await setupWithPoolFunds();
-    const { root } = singleLeafProof(USER, 0, 100n);
+    const { root } = singleLeafProof(USER, 1, 1n, 0, 100n);
     await program.commitLeaderboardRoot({
       admin: ADMIN, periodId: 1n, periodType: 0, merkleRoot: root, arweaveTxId: new Uint8Array(48),
     });
-    // Try to distribute to a DIFFERENT recipient — proof for original recipient should not match.
     try {
       await program.distributeWeeklyRewards({
-        admin: ADMIN, periodId: 1n, recipient: USER2, position: 0, amount: 100n, merkleProof: [],
+        admin: ADMIN, periodId: 1n, recipient: USER2, position: 1, amount: 100n, merkleProof: [],
       });
       expect.fail("expected InvalidProof");
     } catch (e) {
@@ -427,30 +498,30 @@ describe("DR-010 — commit_leaderboard_root + distribute_*_rewards (Merkle-veri
   it("distribute_weekly_rewards: succeeds with valid proof; transfers from weekly pool", async () => {
     const { program, state } = await setupWithPoolFunds();
     const distAmount = 10n * ONE_USDC;
-    const { root, proof } = singleLeafProof(USER, 0, distAmount);
+    const { root, proof } = singleLeafProof(USER, 1, 1n, 0, distAmount);
     await program.commitLeaderboardRoot({
       admin: ADMIN, periodId: 1n, periodType: 0, merkleRoot: root, arweaveTxId: new Uint8Array(48),
     });
     const before = state.weeklyPool;
-    expect(before > distAmount).to.equal(true);  // pool has enough (chai BigInt)
+    expect(before > distAmount).to.equal(true);
     await program.distributeWeeklyRewards({
-      admin: ADMIN, periodId: 1n, recipient: USER, position: 0, amount: distAmount, merkleProof: proof,
+      admin: ADMIN, periodId: 1n, recipient: USER, position: 1, amount: distAmount, merkleProof: proof,
     });
     expect(state.weeklyPool).to.equal(before - distAmount);
   });
 
   it("distribute_weekly_rewards: rejects re-distribution to same recipient/position (AlreadyClaimed)", async () => {
     const { program } = await setupWithPoolFunds();
-    const { root, proof } = singleLeafProof(USER, 0, 10n * ONE_USDC);
+    const { root, proof } = singleLeafProof(USER, 1, 1n, 0, 10n * ONE_USDC);
     await program.commitLeaderboardRoot({
       admin: ADMIN, periodId: 1n, periodType: 0, merkleRoot: root, arweaveTxId: new Uint8Array(48),
     });
     await program.distributeWeeklyRewards({
-      admin: ADMIN, periodId: 1n, recipient: USER, position: 0, amount: 10n * ONE_USDC, merkleProof: proof,
+      admin: ADMIN, periodId: 1n, recipient: USER, position: 1, amount: 10n * ONE_USDC, merkleProof: proof,
     });
     try {
       await program.distributeWeeklyRewards({
-        admin: ADMIN, periodId: 1n, recipient: USER, position: 0, amount: 10n * ONE_USDC, merkleProof: proof,
+        admin: ADMIN, periodId: 1n, recipient: USER, position: 1, amount: 10n * ONE_USDC, merkleProof: proof,
       });
       expect.fail("expected AlreadyClaimed");
     } catch (e) {
@@ -461,17 +532,101 @@ describe("DR-010 — commit_leaderboard_root + distribute_*_rewards (Merkle-veri
   it("distribute_monthly_rewards: same shape as weekly but operates on monthly pool", async () => {
     const { program, state } = await setupWithPoolFunds();
     const distAmount = 10n * ONE_USDC;
-    const { root, proof } = singleLeafProof(USER, 0, distAmount);
+    const { root, proof } = singleLeafProof(USER, 1, 1n, 1, distAmount);
     await program.commitLeaderboardRoot({
       admin: ADMIN, periodId: 1n, periodType: 1, merkleRoot: root, arweaveTxId: new Uint8Array(48),
     });
     const beforeWeekly = state.weeklyPool;
     const beforeMonthly = state.monthlyPool;
     await program.distributeMonthlyRewards({
-      admin: ADMIN, periodId: 1n, recipient: USER, position: 0, amount: distAmount, merkleProof: proof,
+      admin: ADMIN, periodId: 1n, recipient: USER, position: 1, amount: distAmount, merkleProof: proof,
     });
-    expect(state.weeklyPool).to.equal(beforeWeekly);          // weekly unchanged
-    expect(state.monthlyPool).to.equal(beforeMonthly - distAmount);  // monthly drained
+    expect(state.weeklyPool).to.equal(beforeWeekly);
+    expect(state.monthlyPool).to.equal(beforeMonthly - distAmount);
+  });
+
+  // ─── New post-audit tests ─────────────────────────────────────────────
+
+  it("rejects position=0 with InvalidDistributionPosition (1..10) — matches Rust is_valid_position", async () => {
+    const { program } = await setupWithPoolFunds();
+    const { root, proof } = singleLeafProof(USER, 0, 1n, 0, 10n * ONE_USDC);
+    await program.commitLeaderboardRoot({
+      admin: ADMIN, periodId: 1n, periodType: 0, merkleRoot: root, arweaveTxId: new Uint8Array(48),
+    });
+    try {
+      await program.distributeWeeklyRewards({
+        admin: ADMIN, periodId: 1n, recipient: USER, position: 0, amount: 10n * ONE_USDC, merkleProof: proof,
+      });
+      expect.fail("expected InvalidDistributionPosition");
+    } catch (e) {
+      expect((e as Error).message).to.match(/InvalidDistributionPosition/);
+    }
+  });
+
+  it("MULTI-LEAF MERKLE: 2-leaf tree, valid proof for second leaf walks correctly", async () => {
+    const { program, state } = await setupWithPoolFunds();
+    const distAmount = 5n * ONE_USDC;
+    const leaves = [
+      { recipient: USER,  position: 1, periodId: 7n, periodType: 0 as const, amount: distAmount },
+      { recipient: USER2, position: 2, periodId: 7n, periodType: 0 as const, amount: distAmount },
+    ];
+    const { root, proof } = twoLeafProof(leaves, 1);
+    await program.commitLeaderboardRoot({
+      admin: ADMIN, periodId: 7n, periodType: 0, merkleRoot: root, arweaveTxId: new Uint8Array(48),
+    });
+    const beforePool = state.weeklyPool;
+    await program.distributeWeeklyRewards({
+      admin: ADMIN, periodId: 7n, recipient: USER2, position: 2, amount: distAmount, merkleProof: proof,
+    });
+    expect(state.weeklyPool).to.equal(beforePool - distAmount);
+  });
+
+  it("MULTI-LEAF MERKLE: tampered amount with otherwise-valid proof rejects (InvalidProof)", async () => {
+    const { program } = await setupWithPoolFunds();
+    const distAmount = 5n * ONE_USDC;
+    const leaves = [
+      { recipient: USER,  position: 1, periodId: 8n, periodType: 0 as const, amount: distAmount },
+      { recipient: USER2, position: 2, periodId: 8n, periodType: 0 as const, amount: distAmount },
+    ];
+    const { root, proof } = twoLeafProof(leaves, 0);
+    await program.commitLeaderboardRoot({
+      admin: ADMIN, periodId: 8n, periodType: 0, merkleRoot: root, arweaveTxId: new Uint8Array(48),
+    });
+    try {
+      // Pass amount=10 USDC but proof was built for amount=5 USDC
+      await program.distributeWeeklyRewards({
+        admin: ADMIN, periodId: 8n, recipient: USER, position: 1, amount: 10n * ONE_USDC, merkleProof: proof,
+      });
+      expect.fail("expected InvalidProof for tampered amount");
+    } catch (e) {
+      expect((e as Error).message).to.match(/InvalidProof/);
+    }
+  });
+
+  it("period_id isolation: proof valid for periodId=1 does NOT verify against periodId=2's root", async () => {
+    // Sonnet audit caught the original mock omitted period_id from the leaf, so
+    // the same recipient/position/amount accepted across all periods. Fix verified.
+    const { program } = await setupWithPoolFunds();
+    const distAmount = 5n * ONE_USDC;
+    const { root: rootP1 } = singleLeafProof(USER, 1, 1n, 0, distAmount);
+    // Commit DIFFERENT root for period 2
+    const { root: rootP2, proof } = singleLeafProof(USER, 1, 2n, 0, distAmount);
+    await program.commitLeaderboardRoot({
+      admin: ADMIN, periodId: 1n, periodType: 0, merkleRoot: rootP1, arweaveTxId: new Uint8Array(48),
+    });
+    await program.commitLeaderboardRoot({
+      admin: ADMIN, periodId: 2n, periodType: 0, merkleRoot: rootP2, arweaveTxId: new Uint8Array(48),
+    });
+    // Proof for period 2 should ONLY verify in period 2, not period 1.
+    // (Pre-fix: same leaf hash would have verified against any period's root.)
+    try {
+      await program.distributeWeeklyRewards({
+        admin: ADMIN, periodId: 1n, recipient: USER, position: 1, amount: distAmount, merkleProof: proof,
+      });
+      expect.fail("expected InvalidProof (proof was for period 2)");
+    } catch (e) {
+      expect((e as Error).message).to.match(/InvalidProof/);
+    }
   });
 });
 

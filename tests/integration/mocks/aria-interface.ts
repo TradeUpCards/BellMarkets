@@ -401,7 +401,12 @@ function distributeRewardsImpl(
   if (state.config.admin !== args.admin) throw new Error("distributeRewards: NotAdmin");
   if (!state.feeConfig) throw new Error("distributeRewards: FeeConfigNotInitialized");
   if (args.amount === 0n) throw new Error("distributeRewards: ZeroAmount");
-  if (args.position > 9) throw new Error("distributeRewards: InvalidPosition (0..9)");
+  // Position is 1-indexed per Rust `is_valid_position` (>= 1, <= 10). Sonnet
+  // audit 2026-05-23 caught the missing lower bound; mock previously accepted
+  // position=0 which the on-chain handler would revert with InvalidDistributionPosition.
+  if (args.position < 1 || args.position > 10) {
+    throw new Error("distributeRewards: InvalidDistributionPosition (1..10)");
+  }
 
   const key = `${periodType}:${args.periodId}`;
   const commitment = state.leaderboardCommitments.get(key);
@@ -415,11 +420,14 @@ function distributeRewardsImpl(
     throw new Error(`distributeRewards: AlreadyClaimed`);
   }
 
-  // Merkle proof verification (mock — recompute and compare).
-  // Leaf format mirrors what Bram's indexer would build:
-  //   leaf = sha256( recipient_pubkey_str || ":" || position || ":" || amount )
-  // Then walk proof up: at each step, hash(min(cur, sib) || max(cur, sib)) for sorted-pair.
-  const computed = mockMerkleVerify(args.recipient, args.position, args.amount, args.merkleProof, commitment.merkleRoot);
+  // Merkle proof verification (mock).
+  // Leaf format mirrors Aria's `merkle.rs::compute_leaf` field set (recipient,
+  // position, period_id, period_type, amount). String encoding instead of
+  // Aria's binary [u8;50] — see mockMerkleLeaf docstring for the why.
+  const computed = mockMerkleVerify(
+    args.recipient, args.position, args.periodId, periodType, args.amount,
+    args.merkleProof, commitment.merkleRoot,
+  );
   if (!computed) {
     throw new Error("distributeRewards: InvalidProof");
   }
@@ -440,17 +448,39 @@ function distributeRewardsImpl(
 }
 
 /**
- * Mock Merkle verifier — Node-side hand-rolled sha256-tree using crypto.subtle.
- * Returns true if the supplied proof walks the leaf to the committed root.
+ * Mock Merkle leaf computation. Matches Aria's `merkle.rs::compute_leaf`
+ * structurally (includes ALL 5 fields: recipient, position, period_id,
+ * period_type, amount) but uses a string encoding instead of binary.
  *
- * Synchronous deterministic hash via `node:crypto`. Sorted-pair concatenation:
- * at each step, hash(min(a,b) || max(a,b)). This matches Aria's on-chain
- * `merkle.rs` verifier per DR-010 Option B.
+ * Why string vs Aria's binary [u8;50]: mock recipient is a JS string label
+ * (e.g., "alice-pubkey") not a real base58 Pubkey, so binary `recipient.as_ref()`
+ * has no equivalent. The mock is SELF-CONSISTENT (both leaf-builder + verifier
+ * use this same format) — tests catch any field-tampering bug. Cannot verify
+ * real on-chain proofs from Bram's indexer; that's a deferred concern when we
+ * want to integration-test against the indexer's output specifically.
+ *
+ * Critical fix (Sonnet audit 2026-05-23): earlier version omitted period_id +
+ * period_type from the leaf, causing tests to pass for the wrong reason
+ * (same leaf accepted across periods).
  */
-function mockMerkleVerify(
+export function mockMerkleLeaf(
   recipient: Pubkey,
   position: number,
+  periodId: bigint,
+  periodType: 0 | 1,
   amount: UsdcMicros,
+): Uint8Array {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { createHash } = require("node:crypto") as typeof import("node:crypto");
+  const leafStr = `${recipient}:${position}:${periodId.toString()}:${periodType}:${amount.toString()}`;
+  return new Uint8Array(createHash("sha256").update(leafStr).digest());
+}
+
+/** Walks a proof from leaf to root using sorted-pair sha256 (matches OpenZeppelin
+ *  + Aria's `verify_merkle_proof`). Sibling at each level is concat'd with the
+ *  lexicographically-smaller half first. */
+export function mockMerkleVerifyProof(
+  leaf: Uint8Array,
   proof: Uint8Array[],
   expectedRoot: Uint8Array,
 ): boolean {
@@ -458,8 +488,7 @@ function mockMerkleVerify(
   const { createHash } = require("node:crypto") as typeof import("node:crypto");
   const sha256 = (b: Uint8Array): Uint8Array => new Uint8Array(createHash("sha256").update(b).digest());
 
-  const leafStr = `${recipient}:${position}:${amount.toString()}`;
-  let cur = sha256(new TextEncoder().encode(leafStr));
+  let cur = leaf;
   for (const sib of proof) {
     const [a, b] = compareBytes(cur, sib) < 0 ? [cur, sib] : [sib, cur];
     const concat = new Uint8Array(a.length + b.length);
@@ -468,6 +497,20 @@ function mockMerkleVerify(
     cur = sha256(concat);
   }
   return compareBytes(cur, expectedRoot) === 0;
+}
+
+/** Convenience for the distribute path — leaf-computes + walks proof. */
+function mockMerkleVerify(
+  recipient: Pubkey,
+  position: number,
+  periodId: bigint,
+  periodType: 0 | 1,
+  amount: UsdcMicros,
+  proof: Uint8Array[],
+  expectedRoot: Uint8Array,
+): boolean {
+  const leaf = mockMerkleLeaf(recipient, position, periodId, periodType, amount);
+  return mockMerkleVerifyProof(leaf, proof, expectedRoot);
 }
 
 function compareBytes(a: Uint8Array, b: Uint8Array): number {
@@ -648,11 +691,16 @@ export function createMockAria(opts: MockOptions = {}): { program: AriaProgram; 
 
       // DR-008 fee math. When FeeConfig.mintFeeBps == 0 (default), no fee — preserves
       // Day-1..4 behavior for tests that don't initialize FeeConfig.
+      //
+      // Tier scaling (Sonnet audit 2026-05-23 fix): Rust handler scales the raw
+      // tier bps by `mint_fee_bps / 200` so that promo modes (mint_fee_bps != 200)
+      // proportionally adjust the tier discount too. e.g., mint_fee_bps=100 →
+      // tier1 effective is 100 bps (not 200). Earlier mock used raw tier_bps which
+      // matched only the canonical 200-bps config.
       let fee = 0n;
       let creatorRebateFires = false;
       if (state.feeConfig && state.feeConfig.mintFeeBps > 0) {
         const fc = state.feeConfig;
-        // Tier discount: per DR-008. Tier breakpoints in micro-USDC.
         const userCfg = state.userConfigs.get(args.user) ?? {
           user: args.user, mintVolume30d: 0n, bump: 254,
         };
@@ -661,12 +709,15 @@ export function createMockAria(opts: MockOptions = {}): { program: AriaProgram; 
         else if (userCfg.mintVolume30d < 10_000n * ONE_USDC)  tierBps = 150;
         else                                                  tierBps = 100;
 
+        // Scale tier by mint_fee_bps (matches Rust effective_bps formula).
+        const scaledTierBps = Math.floor((tierBps * fc.mintFeeBps) / 200);
+
         // Creator rebate (DR-008): if signer == strikeMarket.creator AND market is Unsettled.
         const isCreator = m.creator === args.user;
         creatorRebateFires = isCreator && outcomeKind(m.outcome) === "unsettled";
-        let effectiveBps = tierBps;
+        let effectiveBps = scaledTierBps;
         if (creatorRebateFires) {
-          effectiveBps = Math.floor((tierBps * (10000 - fc.creatorRebateBps)) / 10000);
+          effectiveBps = Math.floor((scaledTierBps * (10000 - fc.creatorRebateBps)) / 10000);
         }
         fee = (args.amount * BigInt(effectiveBps)) / 10_000n;
 
@@ -871,8 +922,12 @@ export function createMockAria(opts: MockOptions = {}): { program: AriaProgram; 
 
       const grace = state.feeConfig?.forceRedeemGraceSecs ?? DEFAULT_FEE_CONFIG.forceRedeemGraceSecs;
       const eligibleAt = m.settledAtUnix + grace;
-      if (state.blockTime < eligibleAt) {
-        throw new Error(`forceRedeem: ForceRedeemTooEarly (eligible at ${eligibleAt}, now ${state.blockTime})`);
+      // Sonnet audit 2026-05-23: Rust uses `require!(now > settled_at + grace)`
+      // (strict-greater). Earlier mock used `<` which allowed `blockTime == eligibleAt`
+      // through. Off-by-one at the boundary. Fixed to `<=` so eligibleAt itself
+      // is the LAST rejected timestamp; valid range is blockTime > eligibleAt.
+      if (state.blockTime <= eligibleAt) {
+        throw new Error(`forceRedeem: ForceRedeemTooEarly (eligible at ${eligibleAt + 1n}, now ${state.blockTime})`);
       }
 
       const key = posKey(args.marketId, args.user);
