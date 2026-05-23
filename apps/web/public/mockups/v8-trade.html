@@ -701,11 +701,9 @@
     animation: pulse 1.5s ease-in-out infinite;
   }
 
-  /* ===== RIGHT COL ===== */
+  /* ===== RIGHT COL — natural height, no internal scroll (Cory feedback) ===== */
   .right-col {
     display: flex; flex-direction: column; gap: 12px;
-    position: sticky; top: 0; align-self: start;
-    max-height: calc(100vh - 90px); overflow-y: auto;
   }
 
   /* Trade panel */
@@ -943,6 +941,40 @@
   }
   .ob-both-col:first-child .ob-both-h { color: var(--yes); }
   .ob-both-col:nth-child(2) .ob-both-h { color: var(--no); }
+  .ob-both-h {
+    justify-content: space-between;
+  }
+  .ob-both-h-meta {
+    color: var(--text-muted);
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+  /* Explanation banner at top of BOTH view */
+  .ob-both-explain {
+    background: rgba(34, 211, 238, 0.06);
+    border-bottom: 1px solid rgba(34, 211, 238, 0.20);
+    padding: 8px 14px;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 10px;
+    color: var(--text-muted);
+    line-height: 1.45;
+  }
+  /* "Asks (selling YES)" / "Bids (buying YES)" section dividers */
+  .ob-section-label {
+    background: var(--panel-2);
+    padding: 4px 14px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+  .ob-section-label.asks { color: var(--no); }
+  .ob-section-label.bids { color: var(--yes); }
 
   /* Recent trades */
   .trades-card {
@@ -2560,20 +2592,25 @@
             <div class="ob-row bid"><div class="depth-bar" style="width: 10%"></div><span class="price">0.485</span><span class="size">270</span><span class="total">2,100</span></div>
           </div>
 
-          <!-- BOTH VIEW — vertically stacked (Cory: "on top of each other like a normal order book view") -->
+          <!-- BOTH VIEW — vertically stacked YES + NO books with explanation -->
           <div class="ob-both" hidden>
+            <div class="ob-both-explain">
+              YES + NO are separate tradeable contracts (each with own bids/asks).
+              Prices sum to ~$1 (binary payoff). Watch for gaps = arbitrage.
+            </div>
             <!-- YES book -->
             <div class="ob-both-col">
-              <div class="ob-both-h">YES</div>
+              <div class="ob-both-h">
+                <span>YES</span>
+                <span class="ob-both-h-meta mono">last $0.520 · spread 7.7%</span>
+              </div>
               <div class="ob-rows-h"><div>price</div><div>size</div><div>total</div></div>
+              <div class="ob-section-label asks">— Asks (selling YES) —</div>
               <div class="ob-row ask"><div class="depth-bar" style="width: 18%"></div><span class="price">0.555</span><span class="size">490</span><span class="total">1,964</span></div>
               <div class="ob-row ask"><div class="depth-bar" style="width: 14%"></div><span class="price">0.550</span><span class="size">375</span><span class="total">1,474</span></div>
               <div class="ob-row ask"><div class="depth-bar" style="width: 26%"></div><span class="price">0.545</span><span class="size">722</span><span class="total">1,099</span></div>
               <div class="ob-row ask"><div class="depth-bar" style="width: 12%"></div><span class="price">0.540</span><span class="size">377</span><span class="total">377</span></div>
-              <div class="ob-spread">
-                <span class="last mono">$0.520 ↑</span>
-                <span class="spread mono">spread 0.040 · 7.7%</span>
-              </div>
+              <div class="ob-section-label bids">— Bids (buying YES) —</div>
               <div class="ob-row bid"><div class="depth-bar" style="width: 20%"></div><span class="price">0.500</span><span class="size">560</span><span class="total">560</span></div>
               <div class="ob-row bid"><div class="depth-bar" style="width: 16%"></div><span class="price">0.495</span><span class="size">440</span><span class="total">1,000</span></div>
               <div class="ob-row bid"><div class="depth-bar" style="width: 30%"></div><span class="price">0.490</span><span class="size">830</span><span class="total">1,830</span></div>
@@ -2581,16 +2618,17 @@
             </div>
             <!-- NO book -->
             <div class="ob-both-col">
-              <div class="ob-both-h">NO</div>
+              <div class="ob-both-h">
+                <span>NO</span>
+                <span class="ob-both-h-meta mono">last $0.480 · spread 8.3%</span>
+              </div>
               <div class="ob-rows-h"><div>price</div><div>size</div><div>total</div></div>
+              <div class="ob-section-label asks">— Asks (selling NO) —</div>
               <div class="ob-row ask"><div class="depth-bar" style="width: 20%"></div><span class="price">0.515</span><span class="size">560</span><span class="total">2,100</span></div>
               <div class="ob-row ask"><div class="depth-bar" style="width: 16%"></div><span class="price">0.510</span><span class="size">440</span><span class="total">1,540</span></div>
               <div class="ob-row ask"><div class="depth-bar" style="width: 30%"></div><span class="price">0.505</span><span class="size">830</span><span class="total">1,100</span></div>
               <div class="ob-row ask"><div class="depth-bar" style="width: 10%"></div><span class="price">0.500</span><span class="size">270</span><span class="total">270</span></div>
-              <div class="ob-spread">
-                <span class="last mono">$0.480 ↓</span>
-                <span class="spread mono">spread 0.040 · 8.3%</span>
-              </div>
+              <div class="ob-section-label bids">— Bids (buying NO) —</div>
               <div class="ob-row bid"><div class="depth-bar" style="width: 18%"></div><span class="price">0.460</span><span class="size">490</span><span class="total">490</span></div>
               <div class="ob-row bid"><div class="depth-bar" style="width: 14%"></div><span class="price">0.455</span><span class="size">375</span><span class="total">865</span></div>
               <div class="ob-row bid"><div class="depth-bar" style="width: 26%"></div><span class="price">0.450</span><span class="size">722</span><span class="total">1,587</span></div>
