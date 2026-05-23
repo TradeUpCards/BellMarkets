@@ -995,6 +995,28 @@
   ::-webkit-scrollbar-thumb { background: var(--panel-3); border-radius: 4px; border: 1px solid var(--bg); }
   ::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
 
+  /* Go Pro button — distinct from connect-btn (cyan/pink gradient pill) */
+  .go-pro-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: linear-gradient(135deg, rgba(34, 211, 238, 0.18), rgba(244, 114, 182, 0.14));
+    border: 1px solid rgba(34, 211, 238, 0.50);
+    color: var(--accent);
+    padding: 8px 14px;
+    border-radius: 6px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px; font-weight: 700;
+    letter-spacing: 0.8px; text-transform: uppercase;
+    text-decoration: none;
+    min-height: 40px;
+    transition: all 150ms;
+  }
+  .go-pro-btn:hover {
+    border-color: var(--accent);
+    background: linear-gradient(135deg, rgba(34, 211, 238, 0.30), rgba(244, 114, 182, 0.22));
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(34, 211, 238, 0.25);
+  }
+
   /* Watch button — compact icon, sits inline with chart controls */
   .chart-watch-btn {
     width: 30px; height: 30px;
@@ -1182,6 +1204,16 @@
     padding: 0;
     margin-left: 0;
   }
+  /* Strike pill INLINE variant — single-line compact (Cory feedback: market header too tall) */
+  .strike-pills-inline .strike-pill {
+    flex-direction: row;
+    gap: 5px;
+    padding: 4px 8px;
+    min-width: auto;
+    min-height: 28px;
+  }
+  .strike-pills-inline .strike-pill .px { font-size: 10px; }
+  .strike-pills-inline .strike-pill .prob { font-size: 11px; }
   .strike-pills-inline::-webkit-scrollbar { height: 0; }
   .strike-pills-inline .strike-pill { flex-shrink: 0; }
   /* Strike dropdown — only shown on small screens (replaces inline pills) */
@@ -1772,6 +1804,10 @@
       </button>
       <button class="icon-btn" aria-label="Notifications" title="Notifications">🔔</button>
       <button class="icon-btn" onclick="toggleTheme()" aria-label="Toggle theme" title="Toggle theme">◐</button>
+      <a href="#pro" class="go-pro-btn" title="Bell Pro · AI briefings + analytics">
+        <span aria-hidden="true">✦</span>
+        <span>Go Pro</span>
+      </a>
       <button class="connect-btn">
         <span style="font-size: 14px;" aria-hidden="true">⬢</span>
         <span>4aPZ…G2iy</span>
@@ -1813,14 +1849,7 @@
       <option>$720 · 14% YES</option>
       <option>$740 · 6% YES</option>
     </select>
-    <!-- Pro CTA card — TALL vertical card in top-right of market header (Cory feedback: not left rail, not skinny bar) -->
-    <a href="#pro" class="pro-rail-card pro-header-card" id="pro">
-      <span class="pro-header-glow" aria-hidden="true"></span>
-      <span class="pro-rail-badge"><span aria-hidden="true">✦</span> BELL PRO</span>
-      <div class="pro-rail-title">Today's META briefing</div>
-      <div class="pro-rail-sub">AI analysis · earnings · sector beta · 5d momentum on all 7 MAG7 tickers.</div>
-      <button class="pro-rail-cta">UNLOCK · 9 USDC/mo →</button>
-    </a>
+    <!-- Pro CTA moved to main nav bar (Cory feedback: market header too tall) -->
   </div>
 </div>
 
