@@ -124,5 +124,12 @@ pub fn handler(ctx: Context<Redeem>, amount: u64) -> Result<()> {
         amount,
     )?;
 
+    // P2 / DR-008: decrement pairs_outstanding so close_settled_market (P4)
+    // can gate on `== 0`. saturating_sub guards the 7 pre-DR-008 META markets
+    // which started with the counter at 0; those pre-counter mints are
+    // best-effort and won't make the counter negative.
+    let sm = &mut ctx.accounts.strike_market;
+    sm.pairs_outstanding = sm.pairs_outstanding.saturating_sub(amount);
+
     Ok(())
 }
