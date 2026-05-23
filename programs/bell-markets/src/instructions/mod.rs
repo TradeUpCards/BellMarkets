@@ -6,6 +6,7 @@ pub mod settle_market;
 pub mod admin_settle;
 pub mod redeem;
 pub mod redeem_invalid;
+pub mod redeem_pair;
 pub mod pause;
 
 pub use initialize_config::*;
@@ -16,4 +17,5 @@ pub use settle_market::*;
 pub use admin_settle::*;
 pub use redeem::*;
 pub use redeem_invalid::*;
+pub use redeem_pair::*;
 pub use pause::*;

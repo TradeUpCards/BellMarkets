@@ -33,6 +33,7 @@ pub struct AdminSettle<'info> {
     #[account(
         mut,
         constraint = strike_market.outcome == Outcome::Unsettled @ BellMarketsError::AlreadySettled,
+        constraint = strike_market.config == config.key() @ BellMarketsError::ConfigMismatch,
     )]
     pub strike_market: Box<Account<'info, StrikeMarket>>,
 
