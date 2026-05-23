@@ -127,8 +127,9 @@ export interface AriaProgram {
   // Permissionless (DR-002) / user-callable
   mintPair(args: MintPairArgs): Promise<TxResult>;
   settleMarket(args: SettleMarketArgs): Promise<TxResult>;
-  redeem(args: RedeemArgs): Promise<TxResult>;             // single winning side only
-  redeemInvalid(args: RedeemInvalidArgs): Promise<TxResult>; // Day-3: refund both sides for Invalid markets
+  redeem(args: RedeemArgs): Promise<TxResult>;             // single winning side only (post-settle Yes/No)
+  redeemInvalid(args: RedeemInvalidArgs): Promise<TxResult>; // Day-3: refund both sides for Invalid markets (post-settle)
+  redeemPair(args: RedeemPairArgs): Promise<TxResult>;     // Day-4: inverse of mint_pair (pre-settle only)
 
   // Read helpers
   fetchMarketConfig(): Promise<MarketConfig>;
@@ -187,6 +188,14 @@ export interface RedeemArgs {
 }
 
 export interface RedeemInvalidArgs {
+  user: Pubkey;
+  marketId: Pubkey;
+  amount: UsdcMicros;                   // burn `amount` YES + `amount` NO, receive `amount` USDC
+}
+
+/** Day-4: pre-settlement pair burn (inverse of mint_pair). Gated to Outcome::Unsettled.
+ *  Identical wire shape to redeem_invalid but opposite outcome gate. */
+export interface RedeemPairArgs {
   user: Pubkey;
   marketId: Pubkey;
   amount: UsdcMicros;                   // burn `amount` YES + `amount` NO, receive `amount` USDC
@@ -399,6 +408,41 @@ export function createMockAria(opts: MockOptions = {}): { program: AriaProgram; 
       state.vaults.set(args.marketId, (state.vaults.get(args.marketId) ?? 0n) - args.amount);
 
       log("redeem", { user: args.user, marketId: args.marketId, amount: args.amount, winningSide: oc });
+      return tx();
+    },
+
+    async redeemPair(args) {
+      // Day-4 instruction. Mirror-image of redeem_invalid but gated to
+      // Outcome::Unsettled (pre-settlement only). Powers the atomic Sell No
+      // flow in Cleo's POV-3: [phoenix.swap(yes->no), redeem_pair(amount)].
+      if (!state.config) throw new Error("redeemPair: config not initialized");
+      if (state.config.paused) throw new Error("redeemPair: Paused");
+      if (args.amount === 0n) throw new Error("redeemPair: ZeroAmount");
+      const m = state.markets.get(args.marketId);
+      if (!m) throw new Error(`redeemPair: market ${args.marketId} not found`);
+      // Outcome::Unsettled required — Aria uses AlreadySettled error code (not a
+      // dedicated NotPreSettle) to signal post-settle calls. Matches Rust handler.
+      if (outcomeKind(m.outcome) !== "unsettled") {
+        throw new Error(`redeemPair: AlreadySettled (use redeem or redeem_invalid post-settle)`);
+      }
+
+      const key = posKey(args.marketId, args.user);
+      const pos = state.positions.get(key) ?? {
+        marketId: args.marketId, wallet: args.user, yesBalance: 0n, noBalance: 0n,
+      };
+      if (args.amount > pos.yesBalance) {
+        throw new Error(`redeemPair: insufficient YES (have=${pos.yesBalance}, want=${args.amount})`);
+      }
+      if (args.amount > pos.noBalance) {
+        throw new Error(`redeemPair: insufficient NO (have=${pos.noBalance}, want=${args.amount})`);
+      }
+
+      pos.yesBalance -= args.amount;
+      pos.noBalance  -= args.amount;
+      state.positions.set(key, pos);
+      state.vaults.set(args.marketId, (state.vaults.get(args.marketId) ?? 0n) - args.amount);
+
+      log("redeemPair", { user: args.user, marketId: args.marketId, amount: args.amount });
       return tx();
     },
 

@@ -189,7 +189,12 @@ describe("BellMarkets live program call (Drew, integration via Anchor JS)", func
     //      admin check. NotExpired only fires inside the handler body, after
     //      any signer/admin constraint would have rejected. The presence of
     //      NotExpired ⇒ no admin gate.
-    const STRIKE_MARKET_DISCRIMINATOR_B58 = "DkVwfedB46v";   // base58 of [109,109,58,228,193,219,99,7]
+    // StrikeMarket discriminator bytes [109,109,58,228,193,219,99,7], base58-encoded.
+    // The base58 was computed by hand the first time (got it wrong as "DkVwfedB46v"
+    // — the test silently skipped instead of running, because getProgramAccounts
+    // returned 0 matches for the wrong filter). Live-checked on 2026-05-22 against
+    // 7 known StrikeMarkets on devnet — correct value is "KJaQDqXuFRY".
+    const STRIKE_MARKET_DISCRIMINATOR_B58 = "KJaQDqXuFRY";
     const accounts = await connection.getProgramAccounts(new PublicKey(PROGRAM_ID), {
       filters: [{ memcmp: { offset: 0, bytes: STRIKE_MARKET_DISCRIMINATOR_B58 } }],
       dataSlice: { offset: 0, length: 0 },

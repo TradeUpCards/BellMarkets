@@ -200,25 +200,26 @@ describe("BellMarkets live deploy verify (Drew, integration)", function () {
     expect(idl.metadata?.name).to.equal("bell_markets");
     expect(idl.metadata?.spec).to.equal("0.1.0");
 
-    // 9 instructions Aria's lib.rs declares (Day-3 added redeem_invalid).
+    // Day-3: 9 instructions (added redeem_invalid).
+    // Day-4: 10 instructions (added redeem_pair on Aria's crt/aria-init, pending merge).
+    // Forward-compatible assertion: require the 9 core ix; tolerate redeem_pair if present.
     const ixNames: string[] = (idl.instructions ?? []).map((i: { name: string }) => i.name).sort();
-    expect(ixNames).to.deep.equal([
-      "add_strike",
-      "admin_settle",
-      "create_strike_market",
-      "initialize_config",
-      "mint_pair",
-      "pause",
-      "redeem",
-      "redeem_invalid",
-      "settle_market",
-    ]);
+    const required9 = [
+      "add_strike", "admin_settle", "create_strike_market", "initialize_config",
+      "mint_pair", "pause", "redeem", "redeem_invalid", "settle_market",
+    ];
+    for (const required of required9) expect(ixNames).to.include(required);
+    const day4 = ixNames.includes("redeem_pair");
+    expect(ixNames.length, day4 ? "expected 10 ix (Day-4 redeem_pair landed)" : "expected 9 ix (Day-4 redeem_pair not yet merged)")
+      .to.equal(day4 ? 10 : 9);
 
     // 2 accounts.
     const accountNames: string[] = (idl.accounts ?? []).map((a: { name: string }) => a.name).sort();
     expect(accountNames).to.deep.equal(["MarketConfig", "StrikeMarket"]);
 
     // Day-3: 26 errors (Aria added ConfigMismatch when shipping redeem_invalid).
+    // Day-4: still 26 (no new error variants; redeem_pair reuses AlreadySettled
+    // for post-settle calls, ConfigMismatch for cross-config, ZeroAmount, etc.).
     const codes: number[] = (idl.errors ?? []).map((e: { code: number }) => e.code).sort((a, b) => a - b);
     expect(codes.length).to.equal(26);
     expect(codes[0]).to.equal(6000);
