@@ -1,0 +1,298 @@
+// ============================================================
+// BellMarkets — Dynamic Views
+//
+// Temporal narratives. Each view walks through one architectural
+// commitment in execution order. These are the interview-defense
+// artifacts: open the relevant dynamic view, narrate the steps,
+// done.
+//
+// Companion to bell-markets.c4 (structural model).
+// ============================================================
+
+views {
+
+  // ============================================================
+  // 1. DAILY LIFECYCLE — what happens during one trading day
+  // ============================================================
+
+  dynamic view dailyLifecycle {
+    title 'Daily Lifecycle — One Trading Day (8 AM → 4 PM ET)'
+    description '
+      The full happy-path lifecycle. 8 AM cron creates markets, traders
+      mint and trade throughout the session, 4 PM Pyth posts close,
+      4:05 PM cron cranks settle, traders redeem post-settle.
+
+      This is the primary narrative for "what does the system do day-
+      to-day?". Walk it for the interview opener.
+    '
+
+    // ----- Morning: market creation -----
+
+    triggerDev -> bellMarkets.automation.morningJob 'step 1: cron fires at 8:00 AM ET'
+    bellMarkets.automation.morningJob -> bellMarkets.automation.hermesClient 'step 2: read MAG7 spot via Hermes'
+    bellMarkets.automation.hermesClient -> pyth.pythHermesAPI 'step 3: HTTP fetch'
+    bellMarkets.automation.morningJob -> bellMarkets.automation.strikeCalc 'step 4: compute ATM ± 3/6/9%'
+    bellMarkets.automation.morningJob -> bellMarkets.automation.anchorClient 'step 5: build createMarket tx × 35'
+    bellMarkets.automation.anchorClient -> bellMarkets.program.createMarket 'step 6: sign with platform admin'
+    bellMarkets.program.createMarket -> bellMarkets.strikeMarkets 'step 7: allocate StrikeMarket PDA'
+    bellMarkets.program.createMarket -> bellMarkets.yesNoMints 'step 8: mint YES + NO mints'
+    bellMarkets.program.createMarket -> bellMarkets.usdcVault 'step 9: allocate USDC vault'
+    bellMarkets.program.createMarket -> phoenix 'step 10: bind Phoenix FIFOMarket'
+
+    // ----- Daytime: trading -----
+
+    trader -> walletAdapter 'step 11: connects Phantom mid-morning'
+    trader -> bellMarkets.frontend.useAllMarkets 'step 12: browses markets'
+    bellMarkets.frontend.useAllMarkets -> bellMarkets.strikeMarkets 'step 13: reads StrikeMarket via subscription'
+    trader -> bellMarkets.frontend.buildMintPair 'step 14: mints 1 USDC → 1 YES + 1 NO'
+    bellMarkets.frontend.buildMintPair -> bellMarkets.program.mintPair 'step 15: signed tx via wallet'
+    bellMarkets.program.mintPair -> bellMarkets.usdcVault 'step 16: USDC in, $1 invariant grows'
+    bellMarkets.program.mintPair -> bellMarkets.yesNoMints 'step 17: mint 1 YES + 1 NO to trader ATA'
+
+    trader -> bellMarkets.frontend.buildBuyYes 'step 18: places limit buy on Phoenix'
+    bellMarkets.frontend.buildBuyYes -> phoenix 'step 19: Phoenix place_order'
+
+    // ----- 4 PM ET: market close -----
+
+    pyth -> solana 'step 20: 4:00 PM — Pyth pushes close price on-chain'
+
+    // ----- 4:05 PM: settle cron -----
+
+    triggerDev -> bellMarkets.automation.settlementJob 'step 21: cron fires at 4:05 PM ET'
+    bellMarkets.automation.settlementJob -> bellMarkets.automation.anchorClient 'step 22: list all unsettled markets'
+    bellMarkets.automation.settlementJob -> bellMarkets.automation.retryHelper 'step 23: bounded retry harness ready'
+    bellMarkets.automation.settlementJob -> bellMarkets.program.settleMarket 'step 24: crank settle × 35'
+    bellMarkets.program.settleMarket -> bellMarkets.program.pythAdapter 'step 25: read Pyth price account'
+    bellMarkets.program.pythAdapter -> pyth.pythPriceAccount 'step 26: validate staleness + confidence'
+    bellMarkets.program.settleMarket -> bellMarkets.strikeMarkets 'step 27: write outcome + settle_price'
+
+    // ----- Post-settle: redeems -----
+
+    trader -> bellMarkets.frontend.buildRedeem 'step 28: claims winning side'
+    bellMarkets.frontend.buildRedeem -> bellMarkets.program.redeem 'step 29: signed redeem tx'
+    bellMarkets.program.redeem -> bellMarkets.yesNoMints 'step 30: burn winning token'
+    bellMarkets.program.redeem -> bellMarkets.usdcVault 'step 31: transfer $1 USDC out'
+  }
+
+  // ============================================================
+  // 2. PERMISSIONLESS SETTLE — DR-002 / HY-5 cron-failure demo
+  // ============================================================
+
+  dynamic view permissionlessSettle {
+    title 'Permissionless Settle — DR-002 in Action (HY-5 Demo)'
+    description '
+      The highest-value architectural commitment, narrated end-to-end.
+      4:05 PM cron fails (Trigger.dev outage, network glitch, anything).
+      Five minutes pass. A random user notices their position is stuck
+      unsettled. They call settle_market themselves — succeeds. No
+      special permission needed. Protocol kept working.
+
+      This is the cron-failure demo Drew is building (docs/demo/cron-
+      failure-path.md). It s the strongest "we built this correctly"
+      narrative for interview defense.
+    '
+
+    triggerDev -> bellMarkets.automation.settlementJob 'step 1: 4:05 PM cron fires'
+    bellMarkets.automation.settlementJob -> bellMarkets.automation.heliusClient 'step 2: try to load program'
+    bellMarkets.automation.heliusClient -> helius 'step 3: ❌ RPC outage'
+    bellMarkets.automation.settlementJob -> bellMarkets.automation.retryHelper 'step 4: retry harness exhausts after 15 min'
+
+    // The market is now unsettled past 4:20 PM. Anyone can act.
+
+    cranker -> bellMarkets.frontend.useAllMarkets 'step 5: anyone sees unsettled market'
+    bellMarkets.frontend.useAllMarkets -> bellMarkets.strikeMarkets 'step 6: outcome.is_none && expiry < now'
+    cranker -> bellMarkets.program.settleMarket 'step 7: cranker signs settle from THEIR own keypair'
+    bellMarkets.program.settleMarket -> bellMarkets.program.pythAdapter 'step 8: same oracle read as cron would do'
+    bellMarkets.program.pythAdapter -> pyth.pythPriceAccount 'step 9: Pyth is fine, RPC was the issue'
+    bellMarkets.program.settleMarket -> bellMarkets.strikeMarkets 'step 10: writes outcome — same result as cron'
+
+    // Protocol is back. Cron failure had zero protocol impact.
+
+    trader -> bellMarkets.frontend.buildRedeem 'step 11: trader redeems as normal'
+    bellMarkets.frontend.buildRedeem -> bellMarkets.program.redeem 'step 12: settle is settle, no matter who cranked'
+  }
+
+  // ============================================================
+  // 3. ATOMIC BUY NO — POV-3 signature UX
+  // ============================================================
+
+  dynamic view atomicBuyNo {
+    title 'Atomic Buy No — POV-3 Signature UX (HY-7)'
+    description '
+      The trade most binary-options dApps make a 2-step user journey
+      (mint pair, then sell YES separately). We refused that. POV-3
+      says Sell + Buy No are first-class atomic ops.
+
+      Trader sees "Buy No" button → one signature → wallet shows two
+      bundled instructions → broadcast → either both succeed or both
+      revert. Walk this view to defend the UX design choice.
+    '
+
+    trader -> bellMarkets.frontend 'step 1: clicks Buy No @ 48¢'
+    bellMarkets.frontend -> bellMarkets.frontend.buildBuyNo 'step 2: composes atomic tx'
+
+    bellMarkets.frontend.buildBuyNo -> bellMarkets.program.mintPair 'step 3: ix0 = mint_pair(1)'
+    bellMarkets.frontend.buildBuyNo -> phoenix 'step 4: ix1 = phoenix sell_yes(1)'
+
+    bellMarkets.frontend -> walletAdapter 'step 5: simulate + present 2-ix tx'
+    walletAdapter -> trader 'step 6: shows "approve tx with 2 instructions"'
+    trader -> walletAdapter 'step 7: signs once'
+    walletAdapter -> bellMarkets.frontend 'step 8: returns signed tx'
+    bellMarkets.frontend.buildBuyNo -> bellMarkets.program 'step 9: submit to RPC'
+
+    // Execution order on-chain (atomic)
+
+    bellMarkets.program.mintPair -> bellMarkets.usdcVault 'step 10a: USDC in (vault grows by $1)'
+    bellMarkets.program.mintPair -> bellMarkets.yesNoMints 'step 10b: mint 1 YES + 1 NO to trader'
+    bellMarkets.program.mintPair -> phoenix 'step 11: trader now holds 1 YES, ready to sell'
+    phoenix -> bellMarkets.yesNoMints 'step 12: YES burned to phoenix maker'
+    phoenix -> bellMarkets.frontend 'step 13: USDC paid to trader (asking price)'
+
+    // Final state: trader holds 1 NO, paid (1 - 0.48) = 0.52 USDC net
+
+    trader -> bellMarkets.frontend 'step 14: net cost $0.52 for 1 NO contract'
+  }
+
+  // ============================================================
+  // 4. MINT PAIR — the $1 invariant primitive (HY-1)
+  // ============================================================
+
+  dynamic view mintPairInvariant {
+    title 'Mint Pair — The $1 Invariant Primitive (HY-1)'
+    description '
+      The single most load-bearing piece of the protocol. mint_pair
+      establishes: vault USDC == pairs_outstanding × $1, always. Every
+      other instruction either preserves this (trade) or restores it
+      (redeem / redeem_invalid / redeem_pair).
+
+      Walk this to explain why $1 max payout is enforced ON-CHAIN, not
+      by a backend.
+    '
+
+    trader -> bellMarkets.frontend.buildMintPair 'step 1: user requests mint N pairs'
+    bellMarkets.frontend.buildMintPair -> walletAdapter 'step 2: wallet signs'
+    bellMarkets.frontend.buildMintPair -> bellMarkets.program.mintPair 'step 3: submit'
+
+    bellMarkets.program.mintPair -> bellMarkets.program.stateModule 'step 4: load MarketConfig + StrikeMarket'
+    bellMarkets.program.mintPair -> circle 'step 5: assert USDC mint matches config.usdc_mint'
+    bellMarkets.program.mintPair -> bellMarkets.marketConfig 'step 6: check paused == false (HY-1 also gates pause)'
+    bellMarkets.program.mintPair -> bellMarkets.strikeMarkets 'step 7: check outcome.is_none (pre-settle only)'
+    bellMarkets.program.mintPair -> bellMarkets.usdcVault 'step 8: transfer N USDC FROM trader TO vault'
+    bellMarkets.program.mintPair -> bellMarkets.yesNoMints 'step 9: mint_to(N YES, trader)'
+    bellMarkets.program.mintPair -> bellMarkets.yesNoMints 'step 10: mint_to(N NO, trader)'
+    bellMarkets.program.mintPair -> bellMarkets.strikeMarkets 'step 11: pairs_outstanding += N'
+
+    // Invariant holds: vault grew by $N, pairs grew by N. Always.
+
+    bellMarkets.program.mintPair -> trader 'step 12: trader holds N YES + N NO; total claim ≤ $N'
+  }
+
+  // ============================================================
+  // 5. ADMIN OVERRIDE SAFETY — why we have a delay
+  // ============================================================
+
+  dynamic view adminOverrideSafety {
+    title 'Admin Override Safety — The 1-Hour Delay'
+    description '
+      Edge case: Pyth confidence stays wide for 15+ minutes after
+      expiry. Settle fails repeatedly. After 1 hour past expiry, admin
+      can manually call admin_settle to force an outcome (including
+      Outcome::Invalid which routes to refund-the-pair).
+
+      The 1-hour delay is the trust gate. Admin CANNOT front-run
+      settle — must wait until after expiry + delay. This is what makes
+      DR-002 meaningful: even admin authority is time-locked.
+
+      Walk this to defend the trust model.
+    '
+
+    // Settle fails repeatedly
+
+    bellMarkets.automation.settlementJob -> bellMarkets.program.settleMarket 'step 1: 4:05 PM cron tries settle'
+    bellMarkets.program.settleMarket -> bellMarkets.program.pythAdapter 'step 2: read Pyth'
+    bellMarkets.program.pythAdapter -> pyth.pythPriceAccount 'step 3: ❌ confidence_bps > 50 (wide spread)'
+    bellMarkets.program.settleMarket -> bellMarkets.automation.settlementJob 'step 4: PythConfidenceTooWide error'
+    bellMarkets.automation.settlementJob -> bellMarkets.automation.retryHelper 'step 5: retry every 30s'
+
+    // 15 min retry window exhausted
+
+    bellMarkets.automation.retryHelper -> bellMarkets.automation.settlementJob 'step 6: 4:20 PM — retry budget exhausted'
+
+    // Wait 45 more min for the admin override window to open
+
+    cranker -> bellMarkets.program.settleMarket 'step 7: cranker tries 4:30 PM — Pyth still wide, still fails'
+
+    // 5:05 PM: admin_override_eligible_at = expiry + 3600s reached
+
+    admin -> bellMarkets.program.adminSettle 'step 8: 5:05 PM — admin signs force_outcome=Invalid'
+    bellMarkets.program.adminSettle -> bellMarkets.strikeMarkets 'step 9: writes outcome, settle_price stays 0'
+
+    // Now redeem_invalid path opens for every holder
+
+    trader -> bellMarkets.program.redeemInvalid 'step 10: anyone burns equal YES+NO → refund'
+    bellMarkets.program.redeemInvalid -> bellMarkets.usdcVault 'step 11: refund pair → vault drains'
+  }
+
+  // ============================================================
+  // 6. FAILED SETTLE RETRY HARNESS — PRD 30s × 15min
+  // ============================================================
+
+  dynamic view retryHarness {
+    title 'Retry Harness — PRD 30s × 15min'
+    description '
+      Settlement nudger does NOT use Trigger.dev s job-level retry
+      (which would restart the whole job, dropping per-market progress).
+      Bram extracted retryUntilDeadline as a pure generic helper.
+      Each market retries independently with its own 30s × 15min window.
+      Non-retriable errors (program logic violations) abort immediately.
+    '
+
+    triggerDev -> bellMarkets.automation.settlementJob 'step 1: 4:05 PM cron fires'
+    bellMarkets.automation.settlementJob -> bellMarkets.automation.anchorClient 'step 2: program.account.strikeMarket.all()'
+    bellMarkets.automation.settlementJob -> bellMarkets.automation.retryHelper 'step 3: spawn 35 retries (parallel per market)'
+
+    // Each market follows this pattern independently
+
+    bellMarkets.automation.retryHelper -> bellMarkets.program.settleMarket 'step 4: attempt 1: 4:05:00 PM'
+    bellMarkets.program.settleMarket -> bellMarkets.automation.retryHelper 'step 5: PythConfidenceTooWide (retriable)'
+    bellMarkets.automation.retryHelper -> bellMarkets.program.settleMarket 'step 6: attempt 2: 4:05:30 PM (+30s)'
+    bellMarkets.program.settleMarket -> bellMarkets.automation.retryHelper 'step 7: PythStale (retriable)'
+    bellMarkets.automation.retryHelper -> bellMarkets.program.settleMarket 'step 8: attempt 3: 4:06:00 PM (+30s)'
+    bellMarkets.program.settleMarket -> bellMarkets.strikeMarkets 'step 9: ✓ settle succeeds; outcome written'
+
+    // Another market hits a non-retriable error
+
+    bellMarkets.automation.retryHelper -> bellMarkets.program.settleMarket 'step 10: market 2 attempt 1'
+    bellMarkets.program.settleMarket -> bellMarkets.automation.retryHelper 'step 11: AlreadySettled (NOT retriable)'
+    bellMarkets.automation.retryHelper -> bellMarkets.automation.settlementJob 'step 12: abort, continue other markets'
+  }
+
+  // ============================================================
+  // 7. SUBSCRIPTION-DRIVEN UI — HY-9 no-polling
+  // ============================================================
+
+  dynamic view subscriptionFlow {
+    title 'Subscription-Driven UI — HY-9 No Polling'
+    description '
+      Every UI data hook subscribes to its source via Helius WebSocket.
+      Zero polling. When state changes on-chain, TanStack Query cache
+      updates within ~400ms; React re-renders on the next frame.
+
+      This is what makes the trading terminal feel real-time without
+      blowing the Helius rate limit. Walk this to defend HY-9.
+    '
+
+    bellMarkets.frontend.pages -> bellMarkets.frontend.useMarketAccount 'step 1: user navigates to /trade/META/680'
+    bellMarkets.frontend.useMarketAccount -> bellMarkets.frontend.useAccountSubscription 'step 2: subscribes via generic hook'
+    bellMarkets.frontend.useAccountSubscription -> helius 'step 3: WebSocket onAccountChange(marketPda)'
+
+    // Anywhere else, a fill happens
+
+    trader -> phoenix 'step 4: other trader fills on order book'
+    phoenix -> bellMarkets.strikeMarkets 'step 5: market state mutates (Yes price ↑)'
+    bellMarkets.strikeMarkets -> helius 'step 6: Solana indexer notices'
+    helius -> bellMarkets.frontend.useAccountSubscription 'step 7: WebSocket push (~400ms)'
+    bellMarkets.frontend.useAccountSubscription -> bellMarkets.frontend.useMarketAccount 'step 8: TanStack setQueryData'
+    bellMarkets.frontend.useMarketAccount -> bellMarkets.frontend.pages 'step 9: React re-renders; user sees new price'
+  }
+}
