@@ -403,7 +403,7 @@
 <div class="candidate featured">
   <div class="candidate-h">
     <div class="candidate-num">08 / TERMINAL REFINED</div>
-    <h2>Terminal Refined<span class="sub">v7 DNA + 2026-05-23 feedback applied + mobile-first</span></h2>
+    <h2>Terminal Refined<span class="sub">v7 DNA + minor tweaks on trade · new sections on landing</span></h2>
     <div class="candidate-colors">
       <div class="swatch" style="background: #060810;"></div>
       <div class="swatch" style="background: #0c1018;"></div>
@@ -417,34 +417,44 @@
       <div class="candidate-desc">
         <h3>Vibe</h3>
         <p>
-          v7 Terminal's DNA, every bullet of Cory's 2026-05-23 feedback applied. Base font 14px (was 12). WCAG AA contrast everywhere
-          — accent cyan brightened to #22d3ee for 9.2:1 on near-black, body color lifted to #e8edf7 for 14.5:1. Logo lockup
-          separated from MARKETS nav with explicit vertical divider + 32px gap. CNBC-style ticker marquee at top (28px, continuous
-          scroll, pauses on hover) replaces v7's static ticker row. Session info compressed to corner module (40px tall, click to expand).
-          Probability matrix gains a view toggle — Matrix view (dense, default) ↔ Cards view (Pulse-style, mobile-friendly). Every
-          price cell shows "$0.84 · 84% implied" with `?` tooltip explaining the convention. Trade panel includes slippage slider with
-          computed worst-price display.
+          v7 trade page layout PRESERVED (left rail + chart + buy/sell + OB + recent trades — what Cory called "pretty good before").
+          Only minor tweaks applied to trade. New content (leaderboard, contests, AI teaser, Pro CTA, carousel) moves to <strong>v8-landing</strong>.
+          Probability matrix on landing already has tickers as rows + 7 strikes as columns (matches Cory's requirement — scales by adding rows, not columns).
         </p>
-        <p><strong>What's new vs v7:</strong> Sidebar widgets (Weekly Leaderboard top-5, Active Contests with progress bars, Bell Pro AI teaser CTA).
-        Mobile bottom-tab bar (Markets / Leaderboard / Contests / Profile) replaces desktop nav at &lt;768px. Matrix horizontally
-        scrollable on mobile with a hint to switch to Cards view. All touch targets ≥44pt. Visible focus rings everywhere. No hover-only
-        interactions. <strong>Mobile-first responsive</strong> — designed at 375px first, expansion to desktop is the additive case.</p>
+        <p><strong>Minor tweaks applied to both pages:</strong></p>
+        <ul style="margin-left: 18px; margin-top: 6px; color: var(--text-muted); font-size: 13px;">
+          <li>Base font 14px (was 12) for legibility</li>
+          <li>WCAG AA contrast — accent cyan lifted to #22d3ee (9.2:1), muted text to #9aa6c0 (7.8:1)</li>
+          <li>Logo lockup separated from MARKETS nav (vertical divider + 32px gap)</li>
+          <li>Tooltips explaining "$0.52 = 52% implied probability" convention on price cells</li>
+          <li>Mobile-first responsive — 375px baseline, bottom tab bar at &lt;768px, ≥44pt touch targets, no hover-only interactions, visible focus rings</li>
+        </ul>
+        <p style="margin-top: 12px;"><strong>v8-landing new content:</strong></p>
+        <ul style="margin-left: 18px; margin-top: 6px; color: var(--text-muted); font-size: 13px;">
+          <li>CNBC-style ticker marquee replaces static ticker row</li>
+          <li>4-slide carousel (Markets / Leaderboard / Contests / Bell Pro) replaces static hero CTAs · 6s autoplay, pauses on hover, dot + arrow controls</li>
+          <li>Leaderboard section — weekly + monthly side-by-side, top-5 each, prize pool surfaced</li>
+          <li>Contests section — 3 active contests with prize pool, progress, time-left</li>
+          <li>Bell Pro CTA section — features grid + 9 USDC/mo pricing + Founder Pass NFT note</li>
+        </ul>
+        <p style="margin-top: 12px;"><strong>v8-trade new additions:</strong> slippage slider in the trade form (DR-008) — 0-5% with computed worst-price display.</p>
       </div>
       <div class="candidate-dna">
         <h3>DNA</h3>
+        <div class="dna-row"><span class="lbl">trade layout</span><span class="val">v7 preserved</span></div>
         <div class="dna-row"><span class="lbl">accent</span><span class="val" style="color: #22d3ee;">#22d3ee</span></div>
         <div class="dna-row"><span class="lbl">body</span><span class="val">IBM Plex Sans 14px</span></div>
         <div class="dna-row"><span class="lbl">numbers</span><span class="val">IBM Plex Mono</span></div>
         <div class="dna-row"><span class="lbl">contrast</span><span class="val">WCAG AA ✓</span></div>
-        <div class="dna-row"><span class="lbl">mobile</span><span class="val">375px baseline + bottom tabs</span></div>
-        <div class="dna-row"><span class="lbl">matrix</span><span class="val">view toggle: matrix ↔ cards</span></div>
-        <div class="dna-row"><span class="lbl">sidebar</span><span class="val">leaderboard + contests + AI teaser</span></div>
-        <div class="dna-row"><span class="lbl">ticker</span><span class="val">CNBC marquee at top</span></div>
+        <div class="dna-row"><span class="lbl">mobile</span><span class="val">375px + bottom tabs</span></div>
+        <div class="dna-row"><span class="lbl">landing hero</span><span class="val">4-slide carousel</span></div>
+        <div class="dna-row"><span class="lbl">landing sections</span><span class="val">LB + contests + Pro</span></div>
+        <div class="dna-row"><span class="lbl">matrix</span><span class="val">tickers as rows ✓</span></div>
       </div>
     </div>
     <div class="candidate-links">
+      <a href="v8-landing.html" class="link-btn">View landing →</a>
       <a href="v8-trade.html" class="link-btn outline">View trade page →</a>
-      <span class="link-btn" style="opacity: 0.5;">Landing pending</span>
     </div>
   </div>
 </div>
