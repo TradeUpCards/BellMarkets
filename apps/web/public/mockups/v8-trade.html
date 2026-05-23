@@ -945,6 +945,84 @@
   ::-webkit-scrollbar-thumb { background: var(--panel-3); border-radius: 4px; border: 1px solid var(--bg); }
   ::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
 
+  /* ===== Pro CTA chip in top header (compact link) ===== */
+  .pro-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: linear-gradient(135deg, rgba(34, 211, 238, 0.10), rgba(244, 114, 182, 0.08));
+    border: 1px solid rgba(34, 211, 238, 0.40);
+    color: var(--accent);
+    padding: 7px 12px;
+    border-radius: 6px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px; font-weight: 700;
+    letter-spacing: 0.8px; text-transform: uppercase;
+    text-decoration: none;
+    min-height: 36px;
+    transition: all 150ms;
+  }
+  .pro-chip:hover {
+    border-color: var(--accent);
+    background: linear-gradient(135deg, rgba(34, 211, 238, 0.18), rgba(244, 114, 182, 0.12));
+    transform: translateY(-1px);
+  }
+
+  /* ===== Pro CTA card in left rail (recreated v8-alt sidebar style) ===== */
+  .pro-rail-card {
+    background: linear-gradient(135deg, rgba(34, 211, 238, 0.10) 0%, rgba(244, 114, 182, 0.06) 100%);
+    border: 1px solid rgba(34, 211, 238, 0.35);
+    border-radius: 6px;
+    padding: 14px;
+    margin: 0 12px 14px;
+    position: relative;
+    overflow: hidden;
+  }
+  .pro-rail-card::before {
+    content: ""; position: absolute; top: -30px; right: -30px;
+    width: 100px; height: 100px;
+    background: radial-gradient(circle, rgba(34, 211, 238, 0.22), transparent 60%);
+    pointer-events: none;
+  }
+  .pro-rail-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: var(--accent-bg-strong); color: var(--accent);
+    padding: 2px 8px; border-radius: 12px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px; font-weight: 700;
+    letter-spacing: 1px; text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .pro-rail-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px; color: var(--text-strong);
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .pro-rail-sub {
+    font-size: 11px; color: var(--text-muted);
+    line-height: 1.5;
+    margin-bottom: 10px;
+  }
+  .pro-rail-cta {
+    width: 100%;
+    background: var(--panel);
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    padding: 7px 10px;
+    border-radius: 4px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px; text-transform: uppercase;
+    cursor: pointer;
+    min-height: 34px;
+    transition: all 150ms;
+    display: flex; align-items: center; justify-content: center; gap: 4px;
+  }
+  .pro-rail-cta:hover {
+    background: var(--accent);
+    color: var(--accent-fg);
+  }
+
   /* ===== Position+Settlement merged card subsection divider ===== */
   .info-card-subsection {
     border-top: 1px solid var(--border);
@@ -1497,6 +1575,11 @@
       </button>
       <button class="icon-btn" aria-label="Notifications" title="Notifications">🔔</button>
       <button class="icon-btn" onclick="toggleTheme()" aria-label="Toggle theme" title="Toggle theme">◐</button>
+      <!-- Pro CTA chip in header (compact; full card in left rail for details) -->
+      <a href="#pro" class="pro-chip" title="Bell Pro · AI briefings + analytics">
+        <span aria-hidden="true">✦</span>
+        <span>Bell Pro</span>
+      </a>
       <button class="connect-btn">
         <span style="font-size: 14px;" aria-hidden="true">⬢</span>
         <span>4aPZ…G2iy</span>
@@ -1538,31 +1621,29 @@
       <option>$720 · 14% YES</option>
       <option>$740 · 6% YES</option>
     </select>
-    <div class="market-controls">
-      <button class="ctrl-btn">← AAPL</button>
-      <button class="ctrl-btn">⌕ Browse <kbd>⌘K</kbd></button>
-      <button class="ctrl-btn">NVDA →</button>
-      <button class="ctrl-btn">★</button>
-    </div>
+    <!-- Star/Watch only — browse buttons removed (redundant with ⌘K search) -->
+    <button class="ctrl-btn" aria-label="Watch this market">★ Watch</button>
   </div>
-  <!-- 8-stat grid REMOVED — those stats already live in the chart card's quick-stats row -->
-</div>
-
-<!-- Pro CTA banner (Cory feedback: high on page) -->
-<div class="pro-cta-banner">
-  <div class="pro-cta-left">
-    <span class="pro-cta-badge"><span aria-hidden="true">✦</span> BELL PRO</span>
-    <span class="pro-cta-text">
-      AI briefings on all 7 MAG7 tickers · per-position PNL digests · earnings-week analysis
-    </span>
-  </div>
-  <button class="pro-cta-btn btn-primary">UNLOCK · 9 USDC/mo →</button>
 </div>
 
 <div class="layout">
 
   <!-- Compact left rail -->
   <aside class="left-rail">
+
+    <!-- Bell Pro card at top of rail (Cory feedback: card style, moved up high) -->
+    <div class="pro-rail-card" id="pro">
+      <span class="pro-rail-badge"><span aria-hidden="true">✦</span> BELL PRO</span>
+      <div class="pro-rail-title">Today's META briefing</div>
+      <div class="pro-rail-sub">
+        AI analysis of earnings proximity, sector beta, and 5-day momentum
+        for the −6% strike. Daily briefings on all 7 MAG7 tickers.
+      </div>
+      <button class="pro-rail-cta">
+        UNLOCK · 9 USDC/mo <span aria-hidden="true">→</span>
+      </button>
+    </div>
+
     <div class="rail-section">
       <div class="rail-section-h">Tickers</div>
       <div class="rail-ticker-list">
@@ -1757,19 +1838,17 @@
               <div class="pos-summary">
                 <div>
                   <span class="pos-side-badge">⬆ YES · 5 contracts</span>
-                  <div class="pos-side-sub">Opened 32m ago · avg $0.62</div>
+                  <div class="pos-side-sub">$3.10 cost · $2.60 value · avg $0.62 · 32m ago</div>
                 </div>
                 <div>
                   <div class="pos-pnl-val down mono">−$0.50</div>
                   <div class="pos-pnl-pct">unrealized · −16.1%</div>
                 </div>
               </div>
-              <div class="pos-stats-grid">
-                <div class="pos-stat"><div class="lbl">Cost basis</div><div class="val">$3.10</div></div>
-                <div class="pos-stat"><div class="lbl">Current value</div><div class="val">$2.60</div></div>
-                <div class="pos-stat"><div class="lbl">If YES wins</div><div class="val" style="color: var(--yes);">$5.00</div></div>
-                <div class="pos-stat"><div class="lbl">If YES loses</div><div class="val" style="color: var(--no);">$0.00</div></div>
-              </div>
+              <!-- 4-stat grid removed (Cory feedback 2026-05-23):
+                   "If YES wins" / "If YES loses" already shown in the Settlement
+                   scenarios below; "Cost basis" + "Current value" moved into
+                   the pos-side-sub line above. Saves 2 rows of vertical space. -->
             </div>
             <!-- Settlement scenarios merged into same card -->
             <div class="info-card-subsection">
