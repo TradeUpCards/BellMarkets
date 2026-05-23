@@ -219,6 +219,26 @@ export function nextTradingDay(from: Date): Date {
   );
 }
 
+/**
+ * Returns the last trading day STRICTLY BEFORE `from`. Symmetric to
+ * `nextTradingDay`. Used by DR-011 to detect "ticker reported earnings
+ * yesterday → restore default cap today".
+ */
+export function previousTradingDay(from: Date): Date {
+  if (!(from instanceof Date) || Number.isNaN(from.getTime())) {
+    throw new Error(`previousTradingDay: invalid Date (${from})`);
+  }
+  const [y, m, d] = parseYmd(toEtDateString(from));
+  let candidate = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+  for (let i = 0; i < 14; i++) {
+    candidate = new Date(candidate.getTime() - 24 * 60 * 60 * 1000);
+    if (isTradingDay(candidate)) return candidate;
+  }
+  throw new Error(
+    `previousTradingDay: no trading day found within 14 days before ${from.toISOString()}`,
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Exports for diagnostics / tests
 // ---------------------------------------------------------------------------

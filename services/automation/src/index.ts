@@ -91,5 +91,20 @@ export {
   isHalfDay,
   getCloseTime,
   nextTradingDay,
+  previousTradingDay,
   toEtDateString,
 } from "./calendar.js";
+
+// DR-011 — earnings calendar
+export {
+  EARNINGS_DATES_2026,
+  EARNINGS_PREEXPAND_BPS,
+  tickersReportingOn,
+  isEarningsDay,
+  tickersToPreExpand,
+  tickersToRestore,
+  listMalformedEarningsDates,
+  listInvalidExpansionCaps,
+} from "./earnings-calendar.js";
+export { runEarningsCronOnce } from "./earnings-evolution.js";
+export type { EarningsCronDeps, EarningsCronOutcome, EarningsActionOutcome } from "./earnings-evolution.js";
