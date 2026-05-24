@@ -344,6 +344,117 @@ describe("BellMarkets edge cases (Drew, eval supplement)", () => {
     });
   });
 
+  // ─── redeem_pair (Day-4 — 10th instruction, pre-settle inverse of mint_pair) ───
+  describe("redeem_pair (Day-4 — pre-settlement pair burn, powers Cleo's POV-3 Sell No)", () => {
+    it("succeeds when Unsettled: drains both sides + vault by `amount`", async () => {
+      const { program, state } = createMockAria();
+      state.blockTime = 1_000_000n;
+      await program.initializeConfig(DEFAULT_INIT);
+      const created = await program.createStrikeMarket({
+        admin: ADMIN, underlyingPythFeed: PYTH, strikePrice: STRIKE_PRICE,
+        expiryUnix: state.blockTime + 60n, phoenixMarket: PHOENIX,
+      });
+      await program.mintPair({ user: USER, marketId: created.marketId, amount: ONE_USDC });
+
+      // Pre-settle: market is Unsettled. redeem_pair must succeed.
+      const before = await program.fetchUserPosition(created.marketId, USER);
+      expect(before.yesBalance).to.equal(ONE_USDC);
+      expect(before.noBalance).to.equal(ONE_USDC);
+      expect(await program.fetchVaultBalance(created.marketId)).to.equal(ONE_USDC);
+
+      const result = await program.redeemPair({ user: USER, marketId: created.marketId, amount: ONE_USDC });
+      expect(result.signature).to.match(/^mock-/);
+
+      const after = await program.fetchUserPosition(created.marketId, USER);
+      expect(after.yesBalance).to.equal(0n);
+      expect(after.noBalance).to.equal(0n);
+      expect(await program.fetchVaultBalance(created.marketId)).to.equal(0n);
+    });
+
+    it("rejects AlreadySettled (gate is Outcome::Unsettled, opposite of redeem_invalid)", async () => {
+      const { program, marketId } = await settleableMarket();
+      await program.settleMarket({ settler: SETTLER, marketId });    // outcome = yes
+      try {
+        await program.redeemPair({ user: USER, marketId, amount: ONE_USDC });
+        expect.fail("expected AlreadySettled");
+      } catch (e) {
+        expect((e as Error).message).to.match(/AlreadySettled/);
+      }
+    });
+
+    it("rejects ZeroAmount", async () => {
+      const { program, state } = createMockAria();
+      state.blockTime = 1_000_000n;
+      await program.initializeConfig(DEFAULT_INIT);
+      const created = await program.createStrikeMarket({
+        admin: ADMIN, underlyingPythFeed: PYTH, strikePrice: STRIKE_PRICE,
+        expiryUnix: state.blockTime + 60n, phoenixMarket: PHOENIX,
+      });
+      await program.mintPair({ user: USER, marketId: created.marketId, amount: ONE_USDC });
+      try {
+        await program.redeemPair({ user: USER, marketId: created.marketId, amount: 0n });
+        expect.fail("expected ZeroAmount");
+      } catch (e) {
+        expect((e as Error).message).to.match(/ZeroAmount/);
+      }
+    });
+
+    it("rejects asymmetric position (insufficient YES OR NO)", async () => {
+      const { program, state } = createMockAria();
+      state.blockTime = 1_000_000n;
+      await program.initializeConfig(DEFAULT_INIT);
+      const created = await program.createStrikeMarket({
+        admin: ADMIN, underlyingPythFeed: PYTH, strikePrice: STRIKE_PRICE,
+        expiryUnix: state.blockTime + 60n, phoenixMarket: PHOENIX,
+      });
+      // USER has 1 YES + 0 NO (asymmetric — sold off NO on Phoenix mid-flow).
+      state.positions.set(`${created.marketId}:${USER}`, {
+        marketId: created.marketId, wallet: USER,
+        yesBalance: ONE_USDC, noBalance: 0n,
+      });
+      try {
+        await program.redeemPair({ user: USER, marketId: created.marketId, amount: ONE_USDC });
+        expect.fail("expected insufficient NO");
+      } catch (e) {
+        expect((e as Error).message).to.match(/insufficient NO/);
+      }
+    });
+
+    // The Aria-flagged property test: mint_pair → redeem_pair is net-zero.
+    // Per Aria's Day-4 cross-lead note: "round-trip property test (mint_pair →
+    // redeem_pair → zero net) lives in your domain."
+    it("ROUND-TRIP PROPERTY: mint_pair($N) → redeem_pair($N) → wallet + vault both back to zero", async () => {
+      const { program, state } = createMockAria();
+      state.blockTime = 1_000_000n;
+      await program.initializeConfig(DEFAULT_INIT);
+      const created = await program.createStrikeMarket({
+        admin: ADMIN, underlyingPythFeed: PYTH, strikePrice: STRIKE_PRICE,
+        expiryUnix: state.blockTime + 60n, phoenixMarket: PHOENIX,
+      });
+
+      // Property: for any amount N > 0, mint_pair(N) followed by redeem_pair(N)
+      // restores all observable state. Vault delta = 0; user delta = 0; supply
+      // (modeled implicitly via balances) = 0. Hard YES #1 ($1 USDC invariant)
+      // requires this symmetry to hold exactly.
+      const sample: bigint[] = [1n, ONE_USDC, 100n * ONE_USDC, 1_000_000n * ONE_USDC];
+      for (const amount of sample) {
+        const wallet = `roundtrip-user-${amount}`;
+        const vaultBefore = await program.fetchVaultBalance(created.marketId);
+        const posBefore = await program.fetchUserPosition(created.marketId, wallet);
+
+        await program.mintPair({ user: wallet, marketId: created.marketId, amount });
+        await program.redeemPair({ user: wallet, marketId: created.marketId, amount });
+
+        const vaultAfter = await program.fetchVaultBalance(created.marketId);
+        const posAfter = await program.fetchUserPosition(created.marketId, wallet);
+
+        expect(vaultAfter, `vault delta for amount=${amount}`).to.equal(vaultBefore);
+        expect(posAfter.yesBalance, `yes delta for amount=${amount}`).to.equal(posBefore.yesBalance);
+        expect(posAfter.noBalance, `no delta for amount=${amount}`).to.equal(posBefore.noBalance);
+      }
+    });
+  });
+
   // ─── mint_pair guards ───────────────────────────────────────────────
   it("mint_pair rejects ZeroAmount", async () => {
     const { program, state } = createMockAria();

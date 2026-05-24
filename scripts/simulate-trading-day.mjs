@@ -34,7 +34,18 @@
  *   node scripts/simulate-trading-day.mjs
  *   node scripts/simulate-trading-day.mjs --outcome=yes_wins
  *   node scripts/simulate-trading-day.mjs --outcome=no_wins
- *   node scripts/simulate-trading-day.mjs --outcome=invalid    (admin override path)
+ *   node scripts/simulate-trading-day.mjs --outcome=invalid       (admin override path)
+ *   node scripts/simulate-trading-day.mjs --kill-cron-at=phase3   (HY-5 cron-death evidence)
+ *
+ * Cron-failure mode (--kill-cron-at=<phase>): simulates Bram's automation
+ * dying mid-batch. The sim's Phase 3 normally settles via Carol (non-admin)
+ * because the mock has no separate "cron" actor. With --kill-cron-at=phase3,
+ * Phase 3 splits in two: (a) the "cron settler" attempts a settle and is
+ * KILLED before writing the outcome (simulated container death); (b) the
+ * sim observes the market is still Unsettled, picks a fresh random keypair
+ * (NOT the cron's), and that user cranks settle_market successfully. Proves
+ * the HY-5 claim in the offline simulation. Matches Bram's exhausted-state
+ * log shape from .project/bell-markets/coordination/cron-failure.md.
  */
 
 import { performance } from "node:perf_hooks";
@@ -50,6 +61,10 @@ const outcomeFlag = argv.find((a) => a.startsWith("--outcome="))?.split("=")[1] 
 const closeAbove = outcomeFlag === "yes_wins";
 const isInvalid = outcomeFlag === "invalid";
 const PYTH_CLOSE_PRICE = closeAbove ? STRIKE_PRICE + 5n * ONE_USDC : STRIKE_PRICE - 5n * ONE_USDC;
+
+const killCronAt = argv.find((a) => a.startsWith("--kill-cron-at="))?.split("=")[1];  // "phase3" or undefined
+const earningsDay = argv.includes("--earnings-day");                                  // DR-011 pre-expansion narrative
+const feesActive = argv.includes("--fees-active");                                    // DR-008 fee math active
 
 const OUTCOME_UNSETTLED = { unsettled: {} };
 const OUTCOME_YES       = { yes: {} };
@@ -67,6 +82,13 @@ function createMockAria(opts = {}) {
     blockTime: 0n,
     slot: 0n,
     txLog: [],
+    // Day-5 state (DR-005/008/010)
+    feeConfig: null,
+    userConfigs: new Map(),
+    tickerConfigs: new Map(),
+    weeklyPool: 0n,
+    monthlyPool: 0n,
+    feeCollector: 0n,
   };
   const posKey = (m, w) => `${m}:${w}`;
   const log = (kind, details) => state.txLog.push({ kind, details, blockTime: state.blockTime });
@@ -77,6 +99,27 @@ function createMockAria(opts = {}) {
   });
   const requireUnsettled = (m, ix) => {
     if (outcomeKind(m.outcome) !== "unsettled") throw new Error(`${ix}: AlreadySettled`);
+  };
+
+  /** Shared market-creation helper. `creator` = pubkey that paid rent (admin or user). */
+  const _createMarket = (creator, args, kind) => {
+    const marketId = `mock-strike-${args.underlyingPythFeed}-${args.expiryUnix}-${args.strikePrice}`;
+    state.markets.set(marketId, {
+      config: "mock-config-pda",
+      underlyingPythFeed: args.underlyingPythFeed,
+      strikePrice: args.strikePrice,
+      expiryUnix: args.expiryUnix,
+      yesMint: `${marketId}-yes`, noMint: `${marketId}-no`, usdcVault: `${marketId}-vault`,
+      phoenixMarket: args.phoenixMarket,
+      settlePrice: 0n, settleConfidence: 0n, settleSlot: 0n, settledAtUnix: 0n,
+      outcome: OUTCOME_UNSETTLED,
+      adminOverrideEligibleAt: args.expiryUnix + state.config.adminOverrideDelaySecs,
+      creator,                                  // DR-005 / DR-008
+      bump: 254, yesMintBump: 253, noMintBump: 252, vaultBump: 251,
+    });
+    state.vaults.set(marketId, 0n);
+    log(kind, { creator, marketId, strikePrice: args.strikePrice, expiryUnix: args.expiryUnix });
+    return { ...tx(), marketId };
   };
 
   const program = {
@@ -94,34 +137,84 @@ function createMockAria(opts = {}) {
     async createStrikeMarket(args) {
       if (state.config.admin !== args.admin) throw new Error("createStrikeMarket: NotAdmin");
       if (args.expiryUnix <= state.blockTime) throw new Error("createStrikeMarket: ExpiryInPast");
-      const marketId = `mock-strike-${args.underlyingPythFeed}-${args.expiryUnix}-${args.strikePrice}`;
-      state.markets.set(marketId, {
+      return _createMarket(args.admin, args, "createStrikeMarket");
+    },
+    /** DR-005 — permissionless user-funded strike creation; user is creator + pays SOL rent. */
+    async userCreateStrikeMarket(args) {
+      if (args.expiryUnix <= state.blockTime) throw new Error("userCreateStrikeMarket: ExpiryInPast");
+      const tc = state.tickerConfigs.get(args.underlyingPythFeed);
+      if (!tc) throw new Error("userCreateStrikeMarket: TickerConfigNotFound");
+      if (args.strikePrice % tc.strikeTickSize !== 0n) throw new Error("userCreateStrikeMarket: StrikeMisalignedTick");
+      const dev = args.strikePrice > tc.capCenter ? args.strikePrice - tc.capCenter : tc.capCenter - args.strikePrice;
+      const maxDev = (tc.capCenter * BigInt(tc.maxUserStrikeDeviationBps)) / 10_000n;
+      if (dev > maxDev) throw new Error("userCreateStrikeMarket: StrikeBeyondDeviationCap");
+      return _createMarket(args.user, args, "userCreateStrikeMarket");
+    },
+    async updateTickerConfig(args) {
+      if (state.config.admin !== args.admin) throw new Error("updateTickerConfig: NotAdmin");
+      const tc = state.tickerConfigs.get(args.pythFeed) ?? {
+        pythFeed: args.pythFeed, maxUserStrikeDeviationBps: 1500, strikeTickSize: ONE_USDC,
+        capCenter: 0n, thresholdBps: 400, lastUpdatedSlot: 0n, bump: 254,
+      };
+      if (args.capCenter !== undefined) tc.capCenter = args.capCenter;
+      if (args.maxUserStrikeDeviationBps !== undefined) tc.maxUserStrikeDeviationBps = args.maxUserStrikeDeviationBps;
+      if (args.strikeTickSize !== undefined) tc.strikeTickSize = args.strikeTickSize;
+      state.tickerConfigs.set(args.pythFeed, tc);
+      log("updateTickerConfig", { admin: args.admin, pythFeed: args.pythFeed });
+      return tx();
+    },
+    async initializeFeeConfig(args) {
+      if (state.config.admin !== args.admin) throw new Error("initializeFeeConfig: NotAdmin");
+      state.feeConfig = {
         config: "mock-config-pda",
-        underlyingPythFeed: args.underlyingPythFeed,
-        strikePrice: args.strikePrice,
-        expiryUnix: args.expiryUnix,
-        yesMint: `${marketId}-yes`, noMint: `${marketId}-no`, usdcVault: `${marketId}-vault`,
-        phoenixMarket: args.phoenixMarket,
-        settlePrice: 0n, settleConfidence: 0n, settleSlot: 0n, settledAtUnix: 0n,
-        outcome: OUTCOME_UNSETTLED,
-        adminOverrideEligibleAt: args.expiryUnix + state.config.adminOverrideDelaySecs,
-        bump: 254, yesMintBump: 253, noMintBump: 252, vaultBump: 251,
-      });
-      state.vaults.set(marketId, 0n);
-      log("createStrikeMarket", { admin: args.admin, marketId, strikePrice: args.strikePrice, expiryUnix: args.expiryUnix });
-      return { ...tx(), marketId };
+        mintFeeBps: args.mintFeeBps ?? 0,
+        platformRetainBps: args.platformRetainBps ?? 5000,
+        weeklyPoolBps: args.weeklyPoolBps ?? 2500,
+        monthlyPoolBps: args.monthlyPoolBps ?? 2500,
+        creatorRebateBps: args.creatorRebateBps ?? 10000,
+        forceRedeemGraceSecs: args.forceRedeemGraceSecs ?? 30n * 24n * 60n * 60n,
+      };
+      log("initializeFeeConfig", { admin: args.admin });
+      return tx();
     },
     async mintPair(args) {
       if (args.amount === 0n) throw new Error("mintPair: ZeroAmount");
       const m = state.markets.get(args.marketId);
       requireUnsettled(m, "mintPair");
+
+      // DR-008 fee math (only when FeeConfig active + mint_fee_bps > 0)
+      let fee = 0n;
+      let creatorRebateFires = false;
+      if (state.feeConfig && state.feeConfig.mintFeeBps > 0) {
+        const fc = state.feeConfig;
+        const uc = state.userConfigs.get(args.user) ?? { mintVolume30d: 0n };
+        const tierBps = uc.mintVolume30d < 1_000n * ONE_USDC ? 200
+                      : uc.mintVolume30d < 10_000n * ONE_USDC ? 150 : 100;
+        const isCreator = m.creator === args.user;
+        creatorRebateFires = isCreator && outcomeKind(m.outcome) === "unsettled";
+        const effBps = creatorRebateFires
+          ? Math.floor((tierBps * (10000 - fc.creatorRebateBps)) / 10000)
+          : tierBps;
+        fee = (args.amount * BigInt(effBps)) / 10_000n;
+        const platformShare = (fee * BigInt(fc.platformRetainBps)) / 10_000n;
+        const weeklyShare = (fee * BigInt(fc.weeklyPoolBps)) / 10_000n;
+        const monthlyShare = fee - platformShare - weeklyShare;
+        state.feeCollector += platformShare;
+        state.weeklyPool += weeklyShare;
+        state.monthlyPool += monthlyShare;
+        if (!creatorRebateFires) {
+          uc.mintVolume30d += args.amount;
+          state.userConfigs.set(args.user, uc);
+        }
+      }
+
       state.vaults.set(args.marketId, (state.vaults.get(args.marketId) ?? 0n) + args.amount);
       const key = posKey(args.marketId, args.user);
       const cur = state.positions.get(key) ?? { marketId: args.marketId, wallet: args.user, yesBalance: 0n, noBalance: 0n };
       cur.yesBalance += args.amount;
       cur.noBalance  += args.amount;
       state.positions.set(key, cur);
-      log("mintPair", { user: args.user, marketId: args.marketId, amount: args.amount });
+      log("mintPair", { user: args.user, marketId: args.marketId, amount: args.amount, fee, creatorRebateFires });
       return tx();
     },
     async _phoenixTrade(args) {
@@ -231,7 +324,7 @@ async function main() {
   state.blockTime = 1_716_300_000n;
   state.slot      = 250_000_000n;
 
-  phase(0, "Generate 3 wallets, fund each, initialize global config");
+  phase(0, "Generate 3 wallets, fund each, initialize global config + TickerConfig (DR-005)");
   step("would airdrop 0.05 SOL each to Alice / Bob / Carol from devnet faucet");
   step("would mint 100 USDC each (devnet test USDC) to Alice / Bob / Carol");
   await program.initializeConfig({
@@ -241,16 +334,44 @@ async function main() {
     adminOverrideDelaySecs: DEFAULT_ADMIN_OVERRIDE_DELAY_SECS,
   });
   ok(`MarketConfig initialized; admin=${ADMIN}`);
+
+  // DR-005 + DR-006: TickerConfig set by Bram's morning cron. For AAPL: 15% dev, $1 tick.
+  // DR-011 --earnings-day pre-expansion: widens to 25% for AAPL low-vol tier.
+  const aaplMaxDev = earningsDay ? 2500 : 1500;
+  await program.updateTickerConfig({
+    admin: ADMIN, pythFeed: PYTH,
+    capCenter: STRIKE_PRICE - 5n * ONE_USDC,   // $675 — close enough that $680 strike is in-cap
+    maxUserStrikeDeviationBps: aaplMaxDev,
+    strikeTickSize: ONE_USDC,
+    thresholdBps: 400,
+  });
+  if (earningsDay) {
+    ok(`DR-011 EARNINGS-EVE: AAPL TickerConfig pre-expanded from 15% → 25% dev cap (anticipates earnings volatility)`);
+  } else {
+    ok(`TickerConfig set for AAPL: cap=$675, dev=${aaplMaxDev}bps, tick=$1`);
+  }
+
+  // DR-008 fee config — disabled by default; --fees-active enables 2% fee path.
+  if (feesActive) {
+    await program.initializeFeeConfig({ admin: ADMIN, mintFeeBps: 200 });
+    ok(`DR-008 FEES ACTIVE: 2% mint fee, 50/25/25 split, 100% creator rebate`);
+  } else {
+    step(`fees disabled (default); pass --fees-active to enable DR-008 fee math`);
+  }
   advanceBlockTime(state, 10);
 
-  phase(1, "Admin creates AAPL $680 market (expiry 35s out)");
+  phase(1, "User-funded strike creation (DR-005): Alice pays SOL rent to spawn AAPL $680");
   const expiryUnix = state.blockTime + 35n;
-  const created = await program.createStrikeMarket({
-    admin: ADMIN, underlyingPythFeed: PYTH,
+  // Alice = first user to want this strike → pays rent → becomes creator (DR-008 rebate eligible).
+  const created = await program.userCreateStrikeMarket({
+    user: ALICE, underlyingPythFeed: PYTH,
     strikePrice: STRIKE_PRICE, expiryUnix, phoenixMarket: PHOENIX,
   });
   const MARKET = created.marketId;
-  ok(`market created: ${MARKET} (strike=$${Number(STRIKE_PRICE) / 1e6}, expiry=${expiryUnix})`);
+  ok(`market created BY ALICE: ${MARKET} (creator=Alice, strike=$${Number(STRIKE_PRICE) / 1e6}, expiry=${expiryUnix})`);
+  if (feesActive) {
+    step(`Alice is creator → her mints into this strike pay 0% fee (default creator_rebate_bps = 10000)`);
+  }
   step(`would verify phoenix_market 8-byte magic prefix (DR-001 / hard-rules.md §4.12)`);
   advanceBlockTime(state, 5);
 
@@ -268,7 +389,9 @@ async function main() {
 
   phase(3, isInvalid
     ? "Admin invokes admin_settle with Invalid (oracle-down recovery path)"
-    : "Settle market — DR-002: Carol cranks from her (non-admin) wallet");
+    : killCronAt === "phase3"
+      ? "CRON-DEATH MODE: simulate Bram's settler dying mid-batch; user cranks settle (HY-5)"
+      : "Settle market — DR-002: Carol cranks from her (non-admin) wallet");
 
   let winSide;
   if (isInvalid) {
@@ -277,6 +400,44 @@ async function main() {
     await program.adminSettle({ admin: ADMIN, marketId: MARKET, forcedOutcome: OUTCOME_INVALID });
     ok(`settled by ${ADMIN} (admin override): outcome=invalid`);
     winSide = "invalid";
+  } else if (killCronAt === "phase3") {
+    // ── HY-5 cron-death simulation ───────────────────────────────────────
+    // Matches the exhausted-state log shape from
+    // .project/bell-markets/coordination/cron-failure.md (Bram's doc).
+    const CRON_SETTLER = "bram-automation-settler-keypair";
+    const FRESH_USER   = "freshly-generated-random-keypair";
+    step(`Bram's cron picks up market ${MARKET}; settler=${CRON_SETTLER}`);
+    step(`would attempt settle_market(); Pyth confidence widens transiently`);
+    step(`attempt 1: AnchorError(PythConfidenceTooWide #6010) — retry in 30s`);
+    step(`attempt 2: AnchorError(PythConfidenceTooWide #6010) — retry in 30s`);
+    step(`... container KILLED mid-retry at attempt 7 (~210s elapsed)`);
+    console.log(JSON.stringify({
+      jobId: "settlement-nudger",
+      runAt: new Date(Number(state.blockTime) * 1000).toISOString(),
+      ctxRunId: `operator-${Date.now()}`,
+      level: "warn",
+      marketPubkey: MARKET,
+      ticker: "AAPL",
+      status: "killed",
+      reason: "container died mid-retry; market remains Unsettled on chain",
+      attempts: 7,
+      elapsedMs: 210_000,
+      lastError: "AnchorError(PythConfidenceTooWide #6010): synthetic",
+    }, null, 2));
+    // On-chain state: market is still Unsettled. Any user can crank.
+    const stillUnsettled = await program.fetchStrikeMarket(MARKET);
+    if (outcomeKind(stillUnsettled.outcome) !== "unsettled") {
+      fail(`HY-5 broken: market unexpectedly settled despite cron kill`);
+    } else {
+      ok(`market remains Unsettled on chain post-cron-kill (verified via fetchStrikeMarket)`);
+    }
+    // Fresh user cranks settle. DR-002 says no special signer required.
+    step(`${FRESH_USER} sees the unsettled market via RPC + clicks "Settle" in UI`);
+    await program.settleMarket({ settler: FRESH_USER, marketId: MARKET });
+    const settled = await program.fetchStrikeMarket(MARKET);
+    winSide = outcomeKind(settled.outcome);
+    ok(`HY-5: settled by ${FRESH_USER} (fresh keypair, no admin authority): outcome=${winSide}`);
+    ok(`cron-death recovery complete; on-chain lifecycle unaffected by Bram's container death`);
   } else {
     step(`would read Pyth account ${PYTH}; mocked close = $${Number(PYTH_CLOSE_PRICE) / 1e6}`);
     await program.settleMarket({ settler: CAROL, marketId: MARKET });

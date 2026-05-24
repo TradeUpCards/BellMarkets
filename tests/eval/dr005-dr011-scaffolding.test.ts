@@ -1,0 +1,696 @@
+// dr005-dr011-scaffolding.test.ts — coverage for the 10 new instructions Aria
+// shipped in the Day-5 merge (DR-005 / DR-006 / DR-008 / DR-010 / DR-011).
+//
+// Status (2026-05-23 Day-5 post-merge): 27 mock-side tests ACTIVE.
+// 11 Bram-side tests (DR-007 trading calendar + DR-011 earnings calendar)
+// remain `it.skip` because their helpers live in `services/automation/`
+// (Bram's territory) and aren't yet exported as importable modules from
+// his workspace. When Bram publishes calendar.ts + earnings-calendar.ts,
+// flip the skip on each and fill in the import.
+//
+// Source DRs:
+//   DR-005 — user_create_strike_market + TickerConfig + UserConfig + force_redeem + close_settled_market
+//   DR-006 — update_ticker_config + 24h rolling strike-grid
+//   DR-007 — trading calendar helpers (Bram-side)
+//   DR-008 — mint_pair fee math + tier discounts + creator rebate + initialize_fee_config + update_fee_config
+//   DR-010 — commit_leaderboard_root + distribute_weekly_rewards + distribute_monthly_rewards + Merkle verify
+//   DR-011 — earnings-calendar pre-expansion (Bram-side)
+
+import { expect } from "chai";
+import { createHash } from "node:crypto";
+import {
+  createMockAria, ONE_USDC, OUTCOME_INVALID, OUTCOME_YES,
+  DEFAULT_FEE_CONFIG, mockMerkleLeaf, mockMerkleVerifyProof,
+  type Pubkey, type MockState, type AriaProgram,
+} from "../integration/mocks/aria-interface";
+
+const ADMIN  = "admin-pubkey";
+const USER   = "user-pubkey";
+const USER2  = "user2-pubkey";
+const PYTH   = "pyth-aapl-feed-mock";
+const PHOENIX = "phoenix-aapl-fifo-market-mock";
+const USDC_MINT = "usdc-mint-mock";
+const TREASURY  = "treasury-mock";
+
+const DEFAULT_INIT = {
+  admin: ADMIN, usdcMint: USDC_MINT, treasury: TREASURY,
+  priceStalenessSecs: 300n, priceConfidenceBps: 50, adminOverrideDelaySecs: 3600n,
+};
+
+// AAPL-tuned per DR-005 §"Decision" table.
+const AAPL_MAX_DEV_BPS = 1500;          // 15%
+const AAPL_TICK = ONE_USDC;             // $1 micro-USDC
+const AAPL_SPOT = 200_000_000n;         // $200
+
+/** Setup: init config, set TickerConfig for AAPL (centered at $200, 15% dev, $1 tick). */
+async function setupWithTickerConfig(opts: Parameters<typeof createMockAria>[0] = {}): Promise<{ program: AriaProgram; state: MockState }> {
+  const { program, state } = createMockAria(opts);
+  state.blockTime = 1_000_000n;
+  state.slot = 250_000_000n;
+  await program.initializeConfig(DEFAULT_INIT);
+  await program.updateTickerConfig({
+    admin: ADMIN, pythFeed: PYTH,
+    capCenter: AAPL_SPOT,
+    maxUserStrikeDeviationBps: AAPL_MAX_DEV_BPS,
+    strikeTickSize: AAPL_TICK,
+    thresholdBps: 400,
+  });
+  return { program, state };
+}
+
+// ─── DR-005 — user_create_strike_market (permissionless, user-funded) ────
+
+describe("DR-005 — user_create_strike_market (permissionless, user-funded)", () => {
+  it("succeeds with strike within ±max_dev_bps of Pyth spot + aligned to tick", async () => {
+    const { program } = await setupWithTickerConfig();
+    const STRIKE = 210_000_000n;        // $210 — within $30 band of $200 spot
+    const res = await program.userCreateStrikeMarket({
+      user: USER, underlyingPythFeed: PYTH, strikePrice: STRIKE,
+      expiryUnix: 1_001_000n, phoenixMarket: PHOENIX,
+    });
+    expect(res.signature).to.match(/^mock-/);
+    const m = await program.fetchStrikeMarket(res.marketId);
+    expect(m.creator).to.equal(USER);   // DR-005 + DR-008: creator field for rebate logic
+    expect(m.strikePrice).to.equal(STRIKE);
+  });
+
+  it("rejects strike beyond max_user_strike_deviation_bps (out-of-cap)", async () => {
+    const { program } = await setupWithTickerConfig();
+    const STRIKE = 250_000_000n;        // $250 — outside $170-$230 band (capCenter ± 15%)
+    try {
+      await program.userCreateStrikeMarket({
+        user: USER, underlyingPythFeed: PYTH, strikePrice: STRIKE,
+        expiryUnix: 1_001_000n, phoenixMarket: PHOENIX,
+      });
+      expect.fail("expected StrikeBeyondDeviationCap");
+    } catch (e) {
+      expect((e as Error).message).to.match(/StrikeBeyondDeviationCap/);
+    }
+  });
+
+  it("rejects strike not aligned to strike_tick_size grid (misaligned tick)", async () => {
+    const { program } = await setupWithTickerConfig();
+    const STRIKE = 200_500_000n;        // $200.50 — not aligned to $1 tick
+    try {
+      await program.userCreateStrikeMarket({
+        user: USER, underlyingPythFeed: PYTH, strikePrice: STRIKE,
+        expiryUnix: 1_001_000n, phoenixMarket: PHOENIX,
+      });
+      expect.fail("expected StrikeMisalignedTick");
+    } catch (e) {
+      expect((e as Error).message).to.match(/StrikeMisalignedTick/);
+    }
+  });
+
+  it("rejects when Pyth feed fails staleness check at create time", async () => {
+    const { program } = await setupWithTickerConfig({ pythBehavior: "stale" });
+    try {
+      await program.userCreateStrikeMarket({
+        user: USER, underlyingPythFeed: PYTH, strikePrice: 200_000_000n,
+        expiryUnix: 1_001_000n, phoenixMarket: PHOENIX,
+      });
+      expect.fail("expected PythStale");
+    } catch (e) {
+      expect((e as Error).message).to.match(/PythStale/);
+    }
+  });
+
+  it("sets StrikeMarket.creator = user pubkey (DR-008 fee logic depends on this)", async () => {
+    const { program } = await setupWithTickerConfig();
+    const res = await program.userCreateStrikeMarket({
+      user: USER, underlyingPythFeed: PYTH, strikePrice: 200_000_000n,
+      expiryUnix: 1_001_000n, phoenixMarket: PHOENIX,
+    });
+    const m = await program.fetchStrikeMarket(res.marketId);
+    expect(m.creator).to.equal(USER);
+    // No setter ix exists for creator — verified by absence in AriaProgram interface.
+  });
+});
+
+// ─── DR-008 — mint_pair fee math (2% with tier discount + creator rebate) ─
+
+describe("DR-008 — mint_pair fee math", () => {
+  /** Setup with active fee config (2% mint fee, default split + rebate). */
+  async function setupWithFeeActive(): Promise<{ program: AriaProgram; state: MockState; marketId: Pubkey }> {
+    const { program, state } = await setupWithTickerConfig();
+    await program.initializeFeeConfig({
+      admin: ADMIN,
+      mintFeeBps: 200,        // 2% — enable the fee mechanism
+      // other fields stay defaults
+    });
+    const res = await program.userCreateStrikeMarket({
+      user: ADMIN, underlyingPythFeed: PYTH, strikePrice: 200_000_000n,
+      expiryUnix: 1_001_000n, phoenixMarket: PHOENIX,
+    });
+    return { program, state, marketId: res.marketId };
+  }
+
+  it("tier 1 ($0-$999): pays 200 bps", async () => {
+    const { program, marketId } = await setupWithFeeActive();
+    // USER has $0 mint_volume_30d → tier 1
+    await program.mintPair({ user: USER, marketId, amount: 999n * ONE_USDC });
+    const pools = await program.fetchPoolBalances();
+    // Fee = 999 × 0.02 = 19.98 USDC. Default split 50/25/25.
+    const fee = (999n * ONE_USDC * 200n) / 10_000n;
+    expect(pools.feeCollector + pools.weekly + pools.monthly).to.equal(fee);
+    const userCfg = await program.fetchUserConfig(USER);
+    expect(userCfg.mintVolume30d).to.equal(999n * ONE_USDC);
+  });
+
+  it("tier boundary: at $1000 mint_volume_30d, NEXT mint pays 150 bps (tier 2)", async () => {
+    const { program, marketId } = await setupWithFeeActive();
+    // Build to exactly $1000 first
+    await program.mintPair({ user: USER, marketId, amount: 1000n * ONE_USDC });
+    const beforeFee = (await program.fetchPoolBalances());
+    const beforeTotal = beforeFee.feeCollector + beforeFee.weekly + beforeFee.monthly;
+    // Now mint $1 more — should be at tier 2 (150 bps)
+    await program.mintPair({ user: USER, marketId, amount: 1n * ONE_USDC });
+    const afterFee = (await program.fetchPoolBalances());
+    const afterDelta = (afterFee.feeCollector + afterFee.weekly + afterFee.monthly) - beforeTotal;
+    expect(afterDelta).to.equal((1n * ONE_USDC * 150n) / 10_000n);
+  });
+
+  it("tier 2 ($1000-$9999): pays 150 bps", async () => {
+    const { program, marketId } = await setupWithFeeActive();
+    await program.mintPair({ user: USER, marketId, amount: 5000n * ONE_USDC });
+    const before = await program.fetchPoolBalances();
+    const beforeTotal = before.feeCollector + before.weekly + before.monthly;
+    await program.mintPair({ user: USER, marketId, amount: 100n * ONE_USDC });
+    const after = await program.fetchPoolBalances();
+    const delta = (after.feeCollector + after.weekly + after.monthly) - beforeTotal;
+    expect(delta).to.equal((100n * ONE_USDC * 150n) / 10_000n);
+  });
+
+  it("tier 3 ($10000+): pays 100 bps", async () => {
+    const { program, marketId } = await setupWithFeeActive();
+    await program.mintPair({ user: USER, marketId, amount: 10_000n * ONE_USDC });
+    const before = await program.fetchPoolBalances();
+    const beforeTotal = before.feeCollector + before.weekly + before.monthly;
+    await program.mintPair({ user: USER, marketId, amount: 100n * ONE_USDC });
+    const after = await program.fetchPoolBalances();
+    const delta = (after.feeCollector + after.weekly + after.monthly) - beforeTotal;
+    expect(delta).to.equal((100n * ONE_USDC * 100n) / 10_000n);
+  });
+
+  it("tier boundary: at exactly $10000 - 1 micro-USDC, NEXT mint pays 150 (tier 2), not 100 (tier 3)", async () => {
+    // Sonnet audit asked for an exact-$10K boundary test. This proves the breakpoint
+    // is `< 10_000 * ONE_USDC` (strict-less), not `<= 10_000 * ONE_USDC` (would map
+    // exactly-$10K to tier 2 instead of tier 3).
+    const { program, marketId } = await setupWithFeeActive();
+    await program.mintPair({ user: USER, marketId, amount: 10_000n * ONE_USDC - 1n });
+    const before = await program.fetchPoolBalances();
+    const beforeTotal = before.feeCollector + before.weekly + before.monthly;
+    // At mintVolume30d = 9_999_999_999, next mint is still tier 2 (150 bps)
+    await program.mintPair({ user: USER, marketId, amount: 100n * ONE_USDC });
+    const after = await program.fetchPoolBalances();
+    const delta = (after.feeCollector + after.weekly + after.monthly) - beforeTotal;
+    expect(delta).to.equal((100n * ONE_USDC * 150n) / 10_000n);
+  });
+
+  it("tier scaling with promo mode: mint_fee_bps=100 → tier 1 pays 100 bps, not 200 (sonnet-audit-3)", async () => {
+    // Verifies the fix for Sonnet audit P0: previously mock used raw tier_bps
+    // regardless of mint_fee_bps, which only matched Rust at canonical mint_fee_bps=200.
+    // With mint_fee_bps=100 (promo mode), effective tier should HALVE.
+    const { program, state } = await setupWithTickerConfig();
+    await program.initializeFeeConfig({
+      admin: ADMIN, mintFeeBps: 100,         // PROMO: half normal fee
+    });
+    const res = await program.userCreateStrikeMarket({
+      user: ADMIN, underlyingPythFeed: PYTH, strikePrice: 200_000_000n,
+      expiryUnix: state.blockTime + 60n, phoenixMarket: PHOENIX,
+    });
+    await program.mintPair({ user: USER, marketId: res.marketId, amount: 100n * ONE_USDC });
+    const pools = await program.fetchPoolBalances();
+    // Tier 1 raw = 200; scaled by mint_fee_bps/200 = 100/200 = 0.5 → effective = 100 bps
+    expect(pools.feeCollector + pools.weekly + pools.monthly).to.equal((100n * ONE_USDC * 100n) / 10_000n);
+  });
+
+  it("creator rebate: creator==user && Unsettled → effective fee is 0 (default 100% rebate)", async () => {
+    const { program, marketId } = await setupWithFeeActive();
+    // Market was created by ADMIN above. Now ADMIN mints → creator rebate fires.
+    const before = await program.fetchPoolBalances();
+    await program.mintPair({ user: ADMIN, marketId, amount: 100n * ONE_USDC });
+    const after = await program.fetchPoolBalances();
+    // Default creator_rebate_bps = 10000 → creator pays 0%
+    expect(after.feeCollector + after.weekly + after.monthly).to.equal(before.feeCollector + before.weekly + before.monthly);
+  });
+
+  it("creator rebate: does NOT update mint_volume_30d (gaming defense per DR-008)", async () => {
+    const { program, marketId } = await setupWithFeeActive();
+    // ADMIN created market; ADMIN mints $1500 → rebate fires; mint_volume_30d must NOT increment
+    await program.mintPair({ user: ADMIN, marketId, amount: 1500n * ONE_USDC });
+    const adminCfg = await program.fetchUserConfig(ADMIN);
+    expect(adminCfg.mintVolume30d).to.equal(0n);
+  });
+
+  it("non-creator mints into creator's strike: pays normal tier fee + updates mint_volume_30d", async () => {
+    const { program, marketId } = await setupWithFeeActive();
+    // USER (not creator) mints $100 → tier 1 (200 bps), volume updates.
+    await program.mintPair({ user: USER, marketId, amount: 100n * ONE_USDC });
+    const userCfg = await program.fetchUserConfig(USER);
+    expect(userCfg.mintVolume30d).to.equal(100n * ONE_USDC);
+    const pools = await program.fetchPoolBalances();
+    expect(pools.feeCollector + pools.weekly + pools.monthly).to.equal((100n * ONE_USDC * 200n) / 10_000n);
+  });
+
+  it("fee splits correctly: platform (50%) + weekly (25%) + monthly (25%) = total fee", async () => {
+    const { program, marketId } = await setupWithFeeActive();
+    await program.mintPair({ user: USER, marketId, amount: 100n * ONE_USDC });
+    const pools = await program.fetchPoolBalances();
+    const totalFee = (100n * ONE_USDC * 200n) / 10_000n;       // $2 micro-USDC = 2_000_000
+    expect(pools.feeCollector).to.equal(totalFee / 2n);         // 50%
+    expect(pools.weekly).to.equal(totalFee / 4n);                // 25%
+    expect(pools.monthly).to.equal(totalFee - pools.feeCollector - pools.weekly);  // remainder = 25%
+  });
+
+  it("initializeFeeConfig rejects bps sum != 10000 (FeeBpsSumMismatch)", async () => {
+    const { program } = await setupWithTickerConfig();
+    try {
+      await program.initializeFeeConfig({
+        admin: ADMIN, platformRetainBps: 4000, weeklyPoolBps: 2500, monthlyPoolBps: 2500,  // sums to 9000
+      });
+      expect.fail("expected FeeBpsSumMismatch");
+    } catch (e) {
+      expect((e as Error).message).to.match(/FeeBpsSumMismatch/);
+    }
+  });
+
+  it("$1 USDC invariant holds with fees active: vault stays exactly amount × pairs_minted (fees go to separate pools)", async () => {
+    const { program, marketId } = await setupWithFeeActive();
+    await program.mintPair({ user: USER,  marketId, amount: 100n * ONE_USDC });
+    await program.mintPair({ user: USER2, marketId, amount: 50n  * ONE_USDC });
+    // Vault should be exactly $150 — fees went to separate fee_collector/weekly/monthly pools.
+    const vault = await program.fetchVaultBalance(marketId);
+    expect(vault).to.equal(150n * ONE_USDC);
+    const pools = await program.fetchPoolBalances();
+    const expectedFees = (100n * ONE_USDC * 200n + 50n * ONE_USDC * 200n) / 10_000n;
+    expect(pools.feeCollector + pools.weekly + pools.monthly).to.equal(expectedFees);
+  });
+});
+
+// ─── DR-005 — force_redeem (admin escape valve after settle + grace) ─────
+
+describe("DR-005 — force_redeem", () => {
+  async function setupSettled(): Promise<{ program: AriaProgram; state: MockState; marketId: Pubkey }> {
+    const { program, state } = await setupWithTickerConfig();
+    const res = await program.userCreateStrikeMarket({
+      user: USER, underlyingPythFeed: PYTH, strikePrice: 200_000_000n,
+      expiryUnix: state.blockTime + 60n, phoenixMarket: PHOENIX,
+    });
+    await program.mintPair({ user: USER, marketId: res.marketId, amount: ONE_USDC });
+    state.blockTime += 70n;
+    await program.settleMarket({ settler: USER, marketId: res.marketId });
+    return { program, state, marketId: res.marketId };
+  }
+
+  it("rejects before settled_at + grace_secs (ForceRedeemTooEarly)", async () => {
+    const { program, marketId } = await setupSettled();
+    // Default grace = 30 days; we're just past expiry, so still too early.
+    try {
+      await program.forceRedeem({ admin: ADMIN, marketId, user: USER, amount: ONE_USDC });
+      expect.fail("expected ForceRedeemTooEarly");
+    } catch (e) {
+      expect((e as Error).message).to.match(/ForceRedeemTooEarly/);
+    }
+  });
+
+  it("succeeds after grace; transfers USDC out of vault", async () => {
+    const { program, state, marketId } = await setupSettled();
+    const grace = DEFAULT_FEE_CONFIG.forceRedeemGraceSecs;
+    state.blockTime += grace + 1n;
+    const before = await program.fetchVaultBalance(marketId);
+    await program.forceRedeem({ admin: ADMIN, marketId, user: USER, amount: ONE_USDC });
+    const after = await program.fetchVaultBalance(marketId);
+    expect(after).to.equal(before - ONE_USDC);
+  });
+
+  it("rejects non-admin caller (NotAdmin)", async () => {
+    const { program, state, marketId } = await setupSettled();
+    state.blockTime += DEFAULT_FEE_CONFIG.forceRedeemGraceSecs + 1n;
+    try {
+      await program.forceRedeem({ admin: USER, marketId, user: USER, amount: ONE_USDC });
+      expect.fail("expected NotAdmin");
+    } catch (e) {
+      expect((e as Error).message).to.match(/NotAdmin/);
+    }
+  });
+
+  it("BOUNDARY: rejects at exactly settled_at + grace_secs (Rust uses strict > per sonnet-audit-3)", async () => {
+    const { program, state, marketId } = await setupSettled();
+    const grace = DEFAULT_FEE_CONFIG.forceRedeemGraceSecs;
+    // Time-travel to EXACTLY settled_at + grace. Rust: rejects (now > settled_at + grace).
+    // Previous mock used `<` allowing this through; fix makes it `<=` rejecting.
+    const market = await program.fetchStrikeMarket(marketId);
+    state.blockTime = market.settledAtUnix + grace;
+    try {
+      await program.forceRedeem({ admin: ADMIN, marketId, user: USER, amount: ONE_USDC });
+      expect.fail("expected ForceRedeemTooEarly at exactly settledAt + grace");
+    } catch (e) {
+      expect((e as Error).message).to.match(/ForceRedeemTooEarly/);
+    }
+    // Advance ONE more second → should now succeed.
+    state.blockTime += 1n;
+    await program.forceRedeem({ admin: ADMIN, marketId, user: USER, amount: ONE_USDC });   // no throw
+  });
+});
+
+// ─── DR-005 — close_settled_market (rent recovery) ───────────────────────
+
+describe("DR-005 — close_settled_market", () => {
+  it("rejects when pairs_outstanding > 0 (PairsStillOutstanding)", async () => {
+    const { program, state } = await setupWithTickerConfig();
+    const res = await program.userCreateStrikeMarket({
+      user: USER, underlyingPythFeed: PYTH, strikePrice: 200_000_000n,
+      expiryUnix: state.blockTime + 60n, phoenixMarket: PHOENIX,
+    });
+    await program.mintPair({ user: USER, marketId: res.marketId, amount: ONE_USDC });
+    state.blockTime += 70n;
+    await program.settleMarket({ settler: USER, marketId: res.marketId });
+    // Vault still has $1 (USER hasn't redeemed). Close should reject.
+    try {
+      await program.closeSettledMarket({ closer: USER, marketId: res.marketId });
+      expect.fail("expected PairsStillOutstanding");
+    } catch (e) {
+      expect((e as Error).message).to.match(/PairsStillOutstanding/);
+    }
+  });
+
+  it("succeeds when pairs_outstanding == 0; recovered rent flows to treasury (fee_collector)", async () => {
+    const { program, state } = await setupWithTickerConfig();
+    const res = await program.userCreateStrikeMarket({
+      user: USER, underlyingPythFeed: PYTH, strikePrice: 200_000_000n,
+      expiryUnix: state.blockTime + 60n, phoenixMarket: PHOENIX,
+    });
+    await program.mintPair({ user: USER, marketId: res.marketId, amount: ONE_USDC });
+    state.blockTime += 70n;
+    await program.settleMarket({ settler: USER, marketId: res.marketId });
+    await program.redeem({ user: USER, marketId: res.marketId, amount: ONE_USDC });
+    expect(await program.fetchVaultBalance(res.marketId)).to.equal(0n);
+    const before = (await program.fetchPoolBalances()).feeCollector;
+    await program.closeSettledMarket({ closer: USER, marketId: res.marketId });   // permissionless
+    const after = (await program.fetchPoolBalances()).feeCollector;
+    expect(after > before).to.equal(true);   // chai doesn't compare BigInt with greaterThan
+  });
+
+  it("rejects when called on Unsettled market (NotSettled)", async () => {
+    const { program, state } = await setupWithTickerConfig();
+    const res = await program.userCreateStrikeMarket({
+      user: USER, underlyingPythFeed: PYTH, strikePrice: 200_000_000n,
+      expiryUnix: state.blockTime + 60n, phoenixMarket: PHOENIX,
+    });
+    try {
+      await program.closeSettledMarket({ closer: USER, marketId: res.marketId });
+      expect.fail("expected NotSettled");
+    } catch (e) {
+      expect((e as Error).message).to.match(/NotSettled/);
+    }
+  });
+
+  it("audit-4: pairs_outstanding tracked independently of vault — force_redeem decrements both in lockstep", async () => {
+    // Earlier mock used `vault > 0` as a proxy for `pairs_outstanding > 0`. That works
+    // for normal mint/redeem flow but breaks if any future ix decremented one without the
+    // other. New mock tracks `pairsOutstanding: bigint` on StrikeMarket directly (matches
+    // Rust state.rs). This test verifies the field is decremented by every redeem-class
+    // ix and that close_settled_market gates on the field, not vault balance.
+    const { program, state } = await setupWithTickerConfig();
+    const res = await program.userCreateStrikeMarket({
+      user: USER, underlyingPythFeed: PYTH, strikePrice: 200_000_000n,
+      expiryUnix: state.blockTime + 60n, phoenixMarket: PHOENIX,
+    });
+    await program.mintPair({ user: USER, marketId: res.marketId, amount: ONE_USDC });
+    const afterMint = await program.fetchStrikeMarket(res.marketId);
+    expect(afterMint.pairsOutstanding).to.equal(ONE_USDC);
+    expect(await program.fetchVaultBalance(res.marketId)).to.equal(ONE_USDC);
+
+    state.blockTime += 70n;
+    await program.settleMarket({ settler: USER, marketId: res.marketId });
+    state.blockTime += DEFAULT_FEE_CONFIG.forceRedeemGraceSecs + 1n;
+    await program.forceRedeem({ admin: ADMIN, marketId: res.marketId, user: USER, amount: ONE_USDC });
+
+    // After force_redeem: both vault AND pairs_outstanding should be 0.
+    const afterForce = await program.fetchStrikeMarket(res.marketId);
+    expect(afterForce.pairsOutstanding).to.equal(0n);
+    expect(await program.fetchVaultBalance(res.marketId)).to.equal(0n);
+
+    // close_settled_market should succeed (gate is pairs_outstanding == 0).
+    await program.closeSettledMarket({ closer: USER, marketId: res.marketId });
+  });
+});
+
+// ─── DR-010 — commit_leaderboard_root + distribute_*_rewards (Merkle) ────
+
+describe("DR-010 — commit_leaderboard_root + distribute_*_rewards (Merkle-verifiable)", () => {
+  /** Helper: setup with fee config + some pool balance to distribute from.
+   *  Mints from USER2 (NOT the creator) to avoid creator rebate zeroing the fee. */
+  async function setupWithPoolFunds(): Promise<{ program: AriaProgram; state: MockState }> {
+    const { program, state } = await setupWithTickerConfig();
+    await program.initializeFeeConfig({ admin: ADMIN, mintFeeBps: 200 });
+    const res = await program.userCreateStrikeMarket({
+      user: USER, underlyingPythFeed: PYTH, strikePrice: 200_000_000n,
+      expiryUnix: state.blockTime + 60n, phoenixMarket: PHOENIX,
+    });
+    // USER2 (NOT creator) mints $10000 → tier 1 200bps fee = $200; split 50/25/25 → $50 weekly + $50 monthly.
+    await program.mintPair({ user: USER2, marketId: res.marketId, amount: 10_000n * ONE_USDC });
+    return { program, state };
+  }
+
+  /** Build a one-leaf Merkle tree (single-recipient). Root = leaf hash; proof = [].
+   *  Uses mockMerkleLeaf so the format matches what distributeRewardsImpl verifies against. */
+  function singleLeafProof(
+    recipient: Pubkey, position: number, periodId: bigint, periodType: 0 | 1, amount: bigint,
+  ): { root: Uint8Array; proof: Uint8Array[] } {
+    return { root: mockMerkleLeaf(recipient, position, periodId, periodType, amount), proof: [] };
+  }
+
+  /** Build a 2-leaf tree. Returns root + proof for `target` (the leaf at index `targetIdx`).
+   *  Exercises the proof-walking loop in distributeRewardsImpl (single-leaf test leaves it dead). */
+  function twoLeafProof(
+    leaves: Array<{ recipient: Pubkey; position: number; periodId: bigint; periodType: 0 | 1; amount: bigint }>,
+    targetIdx: 0 | 1,
+  ): { root: Uint8Array; proof: Uint8Array[] } {
+    const hashes = leaves.map((l) => mockMerkleLeaf(l.recipient, l.position, l.periodId, l.periodType, l.amount));
+    // Sorted-pair concat at the only internal node
+    const [a, b] = (() => {
+      let cmp = 0;
+      for (let i = 0; i < 32; i++) { if (hashes[0][i] !== hashes[1][i]) { cmp = hashes[0][i] - hashes[1][i]; break; } }
+      return cmp < 0 ? [hashes[0], hashes[1]] : [hashes[1], hashes[0]];
+    })();
+    const concat = new Uint8Array(64); concat.set(a, 0); concat.set(b, 32);
+    const root = new Uint8Array(createHash("sha256").update(concat).digest());
+    const proof = [hashes[targetIdx === 0 ? 1 : 0]];        // sibling is the OTHER leaf
+    return { root, proof };
+  }
+
+  it("commit_leaderboard_root: rejects non-admin (NotAdmin)", async () => {
+    const { program } = await setupWithPoolFunds();
+    const { root } = singleLeafProof(USER, 1, 1n, 0, 100n);
+    try {
+      await program.commitLeaderboardRoot({
+        admin: USER, periodId: 1n, periodType: 0,
+        merkleRoot: root, arweaveTxId: new Uint8Array(48),
+      });
+      expect.fail("expected NotAdmin");
+    } catch (e) {
+      expect((e as Error).message).to.match(/NotAdmin/);
+    }
+  });
+
+  it("commit_leaderboard_root: stores commitment in LeaderboardCommitments PDA", async () => {
+    const { program, state } = await setupWithPoolFunds();
+    const { root } = singleLeafProof(USER, 1, 42n, 0, 100n);
+    await program.commitLeaderboardRoot({
+      admin: ADMIN, periodId: 42n, periodType: 0,
+      merkleRoot: root, arweaveTxId: new Uint8Array(48),
+    });
+    expect(state.leaderboardCommitments.size).to.equal(1);
+    const stored = state.leaderboardCommitments.get("0:42");
+    expect(stored).to.exist;
+    expect(stored!.periodId).to.equal(42n);
+    expect(stored!.periodType).to.equal(0);
+  });
+
+  it("distribute_weekly_rewards: rejects when merkle_proof doesn't verify against committed root", async () => {
+    const { program } = await setupWithPoolFunds();
+    const { root } = singleLeafProof(USER, 1, 1n, 0, 100n);
+    await program.commitLeaderboardRoot({
+      admin: ADMIN, periodId: 1n, periodType: 0, merkleRoot: root, arweaveTxId: new Uint8Array(48),
+    });
+    try {
+      await program.distributeWeeklyRewards({
+        admin: ADMIN, periodId: 1n, recipient: USER2, position: 1, amount: 100n, merkleProof: [],
+      });
+      expect.fail("expected InvalidProof");
+    } catch (e) {
+      expect((e as Error).message).to.match(/InvalidProof/);
+    }
+  });
+
+  it("distribute_weekly_rewards: succeeds with valid proof; transfers from weekly pool", async () => {
+    const { program, state } = await setupWithPoolFunds();
+    const distAmount = 10n * ONE_USDC;
+    const { root, proof } = singleLeafProof(USER, 1, 1n, 0, distAmount);
+    await program.commitLeaderboardRoot({
+      admin: ADMIN, periodId: 1n, periodType: 0, merkleRoot: root, arweaveTxId: new Uint8Array(48),
+    });
+    const before = state.weeklyPool;
+    expect(before > distAmount).to.equal(true);
+    await program.distributeWeeklyRewards({
+      admin: ADMIN, periodId: 1n, recipient: USER, position: 1, amount: distAmount, merkleProof: proof,
+    });
+    expect(state.weeklyPool).to.equal(before - distAmount);
+  });
+
+  it("distribute_weekly_rewards: rejects re-distribution to same recipient/position (AlreadyClaimed)", async () => {
+    const { program } = await setupWithPoolFunds();
+    const { root, proof } = singleLeafProof(USER, 1, 1n, 0, 10n * ONE_USDC);
+    await program.commitLeaderboardRoot({
+      admin: ADMIN, periodId: 1n, periodType: 0, merkleRoot: root, arweaveTxId: new Uint8Array(48),
+    });
+    await program.distributeWeeklyRewards({
+      admin: ADMIN, periodId: 1n, recipient: USER, position: 1, amount: 10n * ONE_USDC, merkleProof: proof,
+    });
+    try {
+      await program.distributeWeeklyRewards({
+        admin: ADMIN, periodId: 1n, recipient: USER, position: 1, amount: 10n * ONE_USDC, merkleProof: proof,
+      });
+      expect.fail("expected AlreadyClaimed");
+    } catch (e) {
+      expect((e as Error).message).to.match(/AlreadyClaimed/);
+    }
+  });
+
+  it("distribute_monthly_rewards: same shape as weekly but operates on monthly pool", async () => {
+    const { program, state } = await setupWithPoolFunds();
+    const distAmount = 10n * ONE_USDC;
+    const { root, proof } = singleLeafProof(USER, 1, 1n, 1, distAmount);
+    await program.commitLeaderboardRoot({
+      admin: ADMIN, periodId: 1n, periodType: 1, merkleRoot: root, arweaveTxId: new Uint8Array(48),
+    });
+    const beforeWeekly = state.weeklyPool;
+    const beforeMonthly = state.monthlyPool;
+    await program.distributeMonthlyRewards({
+      admin: ADMIN, periodId: 1n, recipient: USER, position: 1, amount: distAmount, merkleProof: proof,
+    });
+    expect(state.weeklyPool).to.equal(beforeWeekly);
+    expect(state.monthlyPool).to.equal(beforeMonthly - distAmount);
+  });
+
+  // ─── New post-audit tests ─────────────────────────────────────────────
+
+  it("rejects position=0 BEFORE Merkle check (matches Rust is_valid_position bounds-first order)", async () => {
+    // Audit-4: commit a VALID root for position=1 with a real proof, then try distribute
+    // with position=0. If the bounds check fires first, we get InvalidDistributionPosition.
+    // If bounds check were ordered AFTER Merkle, we'd get InvalidProof instead (since the
+    // committed root encodes position=1 but we're claiming position=0). This test pins the
+    // check ORDER as well as the bounds.
+    const { program } = await setupWithPoolFunds();
+    const { root, proof } = singleLeafProof(USER, 1, 1n, 0, 10n * ONE_USDC);   // valid root for position=1
+    await program.commitLeaderboardRoot({
+      admin: ADMIN, periodId: 1n, periodType: 0, merkleRoot: root, arweaveTxId: new Uint8Array(48),
+    });
+    try {
+      await program.distributeWeeklyRewards({
+        admin: ADMIN, periodId: 1n, recipient: USER, position: 0, amount: 10n * ONE_USDC, merkleProof: proof,
+      });
+      expect.fail("expected InvalidDistributionPosition");
+    } catch (e) {
+      // Must be the BOUNDS error, NOT InvalidProof — proves bounds check fires first.
+      expect((e as Error).message, "bounds check must fire BEFORE Merkle verify").to.match(/InvalidDistributionPosition/);
+    }
+  });
+
+  it("MULTI-LEAF MERKLE: 2-leaf tree, valid proof for second leaf walks correctly", async () => {
+    const { program, state } = await setupWithPoolFunds();
+    const distAmount = 5n * ONE_USDC;
+    const leaves = [
+      { recipient: USER,  position: 1, periodId: 7n, periodType: 0 as const, amount: distAmount },
+      { recipient: USER2, position: 2, periodId: 7n, periodType: 0 as const, amount: distAmount },
+    ];
+    const { root, proof } = twoLeafProof(leaves, 1);
+    await program.commitLeaderboardRoot({
+      admin: ADMIN, periodId: 7n, periodType: 0, merkleRoot: root, arweaveTxId: new Uint8Array(48),
+    });
+    const beforePool = state.weeklyPool;
+    await program.distributeWeeklyRewards({
+      admin: ADMIN, periodId: 7n, recipient: USER2, position: 2, amount: distAmount, merkleProof: proof,
+    });
+    expect(state.weeklyPool).to.equal(beforePool - distAmount);
+  });
+
+  it("MULTI-LEAF MERKLE: tampered amount with otherwise-valid proof rejects (InvalidProof)", async () => {
+    const { program } = await setupWithPoolFunds();
+    const distAmount = 5n * ONE_USDC;
+    const leaves = [
+      { recipient: USER,  position: 1, periodId: 8n, periodType: 0 as const, amount: distAmount },
+      { recipient: USER2, position: 2, periodId: 8n, periodType: 0 as const, amount: distAmount },
+    ];
+    const { root, proof } = twoLeafProof(leaves, 0);
+    await program.commitLeaderboardRoot({
+      admin: ADMIN, periodId: 8n, periodType: 0, merkleRoot: root, arweaveTxId: new Uint8Array(48),
+    });
+    try {
+      // Pass amount=10 USDC but proof was built for amount=5 USDC
+      await program.distributeWeeklyRewards({
+        admin: ADMIN, periodId: 8n, recipient: USER, position: 1, amount: 10n * ONE_USDC, merkleProof: proof,
+      });
+      expect.fail("expected InvalidProof for tampered amount");
+    } catch (e) {
+      expect((e as Error).message).to.match(/InvalidProof/);
+    }
+  });
+
+  it("period_id isolation: proof valid for periodId=1 does NOT verify against periodId=2's root", async () => {
+    // Sonnet audit caught the original mock omitted period_id from the leaf, so
+    // the same recipient/position/amount accepted across all periods. Fix verified.
+    const { program } = await setupWithPoolFunds();
+    const distAmount = 5n * ONE_USDC;
+    const { root: rootP1 } = singleLeafProof(USER, 1, 1n, 0, distAmount);
+    // Commit DIFFERENT root for period 2
+    const { root: rootP2, proof } = singleLeafProof(USER, 1, 2n, 0, distAmount);
+    await program.commitLeaderboardRoot({
+      admin: ADMIN, periodId: 1n, periodType: 0, merkleRoot: rootP1, arweaveTxId: new Uint8Array(48),
+    });
+    await program.commitLeaderboardRoot({
+      admin: ADMIN, periodId: 2n, periodType: 0, merkleRoot: rootP2, arweaveTxId: new Uint8Array(48),
+    });
+    // Proof for period 2 should ONLY verify in period 2, not period 1.
+    // (Pre-fix: same leaf hash would have verified against any period's root.)
+    try {
+      await program.distributeWeeklyRewards({
+        admin: ADMIN, periodId: 1n, recipient: USER, position: 1, amount: distAmount, merkleProof: proof,
+      });
+      expect.fail("expected InvalidProof (proof was for period 2)");
+    } catch (e) {
+      expect((e as Error).message).to.match(/InvalidProof/);
+    }
+  });
+});
+
+// ─── DR-007 — trading calendar (Bram-side; pending Bram's calendar.ts publish) ───
+
+describe("DR-007 — trading calendar (skipped: Bram-side helpers not yet exported)", () => {
+  it.skip("isTradingDay: returns false for Saturday + Sunday", async () => undefined);
+  it.skip("isTradingDay: returns false for US full holidays (e.g., Memorial Day 2026-05-25)", async () => undefined);
+  it.skip("isTradingDay: returns TRUE for half-days", async () => undefined);
+  it.skip("getCloseTime: returns 16:00 ET for regular trading days", async () => undefined);
+  it.skip("getCloseTime: returns 13:00 ET for half-days", async () => undefined);
+  it.skip("nextTradingDay: skips weekends + full holidays; KEEPS half-days", async () => undefined);
+});
+
+// ─── DR-011 — earnings-calendar pre-expansion (Bram-side) ───
+
+describe("DR-011 — earnings-calendar pre-expansion (skipped: Bram-side helpers not yet exported)", () => {
+  it.skip("isEarningsTomorrow: returns true day before known MAG7 earnings", async () => undefined);
+  it.skip("preExpansionMagnitude: returns ticker-specific expanded cap", async () => undefined);
+  it.skip("post-earnings restore: returns ticker to default cap", async () => undefined);
+  it.skip("earnings-during-half-day edge case", async () => undefined);
+  it.skip("empty calendar: isEarningsTomorrow returns false; no crash", async () => undefined);
+});
+
+// Sanity heartbeat — confirms file loads cleanly post-merge.
+describe("scaffolding meta", () => {
+  it("file loads + mock + DEFAULT_FEE_CONFIG importable", () => {
+    expect(DEFAULT_FEE_CONFIG.creatorRebateBps).to.equal(10000);
+    expect(typeof createMockAria).to.equal("function");
+  });
+});

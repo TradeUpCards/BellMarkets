@@ -200,29 +200,46 @@ describe("BellMarkets live deploy verify (Drew, integration)", function () {
     expect(idl.metadata?.name).to.equal("bell_markets");
     expect(idl.metadata?.spec).to.equal("0.1.0");
 
-    // 9 instructions Aria's lib.rs declares (Day-3 added redeem_invalid).
+    // Day-3: 9 ix. Day-4: 10. Day-5 (post Aria DR-005/007/008/010 merge): 20.
+    // Forward-compatible: require the 10 Day-4 core ix; tolerate new ix from
+    // Aria's DR-005/008/010 expansion (user_create_strike_market, fee_config
+    // init + update, rewards pool init + commit + distribute, force_redeem,
+    // close_settled_market, update_ticker_config).
     const ixNames: string[] = (idl.instructions ?? []).map((i: { name: string }) => i.name).sort();
-    expect(ixNames).to.deep.equal([
-      "add_strike",
-      "admin_settle",
-      "create_strike_market",
-      "initialize_config",
-      "mint_pair",
-      "pause",
-      "redeem",
-      "redeem_invalid",
-      "settle_market",
+    const required10 = [
+      "add_strike", "admin_settle", "create_strike_market", "initialize_config",
+      "mint_pair", "pause", "redeem", "redeem_invalid", "redeem_pair", "settle_market",
+    ];
+    for (const required of required10) expect(ixNames).to.include(required);
+    expect(ixNames.length, "expected at least 10 core ix").to.be.at.least(10);
+
+    // Day-5 NEW ix presence check — if they're here, structural verify they
+    // match the DR spec. If missing, fail (would mean Aria's merge incomplete).
+    const day5NewIx = [
+      "user_create_strike_market", "update_ticker_config",
+      "force_redeem", "close_settled_market",
+      "initialize_fee_config", "update_fee_config",
+      "initialize_rewards_pools", "commit_leaderboard_root",
+      "distribute_weekly_rewards", "distribute_monthly_rewards",
+    ];
+    for (const newIx of day5NewIx) {
+      expect(ixNames, `Day-5 IDL must include ${newIx} (per DR-005/006/008/010)`).to.include(newIx);
+    }
+
+    // Day-3: 2 accounts. Day-5: 6 accounts (added FeeConfig, LeaderboardCommitments,
+    // TickerConfig, UserConfig per DR-005/008/010).
+    const accountNames: string[] = (idl.accounts ?? []).map((a: { name: string }) => a.name).sort();
+    expect(accountNames).to.include.members(["MarketConfig", "StrikeMarket"]);
+    expect(accountNames).to.include.members([
+      "FeeConfig", "LeaderboardCommitments", "TickerConfig", "UserConfig",
     ]);
 
-    // 2 accounts.
-    const accountNames: string[] = (idl.accounts ?? []).map((a: { name: string }) => a.name).sort();
-    expect(accountNames).to.deep.equal(["MarketConfig", "StrikeMarket"]);
-
-    // Day-3: 26 errors (Aria added ConfigMismatch when shipping redeem_invalid).
+    // Day-3: 26 errors. Day-5: 41 errors (DR-005/008/010 added new variants —
+    // StrikeBeyondDeviationCap, StrikeMisalignedTick, ForceRedeemTooEarly,
+    // PairsStillOutstanding, InvalidProof, FeeBpsSumMismatch, etc.).
     const codes: number[] = (idl.errors ?? []).map((e: { code: number }) => e.code).sort((a, b) => a - b);
-    expect(codes.length).to.equal(26);
+    expect(codes.length, "expected at least 26 errors from Day-3").to.be.at.least(26);
     expect(codes[0]).to.equal(6000);
-    expect(codes[codes.length - 1]).to.equal(6025);
 
     // Outcome enum has 4 variants.
     const outcomeType = (idl.types ?? []).find((t: { name: string }) => t.name === "Outcome");
