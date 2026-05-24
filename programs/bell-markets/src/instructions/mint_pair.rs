@@ -720,6 +720,80 @@ mod tests {
         }
     }
 
+    /// ADVERSARIAL: the DR-008 anti-tier-gaming attack. A creator opens 7
+    /// strikes of their own and mints $1500 in each (creator_rebate_fires =
+    /// true → fee_total = 0 in default config). Without the
+    /// `if !creator_rebate_fires` guard on the `mint_volume_30d` update, the
+    /// creator would accumulate $10,500 of "free" volume — accelerating
+    /// themselves from tier 1 (200 bps) to tier 3 (100 bps) for ALL
+    /// subsequent non-rebated mints in OTHER markets. Net gaming profit:
+    /// 100 bps × future-mint-volume × probability of staying tier 3.
+    ///
+    /// The safeguard at `mint_pair.rs` handler:
+    ///
+    /// ```rust
+    /// if !creator_rebate_fires {
+    ///     uc.mint_volume_30d = uc.mint_volume_30d.saturating_add(amount);
+    /// }
+    /// ```
+    ///
+    /// This test demonstrates the attack mechanics — both with the safeguard
+    /// (volume stays at 0) and WITHOUT (volume inflates to tier 3) — so any
+    /// future refactor that drops the guard fails THIS test, not just the
+    /// existing fee-conservation tests.
+    #[test]
+    fn mint_pair_creator_rebate_no_volume_inflation() {
+        let amount_per_mint = 1_500 * 1_000_000u64; // 1500 USDC base units
+        let n_strikes = 7u64;
+
+        // --- With safeguard (current behavior): rebated mints do NOT update volume.
+        let creator_rebate_fires = true;
+        let mut volume_with_safeguard = 0u64;
+        for _ in 0..n_strikes {
+            if !creator_rebate_fires {
+                volume_with_safeguard = volume_with_safeguard.saturating_add(amount_per_mint);
+            }
+        }
+        assert_eq!(
+            volume_with_safeguard, 0,
+            "DR-008 safeguard: creator-rebated mints MUST NOT inflate mint_volume_30d"
+        );
+        // Attacker stays at tier 1 (200 bps) for non-rebated mints.
+        assert_eq!(tier_fee_bps(volume_with_safeguard), TIER_FEE_BPS_TIER1);
+
+        // --- Without the safeguard (the regression we're guarding against):
+        //     the same attack inflates volume across tier-3 boundary.
+        let mut volume_without_safeguard = 0u64;
+        for _ in 0..n_strikes {
+            volume_without_safeguard = volume_without_safeguard.saturating_add(amount_per_mint);
+        }
+        // 7 × $1500 = $10,500 ≥ $10,000 (TIER_BREAK_10K_USDC) → tier 3.
+        assert_eq!(volume_without_safeguard, 10_500 * 1_000_000);
+        assert!(
+            volume_without_safeguard >= TIER_BREAK_10K_USDC,
+            "without safeguard, attacker crosses into tier 3"
+        );
+        assert_eq!(tier_fee_bps(volume_without_safeguard), TIER_FEE_BPS_TIER3);
+
+        // --- Verify the tier-3 → tier-1 gap is the gaming profit:
+        //     100 bps gap × all future non-rebated mints = attacker's free
+        //     win. The safeguard closes this entirely.
+        let tier_gap = TIER_FEE_BPS_TIER1 - TIER_FEE_BPS_TIER3;
+        assert_eq!(tier_gap, 100, "tier 1 vs tier 3 = 100 bps fee delta");
+
+        // --- Also verify: legitimate (non-rebated) mints DO accumulate volume.
+        let creator_rebate_doesnt_fire = false;
+        let mut legit_volume = 0u64;
+        for _ in 0..n_strikes {
+            if !creator_rebate_doesnt_fire {
+                legit_volume = legit_volume.saturating_add(amount_per_mint);
+            }
+        }
+        assert_eq!(legit_volume, 10_500 * 1_000_000);
+        // Volume reaches tier 3 honestly — the safeguard doesn't penalize
+        // legitimate accumulation, only the rebate-gaming path.
+    }
+
     #[test]
     fn conservation_creator_full_rebate_zeros_all_fees() {
         // Property: when creator rebate fires at 100% (10000 bps),

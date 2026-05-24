@@ -413,4 +413,68 @@ mod tests {
             .collect();
         assert_eq!(valid, vec![61_200, 64_800, 72_000, 75_600]);
     }
+
+    /// ADVERSARIAL: someone tries to spawn a strike market that expires at
+    /// US-equity MARKET OPEN (9:30 AM ET) instead of close. Under the user
+    /// path, this could let the spawner mint pairs at open and trade in a
+    /// market that "expires" mere seconds after creation — settling against
+    /// whatever Pyth spot happens to be at that moment, before normal price
+    /// discovery has occurred for the session.
+    ///
+    /// 9:30 AM ET UTC seconds-since-midnight values:
+    ///   - EDT (UTC-4): 13:30 UTC = 48_600 s
+    ///   - EST (UTC-5): 14:30 UTC = 52_200 s
+    ///
+    /// DR-007 locks expiries to 1 PM ET or 4 PM ET (close times only).
+    /// `expiry_is_market_close_time` rejects both open-time values + a
+    /// pre-market value (4:00 AM ET = 8:00 UTC = 28_800 s) + after-hours
+    /// (7:00 PM ET = 23:00 UTC = 82_800 s).
+    #[test]
+    fn user_create_strike_at_market_open_rejected_adversarial() {
+        // 9:30 AM ET EDT = 13:30 UTC = 48_600 s past midnight
+        assert!(
+            !expiry_is_market_close_time(48_600),
+            "expiry at 9:30 AM ET EDT (market OPEN) MUST be rejected per DR-007"
+        );
+
+        // 9:30 AM ET EST = 14:30 UTC = 52_200 s
+        assert!(
+            !expiry_is_market_close_time(52_200),
+            "expiry at 9:30 AM ET EST MUST be rejected per DR-007"
+        );
+
+        // Same day, multiple days into the epoch — modular check stays consistent.
+        for day_idx in [0i64, 1, 100, 10_000].iter().copied() {
+            let day_secs = day_idx * 86_400;
+            assert!(!expiry_is_market_close_time(day_secs + 48_600),
+                "day {day_idx}: 9:30 AM EDT rejected");
+            assert!(!expiry_is_market_close_time(day_secs + 52_200),
+                "day {day_idx}: 9:30 AM EST rejected");
+        }
+
+        // --- Other adversarial off-hours expiries (should all be rejected):
+        let off_hours_secs = [
+            ("pre-market 4 AM ET EDT", 8 * 3600),         // 28_800
+            ("pre-market 4 AM ET EST", 9 * 3600),         // 32_400
+            ("market open 9:30 AM ET EDT", 13 * 3600 + 30 * 60), // 48_600
+            ("noon 12 PM ET EDT",       16 * 3600),         // 57_600
+            ("after-hours 7 PM ET EDT", 23 * 3600),         // 82_800
+            ("midnight UTC",            0i64),
+            ("11:59 PM UTC",            86_399),
+            ("3 PM ET EDT (pre-close)", 19 * 3600),         // 68_400 — common bait
+            ("4:01 PM ET EDT (right after close)", 20 * 3600 + 60), // 72_060
+        ];
+        for &(name, secs) in &off_hours_secs {
+            assert!(
+                !expiry_is_market_close_time(secs),
+                "off-hours expiry {name} (={secs} s past midnight UTC) MUST be rejected"
+            );
+        }
+
+        // --- Sanity contrast: the 4 valid close times all accept.
+        assert!(expiry_is_market_close_time(61_200), "1 PM ET EDT close accepts");
+        assert!(expiry_is_market_close_time(64_800), "1 PM ET EST close accepts");
+        assert!(expiry_is_market_close_time(72_000), "4 PM ET EDT close accepts");
+        assert!(expiry_is_market_close_time(75_600), "4 PM ET EST close accepts");
+    }
 }
