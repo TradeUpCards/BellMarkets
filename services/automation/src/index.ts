@@ -180,3 +180,42 @@ export type { HeliusEnhancedTx, ParsedSettleEvent } from "./indexer/helius-webho
 
 // DR-014 — user profiles + social linking + notification channels
 export * from "./auth/index.js";
+
+// DR-015 — multi-metric leaderboard (4 metrics in one Merkle tree per period)
+export {
+  hashLeafV2,
+  buildMultiMetricMerkleTree,
+  verifyMultiMetricLeafProof,
+  DEFAULT_METRIC_POOL_SPLIT_BPS,
+  METRIC_ABSOLUTE_PROFIT,
+  METRIC_WIN_STREAK,
+  METRIC_WIN_RATE,
+  METRIC_ROI,
+  METRIC_NAMES,
+} from "./indexer/merkle-v2.js";
+export type {
+  MetricId,
+  MetricLeaderboardEntry,
+  MultiMetricLeaderboard,
+  MultiMetricLeaf,
+  MultiMetricMerkleTree,
+} from "./indexer/merkle-v2.js";
+export {
+  runMultiMetricDistribute,
+  assignAmountsToRanks,
+} from "./indexer/distribute-v2.js";
+export type {
+  MultiMetricDistributeDeps,
+  MultiMetricDistributeOutcome,
+  MultiMetricDistributePosition,
+  MetricSegmentedManifest,
+} from "./indexer/distribute-v2.js";
+export {
+  fetchAllMetricLeaderboards,
+  topProfitLeaderboard,
+  topStreakLeaderboard,
+  topWinRateLeaderboard,
+  topRoiLeaderboard,
+  WIN_RATE_MIN_TRADES,
+} from "./indexer/metric-leaderboards.js";
+export type { FourMetricLeaderboard, PeriodWindow } from "./indexer/metric-leaderboards.js";
