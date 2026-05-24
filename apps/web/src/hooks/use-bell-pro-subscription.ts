@@ -52,10 +52,23 @@ export function useBellProSubscription(): UseQueryResult<BellProSubscription | n
         subscription?: BellProSubscription;
         error?: string;
       };
-      if (!body.ok || !body.subscription) {
+      if (!body.ok) {
         throw new Error(body.error ?? "Billing response malformed.");
       }
-      return body.subscription;
+      // `subscription` absent is a valid "no record yet" state — return the
+      // synthesized `none` row so `isBellProActive` resolves cleanly to false
+      // and downstream UIs render the upgrade CTA without an error flicker
+      // (audit P2, 2026-05-23 evening).
+      return (
+        body.subscription ?? {
+          walletPubkey: walletBase58,
+          status: "none",
+          expiresAtUnix: null,
+          helioSubscriptionId: null,
+          planCode: null,
+          lastEventAtUnix: null,
+        }
+      );
     },
   });
 }

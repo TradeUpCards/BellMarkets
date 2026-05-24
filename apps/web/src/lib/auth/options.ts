@@ -196,5 +196,26 @@ export const authOptions: NextAuthOptions = {
     signIn: "/auth/signin",
     error: "/auth/error",
   },
-  debug: process.env.NODE_ENV === "development",
+  // `debug: true` would route NextAuth's internal OAuth-token-exchange +
+  // profile-payload logs through `console.log` — which dumps email / handle /
+  // OAuth id to stdout, violating the DR-014 "no PII in logs" rule. Use a
+  // redacted custom logger instead (audit P1, 2026-05-23 evening).
+  debug: false,
+  logger: {
+    error(code, metadata) {
+      // Only emit the error code + the error class name. Never the metadata
+      // object (which can contain provider profile / token).
+      const errClass =
+        metadata && typeof metadata === "object" && "name" in metadata
+          ? String((metadata as { name?: string }).name ?? "Error")
+          : "Error";
+      console.error(`[nextauth] ${code} (${errClass})`);
+    },
+    warn(code) {
+      console.warn(`[nextauth] ${code}`);
+    },
+    debug() {
+      // No-op. The default debug logger prints full request payloads.
+    },
+  },
 };
