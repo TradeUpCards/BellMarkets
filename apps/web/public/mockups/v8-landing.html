@@ -1079,6 +1079,80 @@
   }
   .prob-cell:hover .tip-hint { opacity: 1; }
 
+  /* ========== ROW-2COL (Leaderboard|Contests, Bell Pro|Recent Fills) ========== */
+  .row-2col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+  @media (max-width: 1024px) {
+    .row-2col { grid-template-columns: 1fr; }
+  }
+  .half-section { display: flex; flex-direction: column; min-width: 0; }
+  .half-card { height: 100%; display: flex; flex-direction: column; }
+  .section-h-block.compact { margin: 0 0 10px; }
+  .section-h-block.compact h2 { font-size: 16px; }
+
+  /* Leaderboard tabs (period + metric) */
+  .lb-tabs {
+    display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap;
+  }
+  .lb-tab-group {
+    display: flex; background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 4px; padding: 2px; gap: 2px;
+  }
+  .lb-tab {
+    background: transparent; border: none; color: var(--text-muted);
+    font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 700;
+    letter-spacing: 0.5px; text-transform: uppercase;
+    padding: 5px 10px; border-radius: 3px; min-height: 28px; cursor: pointer;
+    transition: all 100ms;
+  }
+  .lb-tab:hover { color: var(--text); }
+  .lb-tab.active { background: var(--accent-bg-strong); color: var(--accent); }
+  .lb-period-meta {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 6px 14px; background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 4px; margin-bottom: 8px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+  }
+  .lb-period-state { color: var(--text-muted); }
+  .lb-pool { color: var(--amber); font-weight: 700; font-size: 12px; }
+  .contests-stack { display: flex; flex-direction: column; gap: 10px; flex: 1; }
+
+  /* Bell Pro card — compact half-width version */
+  .bp-features-compact {
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 12px !important;
+    font-size: 11px !important;
+    margin: 6px 0 12px !important;
+  }
+  .bp-features-compact li { font-size: 11px !important; }
+  .bp-pricing-inline {
+    display: flex; align-items: center; gap: 16px;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 6px; padding: 12px 14px; margin-top: auto;
+  }
+  .bp-pricing-block { display: flex; flex-direction: column; gap: 6px; flex: 0 0 auto; }
+  .bp-pricing-block .bp-price {
+    font-size: 22px; line-height: 1;
+    display: flex; align-items: baseline; gap: 4px;
+  }
+  .bp-pricing-block .bp-price .small { font-size: 11px; color: var(--text-muted); }
+  .bp-pricing-block .bp-price .bp-per { font-size: 11px; color: var(--text-muted); font-weight: 500; }
+  .bp-pricing-block .bp-cta { padding: 6px 10px; font-size: 9px; min-height: 30px; }
+  .bp-founder-block {
+    display: flex; flex-direction: column; gap: 2px;
+    padding-left: 14px; border-left: 1px solid var(--border);
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  .bp-founder-label {
+    font-size: 9px; color: var(--accent);
+    letter-spacing: 1.5px; text-transform: uppercase; font-weight: 700;
+  }
+  .bp-founder-meta { font-size: 10px; color: var(--text-muted); }
+
   /* ========== LEADERBOARD SECTION ========== */
   .section-h-block {
     display: flex; justify-content: space-between; align-items: baseline;
@@ -1966,116 +2040,148 @@
       </div>
     </div>
 
-    <!-- LEADERBOARD SECTION (Cory feedback: new content for landing) -->
-    <div class="section-h-block">
-      <h2><span class="eyebrow">Leaderboard</span> Top traders this week + month</h2>
-      <div style="display: flex; gap: 12px; align-items: center;">
-        <!-- Metric toggle: profit vs streak (Cory question 2026-05-23) -->
-        <div style="display: flex; background: var(--panel-2); border: 1px solid var(--border); padding: 3px; border-radius: 6px;">
-          <button style="padding: 6px 14px; background: var(--accent-bg-strong); color: var(--accent); border: none; border-radius: 4px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; cursor: pointer;">PROFIT</button>
-          <button style="padding: 6px 14px; background: transparent; color: var(--text-muted); border: none; border-radius: 4px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; cursor: pointer;">WIN STREAK</button>
-          <button style="padding: 6px 14px; background: transparent; color: var(--text-muted); border: none; border-radius: 4px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; cursor: pointer;">WIN RATE</button>
+    <!-- Row: Leaderboard (tabbed, half width) + Contests (other half) -->
+    <div class="row-2col">
+
+    <!-- LEADERBOARD — tabbed by period × metric -->
+    <div class="half-section">
+      <div class="section-h-block compact">
+        <h2><span class="eyebrow">Leaderboard</span> Top traders</h2>
+        <a href="#" class="link">All →</a>
+      </div>
+      <div class="lb-tabs">
+        <div class="lb-tab-group period" role="tablist">
+          <button class="lb-tab active" data-period="weekly">Weekly</button>
+          <button class="lb-tab" data-period="monthly">Monthly</button>
         </div>
-        <a href="#" class="link">View all →</a>
+        <div class="lb-tab-group metric" role="tablist">
+          <button class="lb-tab active" data-metric="profit">Profit</button>
+          <button class="lb-tab" data-metric="streak">Win Streak</button>
+          <button class="lb-tab" data-metric="winrate">Win Rate</button>
+        </div>
+      </div>
+      <div class="lb-period-meta">
+        <span class="lb-period-state mono">Weekly · 2d 14h left</span>
+        <span class="lb-pool mono">$1,800 pool</span>
+      </div>
+    <div class="leaderboard-card half-card">
+      <div class="lb-row-item">
+        <span class="rank gold mono">#1</span>
+        <div class="lb-user-block">
+          <span class="lb-avatar">DG</span>
+          <div>
+            <div class="lb-name">degen.sol</div>
+            <div class="lb-meta">12W streak · 47 trades</div>
+          </div>
+        </div>
+        <span class="lb-pnl mono">+$2,847</span>
+      </div>
+      <div class="lb-row-item">
+        <span class="rank silver mono">#2</span>
+        <div class="lb-user-block">
+          <span class="lb-avatar">MX</span>
+          <div>
+            <div class="lb-name">maxprob.eth</div>
+            <div class="lb-meta">8W streak · 38 trades</div>
+          </div>
+        </div>
+        <span class="lb-pnl mono">+$2,103</span>
+      </div>
+      <div class="lb-row-item">
+        <span class="rank bronze mono">#3</span>
+        <div class="lb-user-block">
+          <span class="lb-avatar">QF</span>
+          <div>
+            <div class="lb-name">quantfox</div>
+            <div class="lb-meta">6W streak · 52 trades</div>
+          </div>
+        </div>
+        <span class="lb-pnl mono">+$1,876</span>
+      </div>
+      <div class="lb-row-item">
+        <span class="rank mono">#4</span>
+        <div class="lb-user-block">
+          <span class="lb-avatar">PY</span>
+          <div>
+            <div class="lb-name">pythheaad</div>
+            <div class="lb-meta">4W streak · 29 trades</div>
+          </div>
+        </div>
+        <span class="lb-pnl mono">+$1,421</span>
+      </div>
+      <div class="lb-row-item" style="background: rgba(34, 211, 238, 0.06);">
+        <span class="rank mono" style="color: var(--accent);">#5</span>
+        <div class="lb-user-block">
+          <span class="lb-avatar">CV</span>
+          <div>
+            <div class="lb-name" style="color: var(--accent);">you</div>
+            <div class="lb-meta">3W streak · 24 trades</div>
+          </div>
+        </div>
+        <span class="lb-pnl mono">+$1,247</span>
+      </div>
+      <div class="lb-row-item">
+        <span class="rank mono">#6</span>
+        <div class="lb-user-block">
+          <span class="lb-avatar">FR</span>
+          <div>
+            <div class="lb-name">frontrun.sol</div>
+            <div class="lb-meta">2W streak · 31 trades</div>
+          </div>
+        </div>
+        <span class="lb-pnl mono">+$1,087</span>
       </div>
     </div>
-    <div class="leaderboard-card">
-      <div class="lb-grid">
-        <div class="lb-col">
-          <div class="lb-col-h">
-            <span>Weekly · 2d 14h left</span>
-            <span class="pool mono">$1,800 pool</span>
+    </div><!-- /half-section leaderboard -->
+
+    <!-- CONTESTS — second half of the row -->
+    <div class="half-section">
+      <div class="section-h-block compact">
+        <h2><span class="eyebrow" style="background: rgba(244, 114, 182, 0.12); color: var(--pink); border: 1px solid var(--pink);">Contests</span> Active prize pools</h2>
+        <a href="#" class="link">All →</a>
+      </div>
+      <div class="contests-stack">
+        <div class="contest-card">
+          <span class="ct-eyebrow">EARNINGS WEEK</span>
+          <h3>NVDA Earnings Contest</h3>
+          <p>Pre-expansion strike grid open. Top-10 split by settled-trade accuracy through Friday's report.</p>
+          <div class="contest-pool-line">
+            <span class="contest-pool-amount mono">$3,400</span>
+            <span class="contest-pool-label">PRIZE POOL</span>
           </div>
-          <div class="lb-row-item">
-            <span class="rank gold mono">#1</span>
-            <div class="lb-user-block">
-              <span class="lb-avatar">DG</span>
-              <div>
-                <div class="lb-name">degen.sol</div>
-                <div class="lb-meta">12W streak · 47 trades</div>
-              </div>
-            </div>
-            <span class="lb-pnl mono">+$2,847</span>
-          </div>
-          <div class="lb-row-item">
-            <span class="rank silver mono">#2</span>
-            <div class="lb-user-block">
-              <span class="lb-avatar">MX</span>
-              <div>
-                <div class="lb-name">maxprob.eth</div>
-                <div class="lb-meta">8W streak · 38 trades</div>
-              </div>
-            </div>
-            <span class="lb-pnl mono">+$2,103</span>
-          </div>
-          <div class="lb-row-item">
-            <span class="rank bronze mono">#3</span>
-            <div class="lb-user-block">
-              <span class="lb-avatar">QF</span>
-              <div>
-                <div class="lb-name">quantfox</div>
-                <div class="lb-meta">6W streak · 52 trades</div>
-              </div>
-            </div>
-            <span class="lb-pnl mono">+$1,876</span>
-          </div>
-          <div class="lb-row-item">
-            <span class="rank mono">#4</span>
-            <div class="lb-user-block">
-              <span class="lb-avatar">PY</span>
-              <div>
-                <div class="lb-name">pythheaad</div>
-                <div class="lb-meta">4W streak · 29 trades</div>
-              </div>
-            </div>
-            <span class="lb-pnl mono">+$1,421</span>
-          </div>
-          <div class="lb-row-item" style="background: rgba(34, 211, 238, 0.06);">
-            <span class="rank mono" style="color: var(--accent);">#5</span>
-            <div class="lb-user-block">
-              <span class="lb-avatar">CV</span>
-              <div>
-                <div class="lb-name" style="color: var(--accent);">you</div>
-                <div class="lb-meta">3W streak · 24 trades</div>
-              </div>
-            </div>
-            <span class="lb-pnl mono">+$1,247</span>
+          <div class="contest-progress"><div class="contest-progress-fill" style="width: 35%;"></div></div>
+          <div class="contest-footer">
+            <span class="mono">3d left · 187 entries</span>
+            <span class="mono">join →</span>
           </div>
         </div>
-        <div class="lb-col">
-          <div class="lb-col-h">
-            <span>Monthly · 8d 14h left</span>
-            <span class="pool mono">$12,500 pool</span>
+        <div class="contest-card">
+          <span class="ct-eyebrow">MONTHLY · TOP 10</span>
+          <h3>May Trader Championship</h3>
+          <p>Settled-PNL leaderboard, top-10 traders split the monthly pool.</p>
+          <div class="contest-pool-line">
+            <span class="contest-pool-amount mono">$12,500</span>
+            <span class="contest-pool-label">PRIZE POOL</span>
           </div>
-          <div class="lb-row-item">
-            <span class="rank gold mono">#1</span>
-            <div class="lb-user-block">
-              <span class="lb-avatar">QF</span>
-              <div>
-                <div class="lb-name">quantfox</div>
-                <div class="lb-meta">$8,420 · 198 trades</div>
-              </div>
-            </div>
-            <span class="lb-pnl mono">+$8,420</span>
+          <div class="contest-progress"><div class="contest-progress-fill" style="width: 72%;"></div></div>
+          <div class="contest-footer">
+            <span class="mono">8d left · 524 entries</span>
+            <span class="mono my-rank">you · #5</span>
           </div>
-          <div class="lb-row-item">
-            <span class="rank silver mono">#2</span>
-            <div class="lb-user-block">
-              <span class="lb-avatar">DG</span>
-              <div>
-                <div class="lb-name">degen.sol</div>
-                <div class="lb-meta">$7,103 · 184 trades</div>
-              </div>
-            </div>
-            <span class="lb-pnl mono">+$7,103</span>
-          </div>
-          <div class="lb-row-item">
-            <span class="rank bronze mono">#3</span>
-            <div class="lb-user-block">
-              <span class="lb-avatar">VS</span>
-              <div>
-                <div class="lb-name">vols.sol</div>
-                <div class="lb-meta">$6,251 · 142 trades</div>
+        </div>
+      </div>
+    </div>
+    </div><!-- /row-2col -->
+
+    <!-- HIDDEN: legacy lb-col content (deleted from rendering, kept inert for safety) -->
+    <div style="display: none;">
+      <div class="lb-row-item">
+        <span class="rank gold mono">#1</span>
+        <div class="lb-user-block">
+          <span class="lb-avatar">QF</span>
+          <div>
+            <div class="lb-name">quantfox</div>
+            <div class="lb-meta">$8,420 · 198 trades</div>
               </div>
             </div>
             <span class="lb-pnl mono">+$6,251</span>
@@ -2106,208 +2212,60 @@
       </div>
     </div>
 
-    <!-- CONTESTS SECTION (Cory feedback: new content for landing) -->
-    <div class="section-h-block">
-      <h2><span class="eyebrow" style="color: var(--pink); background: rgba(244, 114, 182, 0.12); border-color: var(--pink); border: 1px solid;">Contests</span> Active prize pools</h2>
-      <a href="#" class="link">All contests →</a>
-    </div>
-    <div class="contests-grid">
-      <div class="contest-card">
-        <span class="ct-eyebrow">EARNINGS WEEK</span>
-        <h3>NVDA Earnings Contest</h3>
-        <p>Pre-expansion strike grid open. Top-10 split by settled-trade accuracy through Friday's report.</p>
-        <div class="contest-pool-line">
-          <span class="contest-pool-amount mono">$3,400</span>
-          <span class="contest-pool-label">PRIZE POOL</span>
+    <!-- Old standalone Contests + Bell Pro sections removed —
+         Contests now lives next to Leaderboard above (row-2col).
+         Bell Pro now pairs with Recent Fills below (row-2col). -->
+
+    <!-- Row: Bell Pro (half) + Recent Fills (half) -->
+    <div class="row-2col">
+
+    <!-- BELL PRO — compact half-width version -->
+    <div class="bell-pro-card half-card">
+      <span class="bp-eyebrow"><span aria-hidden="true">✦</span> Powered by Claude</span>
+      <h2 class="bp-title">Daily briefings on<br><span class="accent">7 MAG7 tickers</span></h2>
+      <p style="color: var(--text-muted); font-size: 13px; line-height: 1.5; margin-bottom: 12px;">
+        Pyth-grounded market intelligence. Per-position PNL digests. Earnings-week deep dives.
+        Behavioral guardrails. Information only — never financial advice.
+      </p>
+      <ul class="bp-features bp-features-compact">
+        <li>All 7 MAG7 daily briefings</li>
+        <li>Per-position PNL digests</li>
+        <li>Earnings-week analysis</li>
+        <li>Sensitivity context</li>
+        <li>Behavioral coaching</li>
+        <li>MCP access (own agent)</li>
+      </ul>
+      <div class="bp-pricing-inline">
+        <div class="bp-pricing-block">
+          <div class="bp-price">9<span class="small"> USDC</span><span class="bp-per">/mo</span></div>
+          <button class="bp-cta">UNLOCK BELL PRO →</button>
         </div>
-        <div class="contest-progress"><div class="contest-progress-fill" style="width: 35%;"></div></div>
-        <div class="contest-footer">
-          <span class="mono">3d left · 187 entries</span>
-          <span class="mono">join →</span>
-        </div>
-      </div>
-      <div class="contest-card">
-        <span class="ct-eyebrow">MONTHLY · TOP 10</span>
-        <h3>May Trader Championship</h3>
-        <p>Settled-PNL leaderboard, top-10 traders split the monthly pool. Funded by 25% of platform fees.</p>
-        <div class="contest-pool-line">
-          <span class="contest-pool-amount mono">$12,500</span>
-          <span class="contest-pool-label">PRIZE POOL</span>
-        </div>
-        <div class="contest-progress"><div class="contest-progress-fill" style="width: 72%;"></div></div>
-        <div class="contest-footer">
-          <span class="mono">8d left · 524 entries</span>
-          <span class="mono my-rank">you · #5</span>
-        </div>
-      </div>
-      <div class="contest-card">
-        <span class="ct-eyebrow">WEEKLY · STREAK</span>
-        <h3>Weekly Streak Champion</h3>
-        <p>Longest win streak wins. Resets weekly. Ties split the pool. Pyth-settled trades only.</p>
-        <div class="contest-pool-line">
-          <span class="contest-pool-amount mono">$1,800</span>
-          <span class="contest-pool-label">PRIZE POOL</span>
-        </div>
-        <div class="contest-progress"><div class="contest-progress-fill" style="width: 88%;"></div></div>
-        <div class="contest-footer">
-          <span class="mono">2d left · ends Sun</span>
-          <span class="mono">degen.sol · 12W</span>
+        <div class="bp-founder-block">
+          <span class="bp-founder-label">FOUNDER PASS</span>
+          <span class="bp-founder-meta">0.5 SOL · lifetime + gov + LP rebate</span>
         </div>
       </div>
     </div>
 
-    <!-- BELL PRO CTA (Cory feedback: AI agent + Pro subscription) -->
-    <div class="section-h-block">
-      <h2><span class="eyebrow">Bell Pro</span> AI-powered market intelligence</h2>
-      <a href="#" class="link">Full features →</a>
-    </div>
-    <div class="bell-pro-card">
-      <div>
-        <span class="bp-eyebrow"><span aria-hidden="true">✦</span> Powered by Claude</span>
-        <h2 class="bp-title">Daily briefings on all<br><span class="accent">7 MAG7 tickers</span></h2>
-        <p style="color: var(--text-muted); font-size: 14px; line-height: 1.6; max-width: 520px;">
-          AI market intelligence built on Pyth-grounded data + earnings transcripts + news ingestion.
-          Position-aware PNL digests after every settle. Earnings-week deep dives. Behavioral guardrails to protect your LTV.
-          Information only — never financial advice.
-        </p>
-        <ul class="bp-features">
-          <li>All 7 MAG7 daily briefings</li>
-          <li>Per-position PNL digests</li>
-          <li>Earnings-week analysis (~28/yr)</li>
-          <li>Sensitivity context per market</li>
-          <li>Behavioral coaching (overtrading)</li>
-          <li>MCP access for your own agent</li>
-        </ul>
+    <!-- RECENT FILLS — moved up next to Bell Pro -->
+    <div class="activity-card half-card">
+      <div class="activity-card-h">
+        <h3>Recent Fills</h3>
+        <span class="live">live · 24 trades</span>
       </div>
-      <div class="bp-pricing">
-        <div class="bp-price">9<span class="small"> USDC</span></div>
-        <div class="bp-period">per month · via Helio</div>
-        <button class="bp-cta">UNLOCK BELL PRO →</button>
-        <div class="bp-founder-note">
-          <strong>Founder Pass</strong> · 0.5 SOL one-time<br>
-          Lifetime Pro + governance + LP rebates
-        </div>
-      </div>
+      <div class="fill-row"><span class="time">14:42:18</span><span class="market"><span class="ticker">META</span>.680</span><span class="side buy-yes">BUY YES</span><span class="price mono">0.520</span><span class="size mono">$200</span></div>
+      <div class="fill-row"><span class="time">14:42:11</span><span class="market"><span class="ticker">NVDA</span>.1340</span><span class="side buy-no">BUY NO</span><span class="price mono">0.480</span><span class="size mono">$500</span></div>
+      <div class="fill-row"><span class="time">14:41:54</span><span class="market"><span class="ticker">AAPL</span>.230</span><span class="side sell-yes">SELL YES</span><span class="price mono">0.520</span><span class="size mono">$100</span></div>
+      <div class="fill-row"><span class="time">14:41:32</span><span class="market"><span class="ticker">TSLA</span>.260</span><span class="side buy-no">BUY NO</span><span class="price mono">0.530</span><span class="size mono">$1,000</span></div>
+      <div class="fill-row"><span class="time">14:41:08</span><span class="market"><span class="ticker">META</span>.680</span><span class="side buy-yes">BUY YES</span><span class="price mono">0.500</span><span class="size mono">$50</span></div>
+      <div class="fill-row"><span class="time">14:40:51</span><span class="market"><span class="ticker">GOOGL</span>.190</span><span class="side buy-yes">BUY YES</span><span class="price mono">0.370</span><span class="size mono">$300</span></div>
+      <div class="fill-row"><span class="time">14:40:33</span><span class="market"><span class="ticker">MSFT</span>.440</span><span class="side sell-yes">SELL YES</span><span class="price mono">0.450</span><span class="size mono">$150</span></div>
+      <div class="fill-row"><span class="time">14:40:12</span><span class="market"><span class="ticker">NVDA</span>.1300</span><span class="side buy-yes">BUY YES</span><span class="price mono">0.730</span><span class="size mono">$250</span></div>
     </div>
 
-    <!-- ACTIVITY: Recent fills + On-chain -->
-    <div class="activity-grid">
-      <div class="activity-card">
-        <div class="activity-card-h">
-          <h3>Recent Fills</h3>
-          <span class="live">live · 24 trades</span>
-        </div>
-        <div class="fill-row">
-          <span class="time">14:42:18</span>
-          <span class="market"><span class="ticker">META</span>.680</span>
-          <span class="side buy-yes">BUY YES</span>
-          <span class="price mono">0.520</span>
-          <span class="size mono">$200</span>
-        </div>
-        <div class="fill-row">
-          <span class="time">14:42:11</span>
-          <span class="market"><span class="ticker">NVDA</span>.1340</span>
-          <span class="side buy-no">BUY NO</span>
-          <span class="price mono">0.480</span>
-          <span class="size mono">$500</span>
-        </div>
-        <div class="fill-row">
-          <span class="time">14:41:54</span>
-          <span class="market"><span class="ticker">AAPL</span>.230</span>
-          <span class="side sell-yes">SELL YES</span>
-          <span class="price mono">0.520</span>
-          <span class="size mono">$100</span>
-        </div>
-        <div class="fill-row">
-          <span class="time">14:41:32</span>
-          <span class="market"><span class="ticker">TSLA</span>.260</span>
-          <span class="side buy-no">BUY NO</span>
-          <span class="price mono">0.530</span>
-          <span class="size mono">$1,000</span>
-        </div>
-        <div class="fill-row">
-          <span class="time">14:41:08</span>
-          <span class="market"><span class="ticker">META</span>.680</span>
-          <span class="side buy-yes">BUY YES</span>
-          <span class="price mono">0.500</span>
-          <span class="size mono">$50</span>
-        </div>
-        <div class="fill-row">
-          <span class="time">14:40:51</span>
-          <span class="market"><span class="ticker">GOOGL</span>.190</span>
-          <span class="side buy-yes">BUY YES</span>
-          <span class="price mono">0.370</span>
-          <span class="size mono">$300</span>
-        </div>
-        <div class="fill-row">
-          <span class="time">14:40:33</span>
-          <span class="market"><span class="ticker">MSFT</span>.440</span>
-          <span class="side sell-yes">SELL YES</span>
-          <span class="price mono">0.450</span>
-          <span class="size mono">$150</span>
-        </div>
-        <div class="fill-row">
-          <span class="time">14:40:12</span>
-          <span class="market"><span class="ticker">NVDA</span>.1300</span>
-          <span class="side buy-yes">BUY YES</span>
-          <span class="price mono">0.730</span>
-          <span class="size mono">$250</span>
-        </div>
-      </div>
+    </div><!-- /row-2col Bell Pro + Recent Fills -->
 
-      <div class="activity-card">
-        <div class="activity-card-h">
-          <h3>On-Chain Status</h3>
-          <span class="live">live</span>
-        </div>
-        <div class="chain-panel-rows">
-          <div class="chain-panel-row">
-            <span class="lbl">Network</span>
-            <span class="val live">devnet · 42ms</span>
-          </div>
-          <div class="chain-panel-row">
-            <span class="lbl">Pyth oracle</span>
-            <span class="val live">fresh · 12s ago</span>
-          </div>
-          <div class="chain-panel-row">
-            <span class="lbl">Confidence</span>
-            <span class="val">12 bps (max 50)</span>
-          </div>
-          <div class="chain-panel-row">
-            <span class="lbl">Slot</span>
-            <span class="val accent">312,847,193</span>
-          </div>
-          <div class="chain-panel-row">
-            <span class="lbl">Slot drift</span>
-            <span class="val">+47 / 400ms</span>
-          </div>
-          <div class="chain-panel-row">
-            <span class="lbl">Program</span>
-            <span class="val">599h7V…kS7uV</span>
-          </div>
-          <div class="chain-panel-row">
-            <span class="lbl">Config PDA</span>
-            <span class="val">6CYzWh…ev9gQ</span>
-          </div>
-          <div class="chain-panel-row">
-            <span class="lbl">USDC mint</span>
-            <span class="val">4zMMC9…DncDU</span>
-          </div>
-          <div class="chain-panel-row">
-            <span class="lbl">Settle in</span>
-            <span class="val amber">02:13:47</span>
-          </div>
-          <div class="chain-panel-row">
-            <span class="lbl">Override eligible</span>
-            <span class="val">+1h after expiry</span>
-          </div>
-          <div class="chain-panel-row">
-            <span class="lbl">Anchor / Rust</span>
-            <span class="val">0.31.1 / 1.95</span>
-          </div>
-        </div>
-      </div>
-    </div>
+    <!-- Old activity-grid removed: Recent Fills moved into row-2col with Bell Pro above; On-Chain Status removed entirely per Cory feedback. -->
 
     <!-- HOW IT WORKS -->
     <div class="how-section">
