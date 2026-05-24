@@ -1680,80 +1680,10 @@
 
     </div><!-- /hero-grid -->
 
-    <!-- TICKER STRIP (old static, hidden) -->
-    <div class="ticker-strip" style="display: none;">
-    <div class="ticker-strip">
-      <div class="ticker-item">
-        <div class="ticker-item-h">
-          <span class="ticker-item-sym">AAPL</span>
-          <span class="ticker-item-chg up">+0.54%</span>
-        </div>
-        <span class="ticker-item-spot">$229.84</span>
-        <svg class="ticker-item-spark" viewBox="0 0 100 18" preserveAspectRatio="none">
-          <polyline points="0,12 10,14 20,11 30,10 40,8 50,9 60,7 70,5 80,7 90,4 100,3" fill="none" stroke="#4ade80" stroke-width="1"/>
-        </svg>
-      </div>
-      <div class="ticker-item">
-        <div class="ticker-item-h">
-          <span class="ticker-item-sym">MSFT</span>
-          <span class="ticker-item-chg up">+0.73%</span>
-        </div>
-        <span class="ticker-item-spot">$441.62</span>
-        <svg class="ticker-item-spark" viewBox="0 0 100 18" preserveAspectRatio="none">
-          <polyline points="0,13 10,12 20,10 30,11 40,9 50,7 60,8 70,6 80,4 90,5 100,3" fill="none" stroke="#4ade80" stroke-width="1"/>
-        </svg>
-      </div>
-      <div class="ticker-item">
-        <div class="ticker-item-h">
-          <span class="ticker-item-sym">GOOGL</span>
-          <span class="ticker-item-chg down">-0.50%</span>
-        </div>
-        <span class="ticker-item-spot">$184.27</span>
-        <svg class="ticker-item-spark" viewBox="0 0 100 18" preserveAspectRatio="none">
-          <polyline points="0,5 10,6 20,4 30,6 40,8 50,7 60,9 70,11 80,10 90,12 100,13" fill="none" stroke="#f87171" stroke-width="1"/>
-        </svg>
-      </div>
-      <div class="ticker-item">
-        <div class="ticker-item-h">
-          <span class="ticker-item-sym">AMZN</span>
-          <span class="ticker-item-chg up">+0.20%</span>
-        </div>
-        <span class="ticker-item-spot">$201.13</span>
-        <svg class="ticker-item-spark" viewBox="0 0 100 18" preserveAspectRatio="none">
-          <polyline points="0,11 10,10 20,12 30,9 40,8 50,10 60,7 70,9 80,6 90,8 100,5" fill="none" stroke="#4ade80" stroke-width="1"/>
-        </svg>
-      </div>
-      <div class="ticker-item">
-        <div class="ticker-item-h">
-          <span class="ticker-item-sym">NVDA</span>
-          <span class="ticker-item-chg up">+1.39%</span>
-        </div>
-        <span class="ticker-item-spot">$1,342.71</span>
-        <svg class="ticker-item-spark" viewBox="0 0 100 18" preserveAspectRatio="none">
-          <polyline points="0,15 10,13 20,11 30,10 40,8 50,6 60,5 70,4 80,3 90,2 100,1" fill="none" stroke="#4ade80" stroke-width="1.2"/>
-        </svg>
-      </div>
-      <div class="ticker-item">
-        <div class="ticker-item-h">
-          <span class="ticker-item-sym">META</span>
-          <span class="ticker-item-chg up">+0.32%</span>
-        </div>
-        <span class="ticker-item-spot">$679.84</span>
-        <svg class="ticker-item-spark" viewBox="0 0 100 18" preserveAspectRatio="none">
-          <polyline points="0,10 10,9 20,11 30,8 40,7 50,9 60,6 70,7 80,5 90,6 100,4" fill="none" stroke="#22d3ee" stroke-width="1"/>
-        </svg>
-      </div>
-      <div class="ticker-item">
-        <div class="ticker-item-h">
-          <span class="ticker-item-sym">TSLA</span>
-          <span class="ticker-item-chg down">-0.70%</span>
-        </div>
-        <span class="ticker-item-spot">$261.04</span>
-        <svg class="ticker-item-spark" viewBox="0 0 100 18" preserveAspectRatio="none">
-          <polyline points="0,6 10,7 20,5 30,8 40,9 50,8 60,10 70,11 80,10 90,12 100,13" fill="none" stroke="#f87171" stroke-width="1"/>
-        </svg>
-      </div>
-    </div>
+    <!-- Old static ticker strip was here — replaced by CNBC marquee at top.
+         The legacy markup was wrapped in a display:none outer div that was
+         never closed (HTML bug) which hid the matrix + everything below it.
+         Removed entirely. -->
 
     <!-- PROBABILITY MATRIX -->
     <div class="matrix-card">
