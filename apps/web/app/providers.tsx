@@ -7,6 +7,7 @@ import { PhantomWalletAdapter } from "@solana/wallet-adapter-phantom";
 import { SolflareWalletAdapter } from "@solana/wallet-adapter-solflare";
 import type { Adapter } from "@solana/wallet-adapter-base";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { SessionProvider } from "next-auth/react";
 
 import { SOLANA_RPC_ENDPOINT } from "@/lib/solana/config";
 import { Toaster } from "@/components/ui/toaster";
@@ -37,15 +38,24 @@ export function Providers({ children }: { children: ReactNode }) {
   );
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <ConnectionProvider endpoint={SOLANA_RPC_ENDPOINT}>
-        <WalletProvider wallets={wallets} autoConnect>
-          <WalletModalProvider>
-            {children}
-            <Toaster />
-          </WalletModalProvider>
-        </WalletProvider>
-      </ConnectionProvider>
-    </QueryClientProvider>
+    <SessionProvider
+      // SessionProvider needs to be the outermost wrapper so any client
+      // component (including the wallet-adapter wallets themselves) can call
+      // `useSession()` for the wallet+OAuth dual-identity flow per DR-014.
+      // `refetchOnWindowFocus={false}` aligns with TanStack's posture and
+      // avoids a stampede of /api/auth/session calls when the user tabs back.
+      refetchOnWindowFocus={false}
+    >
+      <QueryClientProvider client={queryClient}>
+        <ConnectionProvider endpoint={SOLANA_RPC_ENDPOINT}>
+          <WalletProvider wallets={wallets} autoConnect>
+            <WalletModalProvider>
+              {children}
+              <Toaster />
+            </WalletModalProvider>
+          </WalletProvider>
+        </ConnectionProvider>
+      </QueryClientProvider>
+    </SessionProvider>
   );
 }

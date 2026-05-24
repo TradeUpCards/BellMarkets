@@ -2,8 +2,6 @@ import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 
 import { Providers } from "./providers";
-import { SiteHeader } from "@/components/site-header";
-import { SiteFooter } from "@/components/site-footer";
 
 import "./globals.css";
 
@@ -18,9 +16,9 @@ const fontMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "BellMarkets",
+  title: "Bell.Markets — non-custodial markets for MAG7 daily binary options",
   description:
-    "Non-custodial Solana markets for binary outcome contracts on daily MAG7 stock prices.",
+    "Non-custodial Solana markets for binary outcome contracts on daily MAG7 stock prices. $1 USDC payouts settled on-chain by Pyth at 4 PM ET.",
 };
 
 export default function RootLayout({
@@ -29,17 +27,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="dark" suppressHydrationWarning>
+    <html lang="en" data-theme="dark" className="dark" suppressHydrationWarning>
       <body
-        className={`${fontSans.variable} ${fontMono.variable} min-h-screen bg-background font-sans text-foreground antialiased`}
+        className={`${fontSans.variable} ${fontMono.variable}`}
       >
-        <Providers>
-          <div className="flex min-h-screen flex-col">
-            <SiteHeader />
-            <main className="flex-1">{children}</main>
-            <SiteFooter />
-          </div>
-        </Providers>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

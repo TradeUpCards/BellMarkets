@@ -53,6 +53,8 @@ const config: Config = {
         bell: {
           yes: "hsl(var(--bell-yes))",
           no: "hsl(var(--bell-no))",
+          amber: "hsl(var(--bell-amber))",
+          accent: "hsl(var(--bell-accent))",
         },
       },
       borderRadius: {
