@@ -1,6 +1,10 @@
 # Pre-Mainnet Readiness — BellMarkets
 
-**Owner:** Drew (Quality + Integration + Demo lead). **Status:** Day-5 snapshot (2026-05-23). **Scope:** the deployed program at `599h7VznYR4CxyrG5nQbhR13qtRuwPcbnNr5QqbkS7uV` on devnet (deploy-5, slot 464349904).
+**Owner:** Drew (Quality + Integration + Demo lead). **Status:** Day-6 snapshot (2026-05-24). **Scope:** the deployed program at `599h7VznYR4CxyrG5nQbhR13qtRuwPcbnNr5QqbkS7uV` on devnet (deploy-5, slot 464349904).
+
+**Demo pairing:** for a 4-minute walkthrough of the v1 protocol surface, see [`docs/demo/v1-demo-script.md`](../demo/v1-demo-script.md). This readiness doc is the security narrative for reviewer Q&A — pull specific sections (attack tier 1-5, v2 gaps, audit log) when the reviewer presses on production posture.
+
+**Quality lineage:** 5 deploys (audit log §3) + 5 independent Sonnet audit cycles + 14 substantive findings caught and shipped. The bias profile across the 5 cycles: Sonnet repeatedly caught polished-prose-around-weak-assertions, commit-message-vs-doc drift, ownership-protocol process drift, and quantitative cost claims with unit confusion. Going forward, Sonnet audit dispatch after each major push is Drew's standing operating discipline (post-Day-3).
 
 > **TL;DR for an engineering reviewer:** Demo is ready to ship on devnet. Mainnet **is not yet ready**. The major v1 architectural commitments (DR-001 through DR-011) are implemented end-to-end. Critical-path gaps before any mainnet conversation: (1) live Pyth feed coverage for MAG7 stocks (devnet uses SOL/USD only); (2) `force_redeem` doesn't cover Invalid markets — DR-005 v2 gap; (3) zero independent security audit. The protocol's core invariants (DR-002 permissionless settle, $1 USDC conservation, DR-008 fee math) have layered evidence (mock + IDL + chain simulate + cron-kill sim) but no real-money audit.
 
