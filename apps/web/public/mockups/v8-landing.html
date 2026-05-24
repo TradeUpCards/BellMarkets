@@ -662,12 +662,25 @@
   }
   .session-block-h::after { display: none; }
   .session-h-countdown {
-    display: inline-flex; align-items: baseline; gap: 6px;
+    display: inline-flex; align-items: baseline; gap: 8px;
+    padding: 4px 10px;
+    background: rgba(251, 191, 36, 0.10);
+    border: 1px solid rgba(251, 191, 36, 0.40);
+    border-radius: 4px;
     text-transform: none; letter-spacing: 0;
-    font-size: 11px; font-weight: 600;
   }
-  .session-h-countdown .lbl { color: var(--text-muted); }
-  .session-h-countdown .val { font-size: 14px; font-weight: 700; }
+  .session-h-countdown .lbl {
+    color: var(--text-muted);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .session-h-countdown .val {
+    color: var(--amber);
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
   .session-row {
     display: flex; justify-content: space-between; align-items: baseline;
     padding: 8px 0;
@@ -1289,7 +1302,8 @@
   /* ========== ROW-2COL (Leaderboard|Contests, Bell Pro|Recent Fills) ========== */
   .row-2col {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    /* minmax(0, 1fr) prevents min-content from blowing column widths past 50% */
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 16px;
     margin-bottom: 28px;
   }
@@ -1518,10 +1532,19 @@
     border: 1px solid rgba(34, 211, 238, 0.35);
     border-radius: 6px;
     padding: 28px 32px;
-    display: grid; grid-template-columns: 1fr 280px;
+    display: grid; grid-template-columns: minmax(0, 1fr) 280px;
     gap: 28px; align-items: center;
     position: relative; overflow: hidden;
-    margin-bottom: 28px;
+    margin-bottom: 0;
+  }
+  /* Half-width version: drop the 2-column grid (everything stacks) */
+  .bell-pro-card.half-card {
+    display: flex; flex-direction: column;
+    padding: 20px 22px;
+    gap: 0;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
   }
   .bell-pro-card::before {
     content: ""; position: absolute; top: -60px; right: -60px;
