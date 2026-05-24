@@ -2157,17 +2157,16 @@
     /* Hide top-status bar entirely on mobile — too noisy, info repeated elsewhere */
     .top-status { display: none; }
 
-    /* Compact header */
-    .header-inner { grid-template-columns: auto auto; gap: 12px; padding: 10px 14px; }
+    /* Compact header — drop everything except brand + connect, give wallet room */
+    .header-inner { grid-template-columns: 1fr auto; gap: 8px; padding: 10px 14px; }
     .searchbar, .nav, .brand-divider { display: none; }
+    .session-module, .header-right .icon-btn, .go-pro-btn { display: none; }
     .brand { gap: 0; }
-    .logo { font-size: 15px; }
+    .logo { font-size: 14px; }
     .logo-mark { width: 24px; height: 24px; }
-    .session-module .session-time { display: none; }
-    .session-module { padding: 6px 10px; min-height: 36px; font-size: 11px; }
-    .icon-btn { width: 36px; height: 36px; }
-    .connect-btn { padding: 8px 10px; font-size: 12px; min-height: 36px; }
-    .connect-btn span:last-child { max-width: 70px; overflow: hidden; text-overflow: ellipsis; }
+    .header-right { gap: 6px; }
+    .connect-btn { padding: 8px 12px; font-size: 12px; min-height: 38px; }
+    .connect-btn span:last-child { max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
     /* Compact market header — keep only ticker + price + change + switch */
     .market-header { padding: 10px 14px; }
