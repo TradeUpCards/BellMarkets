@@ -219,3 +219,6 @@ export {
   WIN_RATE_MIN_TRADES,
 } from "./indexer/metric-leaderboards.js";
 export type { FourMetricLeaderboard, PeriodWindow } from "./indexer/metric-leaderboards.js";
+
+// AI v2 phase-0/1 — news ingestion + Anthropic SDK wrapper + classifier + briefing prompts
+export * from "./ai/index.js";
