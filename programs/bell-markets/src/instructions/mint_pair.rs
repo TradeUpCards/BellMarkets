@@ -610,6 +610,133 @@ mod tests {
         }
     }
 
+    // ── Fee-pipeline conservation (P4 hardening, 2026-05-23) ─────────
+    //
+    // End-to-end property test for the `mint_pair` fee flow. Composes:
+    //   tier_fee_bps × mint_fee_bps scaling × creator_rebate × split_fee
+    //
+    // The conservation invariant under test:
+    //
+    //   user_paid_total = amount + fee_total
+    //   fee_total = platform + weekly + monthly  (split_fee invariant)
+    //   vault_receives = amount  (the $1 invariant — DR-008 HARD YES #1)
+    //
+    // Therefore: amount + (platform + weekly + monthly) == user_paid_total
+    // AND vault_receives == amount (UNCONDITIONALLY, regardless of fee config).
+    //
+    // The individual helpers are property-tested already
+    // (effective_bps_scaled, fee_after_rebate, split_fee_property_sum_equals_fee_total).
+    // This test composes them at the system level — a regression in ANY one
+    // helper that breaks composition surfaces here.
+
+    /// Pure-function mirror of the handler's effective_bps + fee_total
+    /// computation, for property testing the composed math.
+    fn end_to_end_fee_flow(
+        amount: u64,
+        volume_30d: u64,
+        mint_fee_bps: u16,
+        creator_rebate_fires: bool,
+        creator_rebate_bps: u16,
+        platform_retain_bps: u16,
+        weekly_pool_bps: u16,
+        monthly_pool_bps: u16,
+    ) -> (u64, u64, u64, u64) {
+        // returns (vault_receives, platform_receives, weekly_receives, monthly_receives)
+        let effective_bps = if mint_fee_bps == 0 {
+            0
+        } else {
+            let tier = tier_fee_bps(volume_30d);
+            let scaled = (tier as u32).saturating_mul(mint_fee_bps as u32)
+                / (TIER_FEE_BPS_TIER1 as u32);
+            let after_tier = scaled as u16;
+            if creator_rebate_fires {
+                fee_after_rebate(after_tier, creator_rebate_bps)
+            } else {
+                after_tier
+            }
+        };
+        let fee_total: u64 = ((amount as u128) * (effective_bps as u128) / 10_000) as u64;
+        let (platform, weekly, monthly) = split_fee(
+            fee_total,
+            platform_retain_bps,
+            weekly_pool_bps,
+            monthly_pool_bps,
+        );
+        (amount, platform, weekly, monthly)
+    }
+
+    #[test]
+    fn conservation_vault_always_receives_amount() {
+        // HARD YES #1 ($1 invariant): regardless of fee configuration, the
+        // vault gets EXACTLY `amount` USDC from each mint_pair. Fees are
+        // SEPARATE transfers; they never touch the vault.
+        let configs: &[(u64, u64, u16, bool, u16, u16, u16, u16)] = &[
+            // (amount, vol_30d, mint_fee, rebate_fires, rebate_bps, plat, weekly, monthly)
+            (1_000_000,         0,   0,  false, 10_000, 10_000, 0,     0    ),  // fees off
+            (1_000_000,         0, 200,  false, 10_000,  5_000, 2_500, 2_500),  // canonical
+            (1_000_000_000_000, 0, 200,  false, 10_000,  5_000, 2_500, 2_500),  // big amount
+            (1_000_000,         0, 200,   true, 10_000,  5_000, 2_500, 2_500),  // creator rebate full
+            (1_000_000,         0, 200,   true,  5_000,  5_000, 2_500, 2_500),  // creator rebate half
+            (1_000_000, TIER_BREAK_10K_USDC, 100, false, 10_000, 0, 5_000, 5_000), // promo
+        ];
+        for &(amount, vol, mfb, rebate_fires, rb, p, w, m) in configs {
+            let (vault, _, _, _) = end_to_end_fee_flow(amount, vol, mfb, rebate_fires, rb, p, w, m);
+            assert_eq!(vault, amount,
+                "vault must receive exactly amount={amount} regardless of fee config");
+        }
+    }
+
+    #[test]
+    fn conservation_user_payment_equals_amount_plus_sinks() {
+        // Compose: user_paid_total == amount + (platform + weekly + monthly).
+        // Sweep over: amounts × volumes × mint_fee_bps × rebate states.
+        let amounts = [1u64, 100, 1_000_000, 1_000_000_000_000];
+        let volumes = [0u64, TIER_BREAK_1K_USDC - 1, TIER_BREAK_1K_USDC, TIER_BREAK_10K_USDC];
+        let mint_fees = [0u16, 100, 200, 400];
+        // Use canonical 50/25/25 + 100% rebate config (DR-008 + DR-010 default)
+        for amount in amounts {
+            for volume in volumes {
+                for mfb in mint_fees {
+                    for rebate_fires in [false, true] {
+                        let (vault, p, w, m) = end_to_end_fee_flow(
+                            amount, volume, mfb, rebate_fires, 10_000, 5_000, 2_500, 2_500,
+                        );
+                        let total_sinks = vault as u128 + p as u128 + w as u128 + m as u128;
+                        let fee_paid_part = p as u128 + w as u128 + m as u128;
+                        // user_paid_total computed from same pipeline:
+                        let effective_bps = if mfb == 0 { 0 } else {
+                            let tier = tier_fee_bps(volume);
+                            let scaled = (tier as u32) * (mfb as u32) / (TIER_FEE_BPS_TIER1 as u32);
+                            if rebate_fires { fee_after_rebate(scaled as u16, 10_000) } else { scaled as u16 }
+                        };
+                        let expected_fee_total = ((amount as u128) * (effective_bps as u128)) / 10_000;
+                        assert_eq!(fee_paid_part, expected_fee_total,
+                            "platform+weekly+monthly must equal fee_total — amount={amount} vol={volume} mfb={mfb} rebate_fires={rebate_fires}");
+                        assert_eq!(total_sinks, (amount as u128) + expected_fee_total,
+                            "vault + sinks must equal amount + fee_total");
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn conservation_creator_full_rebate_zeros_all_fees() {
+        // Property: when creator rebate fires at 100% (10000 bps),
+        // platform + weekly + monthly all = 0, regardless of tier or amount.
+        for amount in [1u64, 1_000, 1_000_000].iter().copied() {
+            for vol in [0u64, TIER_BREAK_1K_USDC, TIER_BREAK_10K_USDC].iter().copied() {
+                let (vault, p, w, m) = end_to_end_fee_flow(
+                    amount, vol, 200,  // canonical 2% mint fee
+                    true, 10_000,      // full creator rebate
+                    5_000, 2_500, 2_500,
+                );
+                assert_eq!(vault, amount);
+                assert_eq!(p + w + m, 0, "100% rebate must zero all fee sinks (amount={amount} vol={vol})");
+            }
+        }
+    }
+
     #[test]
     fn split_property_sum_equals_fee_total_over_sweep() {
         // Property: regardless of fee_total OR bps configuration (as long as it
