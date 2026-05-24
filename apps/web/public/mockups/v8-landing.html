@@ -132,11 +132,14 @@
     50% { opacity: 0.5; box-shadow: 0 0 12px var(--yes); }
   }
 
-  /* ========== HEADER ========== */
+  /* ========== HEADER (Cory feedback: sticky on landing) ========== */
   header.top {
     background: var(--bg);
     border-bottom: 1px solid var(--border);
     backdrop-filter: blur(20px) saturate(180%);
+    position: sticky;
+    top: 0;
+    z-index: 100;
   }
   .header-inner {
     display: grid; grid-template-columns: auto 1fr auto;
@@ -291,14 +294,17 @@
     min-height: calc(100vh - 90px);
   }
 
-  /* ========== LEFT RAIL — persistent market navigator ========== */
+  /* ========== LEFT RAIL — sticky below sticky header (Cory feedback) ========== */
   .left-rail {
     background: var(--panel);
     border-right: 1px solid var(--border);
     padding: 16px 0;
     overflow-y: auto;
-    max-height: calc(100vh - 90px);
-    position: sticky; top: 0;
+    /* Header is ~66px tall (sticky at top: 0); rail sits below it */
+    position: sticky;
+    top: 66px;
+    max-height: calc(100vh - 66px);
+    align-self: start;
   }
   /* Rail section — supports both <div> and <details> */
   .rail-section {
