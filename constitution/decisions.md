@@ -387,12 +387,49 @@ Per-market revenue at $10K mint volume / 95% redemption rate: A ~$190, B ~$200, 
 ### DR-009 — CLOB strategy: integrate Phoenix v1 for MVP; revisit at scale
 
 **Date:** 2026-05-22 (Fri evening — extends DR-001)
-**Status:** Active — MVP commitment; future revisit triggered by scale + Model D outcome
+**Status:** Active — MVP commitment; **Model D verified feasible 2026-05-24 (Aria + Bram primary-source verification); execution promoted to v1.5 P0**
 **Made by:** Cory (Tate-routed)
 
 **Context:** DR-001 chose Phoenix v1 integration over building our own CLOB primarily on time-budget grounds (1.5-day build savings). DR-008 surfaced a fee-capture concern: Phoenix trades bypass our `mint_pair`/`redeem` fee touchpoints entirely. The question: does the missed Phoenix-fee revenue justify building (or forking) our own CLOB?
 
 **Decision:** Stay with Phoenix v1 for MVP. Defer custom-CLOB consideration to v2+ scale milestones. Trigger to revisit: ($1M+ daily Phoenix volume) AND (Model D — per-market `fee_receiver` config — proves infeasible on Phoenix v1).
+
+---
+
+### DR-009 amendment 2026-05-24 — Model D feasibility VERIFIED; v1.5 P0 promotion
+
+**Two independent verifications confirm Model D is mechanically feasible on Phoenix v1:**
+- Bram (off-chain investigation): all 5 discovery questions in `specs/clob-strategy.md` §"Discovery questions for Bram" answered YES against the Phoenix v1 codebase
+- Aria (on-chain verification): same 5 questions re-verified against Phoenix-v1 primary source via `gh api repos/Ellipsis-Labs/phoenix-v1/...`; on-chain integration design walk documented in `specs/clob-strategy.md`
+
+**Locked integration plan (v1.5 P0 — first thing post-submission):**
+
+| Component | Change | Estimate |
+|---|---|---|
+| `create_strike_market` ix | Wrap `phoenix::InitializeMarket` CPI; set `fee_recipient` to our `fee_collector_usdc` ATA | ~3-4 hr Aria |
+| Account list | Add `phoenix_program`, `phoenix_market`, `fee_recipient_ata`, `base_lot_size`, `quote_lot_size` to `create_strike_market` accounts struct | included above |
+| State changes | New `phoenix_market` field on `StrikeMarket` PDA (was implicitly derived; now explicit Pubkey to capture the CPI-initialized market) | included above |
+| Property tests | Fee recipient = our ATA invariant; verify fees accumulate to our address on every Phoenix fill | ~1 hr Aria |
+| Audit cycle | Sonnet audit on the new CPI path (matching engine CPI is high-risk category) | ~1 hr |
+| Deploy + verification | deploy_index=7 (or whatever next index lands); verify on-chain that new markets initialize with our fee_recipient | ~30 min |
+| Indexer adapter | Bram updates Helius webhook parser if Phoenix events surface fee accrual differently | ~30 min Bram |
+| Frontend (no change) | Cleo's `create_strike_market` builder gets new account list from refreshed IDL — minimal change | ~15 min Cleo |
+
+**Total v1.5 P0 effort:** ~6-8 hr cross-lead. Single deploy cycle. Routine integration — no novel cryptography or matching-engine work.
+
+**Why this is v1.5 P0 (NOT v1 submission):**
+1. Submission risk — touches `create_strike_market`, the program's core market-creation flow, ~24 hr before submission deadline. Audit cycle + edge-case discovery don't fit the timeline.
+2. Revenue today = $0 — devnet/demo has zero Phoenix volume; the integration captures nothing measurable until mainnet + traction.
+3. Demo defense unaffected — submission narrative includes "DR-009 amendment 2026-05-24 — Model D verified feasible; locked integration plan; ~6-8 hr work gated on $500K+ daily Phoenix volume, not engineering uncertainty."
+
+**Why NOT defer indefinitely:**
+1. Closes the **mint-only fee gap** (DR-008): Phoenix-only secondary trades currently pay zero protocol fees. Model D captures them passively at every fill.
+2. **Defensible at interview** — the integration is *engineered*, not aspirational. We're not betting on Phoenix's roadmap or external dependencies; everything we need exists today.
+3. **No new audit categories** — wrapping an existing audited CPI is dramatically lower-risk than forking Phoenix or building our own matching engine.
+
+**Revisit threshold (unchanged):** if Model D execution somehow fails post-submission, fork-Phoenix conversation resumes at $1M+ daily volume per the existing escalation tree.
+
+---
 
 **Revenue math (50-bps Phoenix venue fee, hypothetical):**
 
@@ -748,6 +785,113 @@ Worst-case (depth 10, top-200 × 4 metrics): proof grows to 320 B, total ~785 B.
 - **Single ranking metric (profit only), defer multi-metric to v2:** rejected. Win streak is already tracked on-chain via `UserConfig.win_streak` and is the strongest behavioral-discipline signal for a $1-payout product. Surfacing only profit misses the retention story Webull Vega / Louis Limited proved (per AI v2 research).
 - **Composite scoring (single weighted metric blending profit + streak + win-rate):** rejected. Black-box scoring is unauditable and a regulatory smell — "we ranked you with our secret formula." Multiple transparent metrics each ranked independently is defensible.
 - **Off-chain-only leaderboard (no Merkle commitment):** rejected. DR-010 already established verifiable leaderboards as a moat vs Polymarket/Kalshi. Backing off would erase the differentiation.
+
+---
+
+### DR-016 — Token program selection: SPL Token for tradeable assets, Token-2022 for platform NFTs, compressed for mass-minted badges
+
+**Date:** 2026-05-24
+**Status:** Active — SPL Token locked for v1 (the tradeable assets); Token-2022 + compressed reserved for v2+ identity surfaces
+**Made by:** Cory (Tate-routed)
+
+**Context:** Solana has three programs that mint balance-bearing tokens, each with different shape and integration cost:
+
+| Program | Account model | Fungible? | Phoenix v1 support |
+|---|---|---|---|
+| SPL Token (`Tokenkeg…`) | Full SPL token account per holder | Yes | Native (Phoenix is built on it) |
+| Token-2022 (`TokenzQd…`) | Full SPL token account per holder; supports extensions (transfer fee, confidential, transfer hook, metadata pointer, non-transferable, etc.) | Yes | Unsupported (Phoenix v1 predates T22) |
+| Compressed (Bubblegum) | Off-chain Merkle leaf; root on-chain | No — asset/NFT-shaped | Unsupported (Phoenix is account-based) |
+
+We have three distinct token-issuance surfaces: (a) YES/NO position tokens that need to trade on Phoenix, (b) Founder Pass NFT (DR-013) + soulbound achievement badges (DR-014), (c) mass-minted per-period leaderboard/contest badges. Picking one program for all three is wrong — they have different shape requirements.
+
+**Decision:** Use SPL Token (legacy) for all tradeable fungible assets in v1 (YES, NO, USDC). Plan Token-2022 + compressed for v2+ identity/badge surfaces, but defer their implementation.
+
+| Use case | Pick | Why |
+|---|---|---|
+| YES/NO position mints, USDC | **SPL Token** | Phoenix v1 requires it; vault arithmetic depends on no transfer-fee skew |
+| Founder Pass NFT (DR-013) | **Token-2022 w/ metadata extension** (v2+) | Saves the separate Metaplex metadata account; cleaner on-token data |
+| Soulbound achievement badges (DR-014) | **Token-2022 non-transferable** (v2+) | Prevents secondary market on identity |
+| Per-week win badges, leaderboard rank NFTs | **Compressed (Bubblegum)** (v2+) | ~1000× cheaper for 500K+ mints/year; correct shape (unique-per-user-per-period) |
+
+**Trade-off:** We pay ~$50/year in extra rent (vs. compressed) for the YES/NO + USDC accounts at 10K MAU scale, in exchange for native Phoenix CLOB integration and zero novel attack surface in the v1 audit. We also defer ~$50K/year in compressed-NFT savings (at scale) by not shipping the badge system in v1 — recoverable in v2.
+
+**Consequences:**
+- v1 audit surface is minimal — only well-understood SPL Token primitives in fund-moving paths
+- Phoenix integration "just works" with our existing account model
+- Future v2 badge work is additive — Bubblegum tree + cNFT mint path, no breaking changes to existing accounts
+- Token-2022 + compressed familiarity is a v2 audit cost we explicitly accept later
+
+**Alternatives considered:**
+
+- **All-SPL-Token (use SPL for badges too):** rejected. At 500K badges/year, account rent is ~$50K/year. Compressed is the correct shape for the use case (unique, per-period, non-tradeable).
+- **All-Token-2022 (use T22 even for YES/NO):** rejected. Phoenix v1 doesn't support T22 markets — would break our CLOB integration entirely. Transfer-fee extension would skew vault math; confidential-transfer extension would hide our settlement invariant from auditors and indexers.
+- **All-compressed (cNFTs for everything):** rejected. cNFTs are NFT-shaped, not fungible. Can't represent "Alice holds 10 YES" without 10 separate Merkle leaves; can't trade on Phoenix at all.
+- **Custom token program forked from SPL:** rejected. We're a binary-options dApp, not a token-standards lab. Forking the most-audited program on Solana to add a feature we don't need is strictly negative.
+
+---
+
+### DR-017 — Vault security model: PDA self-authority, permissionless settle, admin-as-cranker-not-redirector
+
+**Date:** 2026-05-24
+**Status:** Active — load-bearing v1 invariant; auditor-enforced
+**Made by:** Cory (Tate-routed)
+
+**Context:** A non-custodial dApp that holds USDC in vaults needs to prove three properties to be defensible: (1) no human keypair can drain a vault, (2) settlement isn't a centralization vector, (3) admin powers are bounded to "cranking" — making things happen on time — not "redirecting" — choosing who gets paid.
+
+**Decision:** Layer four mechanisms to enforce the three properties:
+
+1. **Every fund-moving account has the strike_market PDA as its authority.**
+   - `usdc_vault: token::authority = strike_market` (programs/bell-markets/src/instructions/create_strike_market.rs:84-87)
+   - `yes_mint: mint::authority = strike_market`, `no_mint: mint::authority = strike_market` (same file lines 62-77)
+   - Result: no keypair — not user, not admin — can move USDC out of a vault or mint YES/NO tokens. Only the program itself, via `CpiContext::new_with_signer` with PDA seeds, can authorize a transfer/mint/burn. Every code path that does this is in our audited source.
+
+2. **Anchor account constraints validate every account before the handler runs.**
+   - `seeds = [b"vault", strike_market.key().as_ref()]` ties each vault to a specific market — can't substitute another market's vault
+   - `has_one = usdc_mint` on config — can't substitute a different stablecoin
+   - `constraint = strike_market.config == config.key()` everywhere — can't mix accounts from different deployments
+   - `token::mint = …, token::authority = user` on user-owned accounts — can't pass someone else's wallet
+   - `constraint = fee_collector_usdc.owner == config.treasury` — can't redirect protocol fees to attacker ATA
+   - These run as part of account validation, BEFORE the handler executes. A malicious tx fails at the boundary, not deep inside business logic.
+
+3. **`settle_market` is permissionless** (programs/bell-markets/src/instructions/settle_market.rs:6, kickoff §4.2 auditor-enforced).
+   - Anyone can crank a settle from the Pyth feed after expiry. No `admin` constraint on the Accounts struct.
+   - Removes the "what if Bell's cranker dies" centralization risk. Users (or third-party bots) can settle their own markets.
+
+4. **Admin can crank but cannot redirect.**
+   - `force_redeem` routes USDC to the *user's* ATA, never admin's (programs/bell-markets/src/instructions/force_redeem.rs:6, 86): "admin is the cranker, USER is made whole"
+   - `admin_settle` is gated by `now >= strike_market.admin_override_eligible_at` (default expiry + 30 days) — admin can't pre-empt oracle settlement (programs/bell-markets/src/instructions/admin_settle.rs:50)
+   - `pause` is a kill-switch only; doesn't permit fund redirection
+   - There is no `withdraw_to_admin`, `set_vault_authority`, or `transfer_vault` instruction. The program has no path to send vault USDC anywhere other than: a winning user (redeem / force_redeem), pair-burner (redeem_pair), or invalid-market refund (redeem_invalid).
+
+**User-side specifics (this is the "how do we stop a user from sending wrong amount / wrong vault / wrong wallet" question):**
+
+| Attack the user might try | What blocks it |
+|---|---|
+| Pass a `usdc_vault` from a different market to drain its funds | `seeds = [b"vault", strike_market.key().as_ref()]` constraint — Anchor recomputes the PDA and rejects if it doesn't match. The vault for market X cannot be paired with a redeem on market Y. |
+| Pass another user's `user_winning_token` to burn their tokens | `token::authority = user` constraint — Anchor verifies the account's authority field equals the `user` signer. Mismatch = rejected. |
+| Pass another user's `user_usdc` as destination, hoping vault sends them USDC | `token::authority = user` on `user_usdc` — same defense. Even if user wants to *gift* USDC to another wallet, they can't; the destination must be theirs. |
+| Burn 1 token, claim 1000 USDC | `token::transfer(…, amount)` and `token::burn(…, amount)` use the same `amount` arg. The SPL Token program enforces that the burn from `user_winning_token` requires `amount` units actually be present (insufficient balance → tx fails). The transfer of `amount` from vault is gated by the burn succeeding first (sequential CPIs in the handler). Amounts are bound together by sharing the same variable. |
+| Burn `amount` they don't own, claim USDC from vault | SPL Token's `Burn` instruction validates that `user_winning_token.amount >= amount` and that `authority == user`. The CPI fails inside the SPL Token program if insufficient. Our program propagates the error and aborts the tx — no partial state mutation, no USDC moves. |
+| Mint pair without paying USDC | `token::transfer(USDC user→vault, amount)` runs first in `mint_pair` (programs/bell-markets/src/instructions/mint_pair.rs:298), THEN the YES/NO mints. If the user lacks USDC, the transfer fails inside SPL Token, the tx aborts, no YES/NO is minted. |
+| Pass `usdc_vault` from market A as the source on a redeem against market B, hoping to mismatch the math | Constraint chain breaks: `strike_market: B` (constraint passes); then `usdc_vault: seeds = [b"vault", strike_market.key().as_ref()]` requires the vault be derived from B's pubkey. Passing A's vault → PDA derivation mismatch → reject. |
+| Settle a market on a Pyth feed that isn't the one bound at creation | `strike_market.underlying_pyth_feed` was set at `create_strike_market`. `settle_market` reads from the same field; the supplied Pyth account is validated against it. Wrong feed = reject. |
+| Resubmit the same redeem tx repeatedly to drain the vault | Each redeem burns the user's winning tokens. Once their balance is 0, the next burn fails. The vault can never pay out more than total tokens of the winning side, which equals the total USDC originally deposited (1:1 invariant). |
+| Mint after settle, hoping to mint cheap losers and avoid the loss | `constraint = strike_market.outcome == Outcome::Unsettled` on mint_pair (programs/bell-markets/src/instructions/mint_pair.rs:161) — mint is locked the instant settle runs. |
+
+**Trade-off:** We pay ~3-5× the lines-of-code overhead of `#[account(…)]` decorators on every Accounts struct in exchange for compile-time-validated, auditor-readable security boundaries. Every constraint is checked before the handler runs; nothing relies on the handler "remembering" to validate.
+
+**Consequences:**
+- Every new instruction must declare its constraints explicitly in the Accounts struct — there's no opt-out
+- The audit punch list focuses on **(a)** new fund-moving paths (CPIs), **(b)** any handler logic that bypasses the Anchor primitives, **(c)** PDA seed derivation correctness
+- "Where can funds go?" has a finite answer: read every `CpiContext::new[_with_signer]` for `Transfer { from: usdc_vault, to: ?, … }`. Today: `user_usdc` (redeem path), `fee_collector_usdc` (mint_pair fee), pool ATAs (mint_pair revenue split). That's it.
+- Permissionless settle means we can't restrict who pays the settle-tx gas cost — but the cost (~5K lamports / ~$0.001) is negligible vs. the centralization benefit
+
+**Alternatives considered:**
+
+- **Admin-keypair vault authority (multi-sig or single):** rejected. Even multi-sig is a centralization vector and an audit-flag for a non-custodial dApp. PDA self-authority removes the question entirely.
+- **Permissioned settle (admin-only):** rejected per kickoff §4.2 — auditor-enforced no-signer-beyond-the-cranker rule. Admin-only settle means our cranker dying = users locked out of redemption.
+- **Trust handler-level checks instead of Anchor constraints:** rejected. Account-level constraints run as part of validation, before any state mutation. Handler-level checks would let partial mutations land on subtle bugs. Anchor's design exists precisely to prevent this category.
+- **`withdraw_to_admin` emergency drain path:** rejected. No mechanism exists in v1 for admin to ever take vault funds. Users get made whole via `force_redeem` (which sends to user, not admin). The strict invariant — "vault USDC only flows to a user who provably held a winning/refundable token" — is load-bearing for the non-custodial narrative.
 
 ---
 

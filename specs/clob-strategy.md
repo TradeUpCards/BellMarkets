@@ -8,15 +8,33 @@
 
 **Locked for MVP and beyond, until scale triggers a revisit:**
 - Integrate Phoenix v1 CLOB; do not build our own matching engine (DR-001)
-- Investigate Phoenix v1 `fee_receiver` config (Model D) to capture trade fees passively (DR-008)
-- Fork or build only if Model D fails AND we hit $1M+ daily volume (DR-009)
+- ~~Investigate~~ **Verified feasible 2026-05-24** — Phoenix v1 `fee_receiver` config (Model D) captures trade fees passively (DR-008, DR-009 amendment). Promoted to v1.5 P0 first post-submission work item.
+- Fork or build only if Model D execution fails AND we hit $1M+ daily volume (DR-009 — preserved escalation tree)
+
+## Revenue gap acknowledgment (v1 submission state)
+
+**The v1 submission ships with a known revenue gap:** Phoenix-only secondary trades (Buy/Sell after mint) pay zero protocol fees. Mint-only fee at 2% (DR-008) is the sole revenue line in the on-chain instruction set today.
+
+**Why we ship with the gap:**
+- Submission-window risk (~24 hr to Mon 7pm ET deadline; touching `create_strike_market` core flow is too risky without a full audit cycle)
+- Revenue today = $0 — devnet/demo has zero Phoenix volume, so the gap costs us nothing measurable until mainnet + traction
+
+**Path to close the gap (locked in DR-009 amendment, ~6-8 hr cross-lead):**
+- Aria wraps `phoenix::InitializeMarket` CPI in `create_strike_market`, sets `fee_recipient` to our `fee_collector_usdc` ATA at market init
+- New `phoenix_market: Pubkey` field on `StrikeMarket` PDA captures the CPI-initialized market
+- Property test: fee_recipient invariant on every Phoenix fill
+- Single deploy cycle (deploy_index=7 or next post-submission)
+- Bram updates Helius webhook parser (~30 min) if fee-accrual events differ
+- Cleo refreshes IDL + builder accounts (~15 min, mechanical)
+
+**Defense at interview:** "DR-009 amendment 2026-05-24 documents the verified-feasible integration with exact account list + CPI signature. The gap is gated on engineering time (~6-8 hr) post-submission, not on technical uncertainty — both Aria and Bram independently verified against Phoenix v1 primary source."
 
 ## The five options on the table
 
 | # | Option | Cost | Revenue capture | Status |
 |---|---|---|---|---|
 | 1 | Phoenix v1 — no venue fee | $0 build | Mint-only via our ix (DR-008) | Current MVP path |
-| 2 | Phoenix v1 + Model D (venue fee) | $0 build + ~30-45 min discovery | Mint + Phoenix-trade fees | Pending Bram investigation |
+| 2 | Phoenix v1 + Model D (venue fee) | ~6-8 hr Aria/Bram/Cleo + 1 deploy cycle | Mint + Phoenix-trade fees | **Verified feasible 2026-05-24 (Aria + Bram primary-source); v1.5 P0** |
 | 3 | Wait for Phoenix v2 | $0 build + indefinite timeline | Same as #2 if v2 ships with fee_receiver | Bet on Phoenix roadmap |
 | 4 | Fork Phoenix v1 | ~1-2 weeks + $10-30K audit | Mint + Phoenix-trade fees (we own the code) | Only at scale + #2 fails |
 | 5 | Build custom CLOB from scratch | ~2-4 months + $50-200K audit | Full control of fee model | Not under any realistic conditions |
@@ -183,6 +201,7 @@ Track scale-triggered or Phoenix-roadmap changes here:
 | Date | Change | Trigger | Authority |
 |---|---|---|---|
 | 2026-05-22 | Initial commit | DR-001 + DR-009 lock | Cory (Tate-routed) |
+| 2026-05-24 | Model D verified feasible; promoted to v1.5 P0; revenue-gap acknowledgment + path-to-close added | Aria + Bram primary-source verification (DR-009 amendment) | Cory (Tate-routed) |
 
 When daily Phoenix volume crosses a milestone ($1M, $5M, $10M) or Phoenix v2 is announced, append a row + describe what action was taken.
 
