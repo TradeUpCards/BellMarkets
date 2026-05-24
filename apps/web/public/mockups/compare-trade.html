@@ -170,7 +170,7 @@
   }
   .round-2-section .section-row { --cols: 2; }
   .round-1-section .section-row { --cols: 5; }
-  .round-3-section .section-row { --cols: 2; }
+  .round-3-section .section-row { --cols: 3; }
 
   body[data-filter="all"] .round-section { display: block; }
   body[data-filter="r1"] .round-2-section,
@@ -260,10 +260,12 @@
 
 <div class="controls">
   <div class="filter-tabs">
-    <button class="filter-tab active" data-filter="all">All <span class="count">8</span></button>
+    <button class="filter-tab active" data-filter="all">All <span class="count">13</span></button>
     <button class="filter-tab" data-filter="r1">Round 1 <span class="count">5</span></button>
     <button class="filter-tab round-2" data-filter="r2">Round 2 <span class="count">2</span></button>
-    <button class="filter-tab round-3" data-filter="r3">Round 3 <span class="count">2</span></button>
+    <button class="filter-tab round-3" data-filter="r3">Round 3 <span class="count">3</span></button>
+    <button class="filter-tab round-4" data-filter="r4">Round 4 <span class="count">2</span></button>
+    <button class="filter-tab round-5" data-filter="r5">Round 5 <span class="count">2</span></button>
   </div>
 
   <div class="scroll-controls">
@@ -272,7 +274,7 @@
       <button class="view-mode-btn" data-view="single">Single</button>
     </div>
     <button class="scroll-btn" data-action="prev" title="Previous (← arrow key)">◀</button>
-    <span class="scroll-position" id="scrollPos">1 / 9</span>
+    <span class="scroll-position" id="scrollPos">1 / 14</span>
     <button class="scroll-btn" data-action="next" title="Next (→ arrow key)">▶</button>
   </div>
 </div>
@@ -290,17 +292,108 @@
     font-family: 'JetBrains Mono', monospace;
     margin-left: 6px;
   }
+  /* Round 4 (Linear quality) — violet accent */
+  .filter-tab.round-4.active { background: #6e60d9; color: #fff; }
+  .round-section.round-4-section { border-color: #6e60d9; box-shadow: 0 4px 16px rgba(110, 96, 217, 0.10); }
+  .round-4-section .section-h { background: linear-gradient(135deg, rgba(110, 96, 217, 0.12), #ffffff); border-bottom-color: rgba(110, 96, 217, 0.30); }
+  .round-4-section .section-h .section-tag { background: #6e60d9; color: #fff; }
+  .round-4-section .section-row { --cols: 2; }
+  /* Round 5 (Gamified) — neon magenta accent */
+  .filter-tab.round-5.active { background: #ff00ea; color: #fff; }
+  .round-section.round-5-section { border-color: #ff00ea; box-shadow: 0 4px 16px rgba(255, 0, 234, 0.10); }
+  .round-5-section .section-h { background: linear-gradient(135deg, rgba(255, 0, 234, 0.12), #ffffff); border-bottom-color: rgba(255, 0, 234, 0.30); }
+  .round-5-section .section-h .section-tag { background: #ff00ea; color: #fff; }
+  .round-5-section .section-row { --cols: 2; }
+  /* Filter rules for r4 + r5 */
+  body[data-filter="r1"] .round-4-section,
+  body[data-filter="r1"] .round-5-section,
+  body[data-filter="r2"] .round-4-section,
+  body[data-filter="r2"] .round-5-section,
+  body[data-filter="r3"] .round-4-section,
+  body[data-filter="r3"] .round-5-section { display: none; }
+  body[data-filter="r4"] .round-1-section,
+  body[data-filter="r4"] .round-2-section,
+  body[data-filter="r4"] .round-3-section,
+  body[data-filter="r4"] .round-5-section { display: none; }
+  body[data-filter="r5"] .round-1-section,
+  body[data-filter="r5"] .round-2-section,
+  body[data-filter="r5"] .round-3-section,
+  body[data-filter="r5"] .round-4-section { display: none; }
 </style>
 
 <div class="sections" id="sections">
+
+  <section class="round-section round-5-section" data-round-section="5">
+    <div class="section-h">
+      <h2>
+        <span class="section-tag">Round 5</span>
+        Gamified · video-game energy
+      </h2>
+      <span class="section-meta">v12 cyberpunk neon · v13 arcade/retro synth-wave</span>
+    </div>
+    <div class="section-row-wrap">
+      <div class="section-row">
+        <div class="col new-iter" data-round="5">
+          <div class="col-header">
+            <div class="col-name"><span class="num">v12</span> Gamified · Cyberpunk</div>
+            <div class="col-actions"><a href="v12-trade.html" target="_blank">↗ open</a></div>
+          </div>
+          <div class="frame-wrap scale">
+            <iframe src="v12-trade.html"></iframe>
+          </div>
+        </div>
+        <div class="col new-iter" data-round="5">
+          <div class="col-header">
+            <div class="col-name"><span class="num">v13</span> Gamified · Arcade/Retro</div>
+            <div class="col-actions"><a href="v13-trade.html" target="_blank">↗ open</a></div>
+          </div>
+          <div class="frame-wrap scale">
+            <iframe src="v13-trade.html"></iframe>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="round-section round-4-section" data-round-section="4">
+    <div class="section-h">
+      <h2>
+        <span class="section-tag">Round 4</span>
+        Linear quality · severe typographic discipline
+      </h2>
+      <span class="section-meta">v10 cyan palette (v7 colors retained) · v11 Linear's own violet palette</span>
+    </div>
+    <div class="section-row-wrap">
+      <div class="section-row">
+        <div class="col new-iter" data-round="4">
+          <div class="col-header">
+            <div class="col-name"><span class="num">v10</span> Linear · v7 cyan</div>
+            <div class="col-actions"><a href="v10-trade.html" target="_blank">↗ open</a></div>
+          </div>
+          <div class="frame-wrap scale">
+            <iframe src="v10-trade.html"></iframe>
+          </div>
+        </div>
+        <div class="col new-iter" data-round="4">
+          <div class="col-header">
+            <div class="col-name"><span class="num">v11</span> Linear · violet</div>
+            <div class="col-actions"><a href="v11-trade.html" target="_blank">↗ open</a></div>
+          </div>
+          <div class="frame-wrap scale">
+            <iframe src="v11-trade.html"></iframe>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
 
   <section class="round-section round-3-section" data-round-section="3">
     <div class="section-h">
       <h2>
         <span class="section-tag">Round 3</span>
-        Terminal refined · 2026-05-23 feedback + mobile-first
+        Terminal direction · v8 + alt + amber variant
       </h2>
-      <span class="section-meta">v8 (active) + v8-alt (reference, rejected) · v9 / Linear / Gamified pending</span>
+      <span class="section-meta">v8 (active) · v8-alt (rejected reference) · v9 amber+denser take</span>
     </div>
     <div class="section-row-wrap">
       <div class="section-row">
@@ -312,6 +405,16 @@
           </div>
           <div class="frame-wrap scale">
             <iframe src="v8-trade.html"></iframe>
+          </div>
+        </div>
+
+        <div class="col new-iter" data-round="3">
+          <div class="col-header">
+            <div class="col-name"><span class="num">v9</span> Terminal · Amber</div>
+            <div class="col-actions"><a href="v9-trade.html" target="_blank">↗ open</a></div>
+          </div>
+          <div class="frame-wrap scale">
+            <iframe src="v9-trade.html"></iframe>
           </div>
         </div>
 
