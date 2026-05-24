@@ -25,16 +25,26 @@
     "@trigger.dev/sdk": "^4.0.0",
     "arweave": "^1.15.5",
     "axios": "^1.7.7",
+    "bs58": "^6.0.0",
+    "discord.js": "^14.16.3",
     "dotenv": "^16.4.5",
     "keccak256": "^1.0.6",
-    "merkletreejs": "^0.4.0"
+    "merkletreejs": "^0.4.0",
+    "next-auth": "^4.24.10",
+    "tweetnacl": "^1.0.3",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@trigger.dev/build": "^4.0.0",
     "@types/node": "^20.14.10",
+    "@types/web-push": "^3.6.4",
     "dotenv-cli": "^7.4.2",
+    "next": "14.2.18",
     "tsx": "^4.19.2",
     "typescript": "^5.5.4",
     "vitest": "^2.1.5"
+  },
+  "peerDependencies": {
+    "next": "^14.2.0"
   }
 }

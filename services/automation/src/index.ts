@@ -177,3 +177,6 @@ export {
   SETTLE_MARKET_DISCRIMINATOR_BASE58,
 } from "./indexer/helius-webhook.js";
 export type { HeliusEnhancedTx, ParsedSettleEvent } from "./indexer/helius-webhook.js";
+
+// DR-014 — user profiles + social linking + notification channels
+export * from "./auth/index.js";
