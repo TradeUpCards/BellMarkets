@@ -51,6 +51,109 @@ export type BellProBriefingContext = {
   fiveDayMomentumPct?: number;
 };
 
+// ---------------------------------------------------------------------------
+// Per-wallet PNL digest (Category B "highest LTV" per ai-v2-plan §2)
+// ---------------------------------------------------------------------------
+
+const PNL_DIGEST_SYSTEM_PROMPT = `You write the BellMarkets PNL digest — a personalized summary of a user's settled trades for a period (typically one trading day).
+
+You are summarizing FACTS the user already paid for. NOT investment advice. NOT a recommendation.
+
+Strict language rules:
+FORBIDDEN: "should", "advise", "recommend", "buy", "sell", "would have", "if you had", "next time you should".
+ALLOWED: "you won X markets and lost Y", "your net PnL was $Z", "factors that contributed".
+
+Structure (~200 words):
+- 1-sentence headline ("You went 4-3 on a $7 net PnL day across META and NVDA.")
+- Per-position bullets (2-4 of the most material trades, one bullet each, naming the ticker + strike + outcome + dollar amount)
+- 1-sentence behavioral observation (NO advice — just the pattern: "Your win rate was higher on AAPL than on NVDA this period.")
+- Final line, verbatim: "Information only. Not financial advice."
+
+Use ONLY the data provided. Do NOT invent positions, prices, or trades not in the input.`;
+
+export type PnlDigestPosition = {
+  ticker: string;
+  strikeUsd: number;
+  outcome: "yes" | "no" | "invalid" | "unsettled";
+  /** 'won' | 'lost' | 'invalid' | 'abstained'. */
+  result: string;
+  /** Amount the user held on the winning side at settle (USDC base units). */
+  amountUsdc: number;
+  settledAt: Date;
+};
+
+export type PnlDigestStats = {
+  wonAmountUsdc: number;
+  lostAmountUsdc: number;
+  netPnlUsdc: number;
+  winCount: number;
+  lossCount: number;
+  invalidCount: number;
+  abstainedCount: number;
+  totalMarkets: number;
+};
+
+export type PnlDigestContext = {
+  walletPubkey: string;
+  periodStart: Date;
+  periodEnd: Date;
+  stats: PnlDigestStats;
+  positions: ReadonlyArray<PnlDigestPosition>;
+};
+
+/**
+ * Build the per-wallet PNL digest prompt. Pure function. Embeds the
+ * deterministic stats + positions table; Sonnet narrates over the
+ * top-N most material positions.
+ */
+export function buildPnlDigestPrompt(input: PnlDigestContext): AnthropicCallInput {
+  const { walletPubkey, periodStart, periodEnd, stats, positions } = input;
+
+  // Truncate wallet for readability (Sonnet doesn't need the full base58)
+  const walletShort = walletPubkey.length > 12
+    ? `${walletPubkey.slice(0, 4)}...${walletPubkey.slice(-4)}`
+    : walletPubkey;
+
+  // Sort by absolute amount desc, take top 8 — enough material for the
+  // bullets without bloating input tokens.
+  const top = [...positions]
+    .sort((a, b) => Math.abs(b.amountUsdc) - Math.abs(a.amountUsdc))
+    .slice(0, 8);
+
+  const positionsBlock = top
+    .map(
+      (p) =>
+        `- ${p.ticker} @ $${p.strikeUsd.toFixed(2)} strike, outcome=${p.outcome}, result=${p.result}, amount=$${p.amountUsdc.toFixed(2)} USDC, settled ${p.settledAt.toISOString()}`,
+    )
+    .join("\n");
+
+  const userMessage = `WALLET: ${walletShort}
+PERIOD: ${periodStart.toISOString()} → ${periodEnd.toISOString()}
+
+DETERMINISTIC STATS:
+  won_amount_usdc:   ${stats.wonAmountUsdc.toFixed(2)}
+  lost_amount_usdc:  ${stats.lostAmountUsdc.toFixed(2)}
+  net_pnl_usdc:      ${stats.netPnlUsdc.toFixed(2)}
+  win_count:         ${stats.winCount}
+  loss_count:        ${stats.lossCount}
+  invalid_count:     ${stats.invalidCount}
+  abstained_count:   ${stats.abstainedCount}
+  total_markets:     ${stats.totalMarkets}
+
+TOP POSITIONS:
+${positionsBlock || "(no positions in this period)"}
+
+Write the ~200-word PNL digest per the rules above. Always close with the disclaimer.`;
+
+  return {
+    kind: "pnl-digest",
+    model: DEFAULT_BRIEFING_MODEL,
+    system: PNL_DIGEST_SYSTEM_PROMPT,
+    messages: [{ role: "user", content: userMessage }],
+    maxTokens: 400,
+  };
+}
+
 /**
  * Build the Bell Pro briefing prompt. Pure function. Ground-truthed context
  * goes into the user message; system prompt enforces 150-word ceiling +

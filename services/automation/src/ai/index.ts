@@ -19,8 +19,19 @@ export {
   insertBriefing,
   getLatestBriefing,
   listLatestBriefings,
+  insertPnlDigest,
+  getLatestPnlDigest,
+  listUserPositionsInPeriod,
 } from "./db.js";
-export type { AiDbDeps, ClassificationInput, BriefingInput, BriefingRecord } from "./db.js";
+export type {
+  AiDbDeps,
+  ClassificationInput,
+  BriefingInput,
+  BriefingRecord,
+  PnlDigestInput,
+  PnlDigestRecord,
+  UserPositionInPeriod,
+} from "./db.js";
 export {
   classifyArticle,
   classifyPendingArticles,
@@ -31,6 +42,13 @@ export type { ClassifyArticleResult } from "./classify.js";
 export {
   buildDailyTickerBriefingPrompt,
   buildBellProBriefingPrompt,
+  buildPnlDigestPrompt,
   DEFAULT_BRIEFING_MODEL,
 } from "./briefing-prompts.js";
-export type { DailyBriefingInput, BellProBriefingContext } from "./briefing-prompts.js";
+export type {
+  DailyBriefingInput,
+  BellProBriefingContext,
+  PnlDigestContext,
+  PnlDigestPosition,
+  PnlDigestStats,
+} from "./briefing-prompts.js";

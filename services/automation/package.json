@@ -16,7 +16,8 @@
     "morning:once": "tsx --env-file=.env scripts/run-morning-once.ts",
     "settle:once": "tsx --env-file=.env scripts/run-settle-once.ts",
     "distribute:once": "tsx --env-file=.env scripts/run-distribute-once.ts",
-    "briefings:gen": "tsx --env-file=.env --env-file=.env.local scripts/gen-briefings.ts"
+    "briefings:gen": "tsx --env-file=.env --env-file=.env.local scripts/gen-briefings.ts",
+    "pnl-digest:gen": "tsx --env-file=.env --env-file=.env.local scripts/gen-pnl-digest.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",

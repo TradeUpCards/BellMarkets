@@ -197,6 +197,175 @@ export async function getLatestBriefing(
   return rows[0] ? rowToBriefing(rows[0]) : undefined;
 }
 
+// ---------------------------------------------------------------------------
+// pnl_digests — per-wallet PNL digests
+// ---------------------------------------------------------------------------
+
+export type PnlDigestInput = {
+  walletPubkey: string;
+  periodStart: Date;
+  periodEnd: Date;
+  model: string;
+  body: string;
+  stats: Record<string, unknown>;
+  promptHash: string;
+  requestId?: string;
+  costCents?: number;
+};
+
+export type PnlDigestRecord = {
+  id: number;
+  walletPubkey: string;
+  periodStart: Date;
+  periodEnd: Date;
+  model: string;
+  body: string;
+  stats: Record<string, unknown>;
+  promptHash: string;
+  requestId: string | undefined;
+  costCents: number | undefined;
+  generatedAt: Date;
+};
+
+export async function insertPnlDigest(input: PnlDigestInput, deps?: AiDbDeps): Promise<number> {
+  const sql = clientOf(deps);
+  const rows = (await sql`
+    INSERT INTO pnl_digests (
+      wallet_pubkey, period_start, period_end, model, body, stats,
+      prompt_hash, request_id, cost_cents
+    )
+    VALUES (
+      ${input.walletPubkey}, ${input.periodStart.toISOString()}, ${input.periodEnd.toISOString()},
+      ${input.model}, ${input.body}, ${JSON.stringify(input.stats)}::jsonb,
+      ${input.promptHash}, ${input.requestId ?? null}, ${input.costCents ?? null}
+    )
+    ON CONFLICT (wallet_pubkey, period_start, period_end) DO UPDATE SET
+      model = excluded.model,
+      body = excluded.body,
+      stats = excluded.stats,
+      prompt_hash = excluded.prompt_hash,
+      request_id = excluded.request_id,
+      cost_cents = excluded.cost_cents,
+      generated_at = NOW()
+    RETURNING id
+  `) as Array<{ id: number }>;
+  const row = rows[0];
+  if (!row) throw new Error("insertPnlDigest: no rows returned");
+  return row.id;
+}
+
+export async function getLatestPnlDigest(
+  walletPubkey: string,
+  deps?: AiDbDeps,
+): Promise<PnlDigestRecord | undefined> {
+  const sql = clientOf(deps);
+  const rows = (await sql`
+    SELECT id, wallet_pubkey, period_start, period_end, model, body, stats,
+           prompt_hash, request_id, cost_cents, generated_at
+    FROM pnl_digests
+    WHERE wallet_pubkey = ${walletPubkey}
+    ORDER BY generated_at DESC
+    LIMIT 1
+  `) as Array<RawPnlDigest>;
+  return rows[0] ? rowToPnlDigest(rows[0]) : undefined;
+}
+
+type RawPnlDigest = {
+  id: number;
+  wallet_pubkey: string;
+  period_start: string;
+  period_end: string;
+  model: string;
+  body: string;
+  stats: Record<string, unknown>;
+  prompt_hash: string;
+  request_id: string | null;
+  cost_cents: string | number | null;
+  generated_at: string;
+};
+
+function rowToPnlDigest(r: RawPnlDigest): PnlDigestRecord {
+  return {
+    id: r.id,
+    walletPubkey: r.wallet_pubkey,
+    periodStart: new Date(r.period_start),
+    periodEnd: new Date(r.period_end),
+    model: r.model,
+    body: r.body,
+    stats: r.stats,
+    promptHash: r.prompt_hash,
+    requestId: r.request_id ?? undefined,
+    costCents: r.cost_cents !== null && r.cost_cents !== undefined ? Number(r.cost_cents) : undefined,
+    generatedAt: new Date(r.generated_at),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// User-positions query — drives PNL digest stats computation
+// ---------------------------------------------------------------------------
+
+export type UserPositionInPeriod = {
+  marketPubkey: string;
+  ticker: string | undefined;
+  strikeMicroUsd: number | undefined; // optional — comes from joined StrikeMarket if indexed
+  outcome: string;
+  result: string;
+  yesHeld: string;
+  noHeld: string;
+  settledAt: Date;
+  settlePrice: string | undefined;
+};
+
+/**
+ * Per-user position rows in a settle window. Joins user_market_holds with
+ * settle_events to scope by observed_at. Used by gen-pnl-digest.
+ */
+export async function listUserPositionsInPeriod(
+  walletPubkey: string,
+  periodStart: Date,
+  periodEnd: Date,
+  deps?: AiDbDeps,
+): Promise<UserPositionInPeriod[]> {
+  const sql = clientOf(deps);
+  const rows = (await sql`
+    SELECT
+      umh.market_pubkey,
+      se.ticker,
+      se.outcome,
+      umh.result,
+      umh.yes_held,
+      umh.no_held,
+      se.observed_at AS settled_at,
+      se.settle_price
+    FROM user_market_holds umh
+    JOIN settle_events se ON se.id = umh.settle_event_id
+    WHERE umh.user_pubkey = ${walletPubkey}
+      AND se.observed_at >= ${periodStart.toISOString()}
+      AND se.observed_at <  ${periodEnd.toISOString()}
+    ORDER BY se.observed_at DESC
+  `) as Array<{
+    market_pubkey: string;
+    ticker: string | null;
+    outcome: string;
+    result: string;
+    yes_held: string;
+    no_held: string;
+    settled_at: string;
+    settle_price: string | null;
+  }>;
+  return rows.map((r) => ({
+    marketPubkey: r.market_pubkey,
+    ticker: r.ticker ?? undefined,
+    strikeMicroUsd: undefined,
+    outcome: r.outcome,
+    result: r.result,
+    yesHeld: r.yes_held,
+    noHeld: r.no_held,
+    settledAt: new Date(r.settled_at),
+    settlePrice: r.settle_price ?? undefined,
+  }));
+}
+
 export async function listLatestBriefings(
   tickers: ReadonlyArray<string>,
   deps?: AiDbDeps,
