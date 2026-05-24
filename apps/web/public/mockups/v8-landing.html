@@ -1657,31 +1657,89 @@
   }
   @media (max-width: 768px) {
     body { padding-bottom: 60px; }
-    .header-inner { grid-template-columns: auto auto; gap: 12px; padding: 12px 16px; }
+
+    /* TOP STATUS — debug bar, irrelevant on mobile */
+    .top-status { display: none; }
+
+    /* HEADER — compact: brand + wallet only. Other items hide on mobile.
+       Bottom-tabs handle nav; sessions/notifications/theme accessible later via menu. */
+    .header-inner { grid-template-columns: 1fr auto; gap: 8px; padding: 10px 14px; }
     .searchbar { display: none; }
     .nav { display: none; }
     .brand-divider { display: none; }
+    .session-module { display: none; }
+    .header-right .icon-btn { display: none; }
+    .go-pro-btn { display: none; }
     .brand { gap: 0; }
-    .top-status { gap: 12px; padding: 6px 12px; flex-wrap: wrap; font-size: 9px; }
+    .logo { font-size: 14px; }
+    .logo-mark { width: 24px; height: 24px; }
+    .header-right { gap: 6px; }
+    .connect-btn { padding: 8px 12px; font-size: 12px; min-height: 38px; }
+    .connect-btn span:last-child { max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    /* Adjust sticky left-rail top offset since header is now ~58px (was 66px) */
+    .left-rail { top: 58px; max-height: calc(100vh - 58px); }
+
     main { padding: 12px; }
-    .carousel-slide { padding: 24px 20px; flex-direction: column; gap: 16px; min-height: 320px; }
-    .slide-art { flex: 0 0 auto; width: 100%; height: 140px; }
-    .slide-title { font-size: 22px; }
+
+    /* CAROUSEL stacks 1-up + smaller */
+    .carousel-slide { padding: 18px 16px; flex-direction: column; gap: 12px; min-height: auto; }
+    .slide-stat { flex: 0 0 auto; width: 100%; padding: 12px; }
+    .slide-stat-num { font-size: 28px; }
+    .slide-title { font-size: 18px !important; }
+    .slide-body p { font-size: 12px !important; margin-bottom: 10px !important; }
+    .slide-actions .btn-primary, .slide-actions .btn-secondary { padding: 10px 16px; font-size: 11px; }
+
+    /* HERO-GRID stacks carousel above session block */
+    .hero-grid { gap: 12px; }
+    .session-block { padding: 14px 16px; }
+
+    /* MATRIX — horizontal scroll, compact columns */
+    .matrix-h { padding: 10px 14px; flex-direction: column; align-items: stretch; gap: 8px; }
+    .matrix-h h3 { font-size: 13px; }
+    .matrix-h-controls { flex-wrap: wrap; gap: 6px; }
+    .matrix-controls { flex-wrap: wrap; }
     .matrix-thead, .matrix-row {
-      grid-template-columns: 80px repeat(7, 56px) 60px;
-      overflow-x: auto;
+      grid-template-columns: 80px 70px repeat(7, 60px) 70px 60px;
     }
     .matrix-card { overflow-x: auto; }
-    .matrix-grid { min-width: 600px; }
-    /* Hide some matrix columns on small screens to reduce horizontal scroll */
-    .matrix-thead > div.hide-mobile,
-    .matrix-row > div.hide-mobile { display: none; }
-    .contests-grid { grid-template-columns: 1fr; }
-    .lb-grid { grid-template-columns: 1fr; }
-    .lb-col:first-child { border-right: none; border-bottom: 1px solid var(--border); }
-    .section-h-block h2 { font-size: 16px; }
+    .matrix-grid { min-width: 720px; }
+
+    /* ROW-2COL stacks at <=1024px already; tighten gap at small screens */
+    .row-2col { gap: 12px; margin-bottom: 18px; }
+
+    /* LEADERBOARD tabs wrap */
+    .lb-tabs { gap: 4px; }
+    .lb-tab { padding: 5px 8px; font-size: 9px; }
+
+    /* CONTESTS - already single column at <1024 via row-2col */
+    .section-h-block h2 { font-size: 15px; }
+    .section-h-block.compact h2 { font-size: 14px; }
+
+    /* BELL PRO compact pricing on mobile */
+    .bp-pricing-inline { flex-direction: column; align-items: stretch; gap: 12px; padding: 10px; }
+    .bp-founder-block { padding-left: 0; padding-top: 10px; border-left: none; border-top: 1px solid var(--border); }
+    .bp-features-compact { grid-template-columns: 1fr !important; }
+
+    /* RECENT FILLS height adjusted */
+    .fills-scroll { max-height: 280px; }
+
+    /* HOW-IT-WORKS stacks */
+    .how-grid { grid-template-columns: 1fr; }
+
+    /* BOTTOM TABS visible */
     .bottom-tabs { display: grid; }
     .hotkey-bar { display: none; }
+  }
+  @media (max-width: 480px) {
+    /* Tighten further on very small screens (iPhone SE etc.) */
+    .matrix-thead, .matrix-row {
+      grid-template-columns: 70px 60px repeat(7, 52px) 60px 50px;
+    }
+    .matrix-grid { min-width: 644px; }
+    .slide-title { font-size: 16px !important; }
+    .slide-stat-num { font-size: 24px; }
+    .lb-tab { padding: 4px 6px; font-size: 9px; }
+    .connect-btn span:last-child { max-width: 60px; font-size: 11px; }
   }
 </style>
 </head>
