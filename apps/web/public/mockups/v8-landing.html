@@ -660,12 +660,14 @@
     font-weight: 700; margin-bottom: 12px;
     display: flex; align-items: center; justify-content: space-between;
   }
-  .session-block-h::after {
-    content: ""; flex: 1;
-    height: 1px;
-    background: linear-gradient(90deg, var(--border) 0%, transparent 100%);
-    margin-left: 10px;
+  .session-block-h::after { display: none; }
+  .session-h-countdown {
+    display: inline-flex; align-items: baseline; gap: 6px;
+    text-transform: none; letter-spacing: 0;
+    font-size: 11px; font-weight: 600;
   }
+  .session-h-countdown .lbl { color: var(--text-muted); }
+  .session-h-countdown .val { font-size: 14px; font-weight: 700; }
   .session-row {
     display: flex; justify-content: space-between; align-items: baseline;
     padding: 8px 0;
@@ -764,7 +766,7 @@
   }
   .matrix-thead {
     grid-column: 1 / -1;
-    display: grid; grid-template-columns: 110px 90px repeat(7, 1fr) 110px 90px 90px;
+    display: grid; grid-template-columns: 110px 90px repeat(7, 1fr) 100px 90px;
     background: var(--panel-2);
     border-bottom: 1px solid var(--border);
   }
@@ -781,7 +783,7 @@
 
   .matrix-row {
     grid-column: 1 / -1;
-    display: grid; grid-template-columns: 110px 90px repeat(7, 1fr) 110px 90px 90px;
+    display: grid; grid-template-columns: 110px 90px repeat(7, 1fr) 100px 90px;
     border-bottom: 1px solid var(--border);
     transition: background 150ms;
     cursor: pointer;
@@ -1295,7 +1297,17 @@
     .row-2col { grid-template-columns: 1fr; }
   }
   .half-section { display: flex; flex-direction: column; min-width: 0; }
-  .half-card { height: 100%; display: flex; flex-direction: column; }
+  .half-card { height: 100%; display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+  /* Scrollable Recent Fills list — max-height keeps card from blowing up */
+  .fills-scroll {
+    max-height: 360px;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  .fills-scroll::-webkit-scrollbar { width: 6px; }
+  .fills-scroll::-webkit-scrollbar-track { background: var(--panel); }
+  .fills-scroll::-webkit-scrollbar-thumb { background: var(--panel-3); border-radius: 3px; }
+  .fills-scroll::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
   .section-h-block.compact { margin: 0 0 10px; }
   .section-h-block.compact h2 { font-size: 16px; }
 
@@ -2049,10 +2061,12 @@
       </div>
     </div>
 
-    <!-- Session block -->
+    <!-- Session block — settle countdown inline with title to save vertical -->
     <div class="session-block">
-      <div class="session-block-h">Today's session</div>
-      <div class="session-row big"><span class="lbl">Settle in</span><span class="val amber">02:13:47</span></div>
+      <div class="session-block-h">
+        <span>Today's session</span>
+        <span class="session-h-countdown mono"><span class="lbl">Settle in</span> <span class="val amber">02:13:47</span></span>
+      </div>
       <div class="session-row"><span class="lbl">Markets active</span><span class="val cyan">49</span></div>
       <div class="session-row"><span class="lbl">Volume 24h</span><span class="val">$184,723</span></div>
       <div class="session-row"><span class="lbl">Trades 24h</span><span class="val">2,847</span></div>
@@ -2104,9 +2118,8 @@
           <div>+3%</div>
           <div>+6%</div>
           <div>+9%</div>
-          <div>Spark · 4h</div>
           <div>Vol 24h</div>
-          <div>OI</div>
+          <div></div>
         </div>
 
         <a class="matrix-row" href="v8-trade.html">
@@ -2122,11 +2135,6 @@
           <div class="prob-cell p-20-39"><span class="strike">$700</span><span class="prob">28%</span></div>
           <div class="prob-cell p-5-19"><span class="strike">$720</span><span class="prob">14%</span></div>
           <div class="prob-cell p-0-4"><span class="strike">$740</span><span class="prob">6%</span></div>
-          <div class="matrix-spark">
-            <svg viewBox="0 0 80 28" preserveAspectRatio="none" style="width:100%;height:100%;">
-              <polyline points="0,20 10,18 20,22 30,16 40,12 50,16 60,10 70,12 80,8" fill="none" stroke="#22d3ee" stroke-width="1.2"/>
-            </svg>
-          </div>
           <div class="matrix-vol mono">
             $42,184
             <span class="delta">+18.2%</span>
@@ -2149,11 +2157,6 @@
           <div class="prob-cell p-20-39"><span class="strike">$1,380</span><span class="prob">31%</span></div>
           <div class="prob-cell p-5-19"><span class="strike">$1,420</span><span class="prob">16%</span></div>
           <div class="prob-cell p-0-4"><span class="strike">$1,460</span><span class="prob">7%</span></div>
-          <div class="matrix-spark">
-            <svg viewBox="0 0 80 28" preserveAspectRatio="none" style="width:100%;height:100%;">
-              <polyline points="0,24 10,22 20,18 30,14 40,11 50,8 60,6 70,4 80,2" fill="none" stroke="#4ade80" stroke-width="1.2"/>
-            </svg>
-          </div>
           <div class="matrix-vol mono">
             $61,892
             <span class="delta">+32.1%</span>
@@ -2176,11 +2179,6 @@
           <div class="prob-cell empty"><span class="strike">$235</span><span class="prob">—</span></div>
           <div class="prob-cell p-20-39"><span class="strike">$240</span><span class="prob">24%</span></div>
           <div class="prob-cell p-5-19"><span class="strike">$250</span><span class="prob">9%</span></div>
-          <div class="matrix-spark">
-            <svg viewBox="0 0 80 28" preserveAspectRatio="none" style="width:100%;height:100%;">
-              <polyline points="0,22 10,20 20,22 30,18 40,14 50,16 60,12 70,14 80,10" fill="none" stroke="#4ade80" stroke-width="1.2"/>
-            </svg>
-          </div>
           <div class="matrix-vol mono">
             $28,743
             <span class="delta">+11.4%</span>
@@ -2203,11 +2201,6 @@
           <div class="prob-cell empty"><span class="strike">$450</span><span class="prob">—</span></div>
           <div class="prob-cell p-20-39"><span class="strike">$460</span><span class="prob">27%</span></div>
           <div class="prob-cell p-5-19"><span class="strike">$480</span><span class="prob">11%</span></div>
-          <div class="matrix-spark">
-            <svg viewBox="0 0 80 28" preserveAspectRatio="none" style="width:100%;height:100%;">
-              <polyline points="0,22 10,20 20,18 30,16 40,14 50,12 60,10 70,8 80,6" fill="none" stroke="#4ade80" stroke-width="1.2"/>
-            </svg>
-          </div>
           <div class="matrix-vol mono">
             $19,621
             <span class="delta">+8.7%</span>
@@ -2230,11 +2223,6 @@
           <div class="prob-cell p-20-39"><span class="strike">$190</span><span class="prob">36%</span></div>
           <div class="prob-cell empty"><span class="strike">$195</span><span class="prob">—</span></div>
           <div class="prob-cell p-5-19"><span class="strike">$200</span><span class="prob">13%</span></div>
-          <div class="matrix-spark">
-            <svg viewBox="0 0 80 28" preserveAspectRatio="none" style="width:100%;height:100%;">
-              <polyline points="0,8 10,10 20,8 30,12 40,16 50,14 60,18 70,20 80,22" fill="none" stroke="#f87171" stroke-width="1.2"/>
-            </svg>
-          </div>
           <div class="matrix-vol mono">
             $12,408
             <span class="delta">-3.2%</span>
@@ -2257,11 +2245,6 @@
           <div class="prob-cell empty"><span class="strike">$205</span><span class="prob">—</span></div>
           <div class="prob-cell p-20-39"><span class="strike">$210</span><span class="prob">29%</span></div>
           <div class="prob-cell p-5-19"><span class="strike">$220</span><span class="prob">12%</span></div>
-          <div class="matrix-spark">
-            <svg viewBox="0 0 80 28" preserveAspectRatio="none" style="width:100%;height:100%;">
-              <polyline points="0,18 10,16 20,18 30,14 40,12 50,16 60,10 70,14 80,8" fill="none" stroke="#4ade80" stroke-width="1.2"/>
-            </svg>
-          </div>
           <div class="matrix-vol mono">
             $16,237
             <span class="delta">+6.8%</span>
@@ -2284,11 +2267,6 @@
           <div class="prob-cell empty"><span class="strike">$265</span><span class="prob">—</span></div>
           <div class="prob-cell p-20-39"><span class="strike">$270</span><span class="prob">26%</span></div>
           <div class="prob-cell p-5-19"><span class="strike">$280</span><span class="prob">13%</span></div>
-          <div class="matrix-spark">
-            <svg viewBox="0 0 80 28" preserveAspectRatio="none" style="width:100%;height:100%;">
-              <polyline points="0,8 10,10 20,8 30,12 40,16 50,14 60,18 70,20 80,22" fill="none" stroke="#f87171" stroke-width="1.2"/>
-            </svg>
-          </div>
           <div class="matrix-vol mono">
             $23,718
             <span class="delta">-5.4%</span>
@@ -2395,11 +2373,28 @@
     </div>
     </div><!-- /half-section leaderboard -->
 
-    <!-- CONTESTS — second half of the row -->
+    <!-- CONTESTS — second half of the row, with filter tabs matching leaderboard pattern -->
     <div class="half-section">
       <div class="section-h-block compact">
         <h2><span class="eyebrow" style="background: rgba(244, 114, 182, 0.12); color: var(--pink); border: 1px solid var(--pink);">Contests</span> Active prize pools</h2>
         <a href="#" class="link">All →</a>
+      </div>
+      <div class="lb-tabs">
+        <div class="lb-tab-group period" role="tablist">
+          <button class="lb-tab active" data-period="active">Active</button>
+          <button class="lb-tab" data-period="upcoming">Upcoming</button>
+          <button class="lb-tab" data-period="ended">Ended</button>
+        </div>
+        <div class="lb-tab-group metric" role="tablist">
+          <button class="lb-tab active" data-type="all">All</button>
+          <button class="lb-tab" data-type="weekly">Weekly</button>
+          <button class="lb-tab" data-type="monthly">Monthly</button>
+          <button class="lb-tab" data-type="event">Event</button>
+        </div>
+      </div>
+      <div class="lb-period-meta">
+        <span class="lb-period-state mono">3 active · 187+ entries</span>
+        <span class="lb-pool mono">$17,700 total pool</span>
       </div>
       <div class="contests-stack">
         <div class="contest-card">
@@ -2508,20 +2503,30 @@
       </div>
     </div>
 
-    <!-- RECENT FILLS — moved up next to Bell Pro -->
+    <!-- RECENT FILLS — scrollable list (Cory feedback) -->
     <div class="activity-card half-card">
       <div class="activity-card-h">
         <h3>Recent Fills</h3>
         <span class="live">live · 24 trades</span>
       </div>
-      <div class="fill-row"><span class="time">14:42:18</span><span class="market"><span class="ticker">META</span>.680</span><span class="side buy-yes">BUY YES</span><span class="price mono">0.520</span><span class="size mono">$200</span></div>
-      <div class="fill-row"><span class="time">14:42:11</span><span class="market"><span class="ticker">NVDA</span>.1340</span><span class="side buy-no">BUY NO</span><span class="price mono">0.480</span><span class="size mono">$500</span></div>
-      <div class="fill-row"><span class="time">14:41:54</span><span class="market"><span class="ticker">AAPL</span>.230</span><span class="side sell-yes">SELL YES</span><span class="price mono">0.520</span><span class="size mono">$100</span></div>
-      <div class="fill-row"><span class="time">14:41:32</span><span class="market"><span class="ticker">TSLA</span>.260</span><span class="side buy-no">BUY NO</span><span class="price mono">0.530</span><span class="size mono">$1,000</span></div>
-      <div class="fill-row"><span class="time">14:41:08</span><span class="market"><span class="ticker">META</span>.680</span><span class="side buy-yes">BUY YES</span><span class="price mono">0.500</span><span class="size mono">$50</span></div>
-      <div class="fill-row"><span class="time">14:40:51</span><span class="market"><span class="ticker">GOOGL</span>.190</span><span class="side buy-yes">BUY YES</span><span class="price mono">0.370</span><span class="size mono">$300</span></div>
-      <div class="fill-row"><span class="time">14:40:33</span><span class="market"><span class="ticker">MSFT</span>.440</span><span class="side sell-yes">SELL YES</span><span class="price mono">0.450</span><span class="size mono">$150</span></div>
-      <div class="fill-row"><span class="time">14:40:12</span><span class="market"><span class="ticker">NVDA</span>.1300</span><span class="side buy-yes">BUY YES</span><span class="price mono">0.730</span><span class="size mono">$250</span></div>
+      <div class="fills-scroll">
+        <div class="fill-row"><span class="time">14:42:18</span><span class="market"><span class="ticker">META</span>.680</span><span class="side buy-yes">BUY YES</span><span class="price mono">0.520</span><span class="size mono">$200</span></div>
+        <div class="fill-row"><span class="time">14:42:11</span><span class="market"><span class="ticker">NVDA</span>.1340</span><span class="side buy-no">BUY NO</span><span class="price mono">0.480</span><span class="size mono">$500</span></div>
+        <div class="fill-row"><span class="time">14:41:54</span><span class="market"><span class="ticker">AAPL</span>.230</span><span class="side sell-yes">SELL YES</span><span class="price mono">0.520</span><span class="size mono">$100</span></div>
+        <div class="fill-row"><span class="time">14:41:32</span><span class="market"><span class="ticker">TSLA</span>.260</span><span class="side buy-no">BUY NO</span><span class="price mono">0.530</span><span class="size mono">$1,000</span></div>
+        <div class="fill-row"><span class="time">14:41:08</span><span class="market"><span class="ticker">META</span>.680</span><span class="side buy-yes">BUY YES</span><span class="price mono">0.500</span><span class="size mono">$50</span></div>
+        <div class="fill-row"><span class="time">14:40:51</span><span class="market"><span class="ticker">GOOGL</span>.190</span><span class="side buy-yes">BUY YES</span><span class="price mono">0.370</span><span class="size mono">$300</span></div>
+        <div class="fill-row"><span class="time">14:40:33</span><span class="market"><span class="ticker">MSFT</span>.440</span><span class="side sell-yes">SELL YES</span><span class="price mono">0.450</span><span class="size mono">$150</span></div>
+        <div class="fill-row"><span class="time">14:40:12</span><span class="market"><span class="ticker">NVDA</span>.1300</span><span class="side buy-yes">BUY YES</span><span class="price mono">0.730</span><span class="size mono">$250</span></div>
+        <div class="fill-row"><span class="time">14:39:58</span><span class="market"><span class="ticker">META</span>.680</span><span class="side buy-no">BUY NO</span><span class="price mono">0.475</span><span class="size mono">$400</span></div>
+        <div class="fill-row"><span class="time">14:39:42</span><span class="market"><span class="ticker">AMZN</span>.205</span><span class="side buy-yes">BUY YES</span><span class="price mono">0.610</span><span class="size mono">$120</span></div>
+        <div class="fill-row"><span class="time">14:39:21</span><span class="market"><span class="ticker">NVDA</span>.1340</span><span class="side sell-yes">SELL YES</span><span class="price mono">0.510</span><span class="size mono">$800</span></div>
+        <div class="fill-row"><span class="time">14:38:55</span><span class="market"><span class="ticker">TSLA</span>.260</span><span class="side buy-yes">BUY YES</span><span class="price mono">0.470</span><span class="size mono">$95</span></div>
+        <div class="fill-row"><span class="time">14:38:33</span><span class="market"><span class="ticker">META</span>.680</span><span class="side buy-yes">BUY YES</span><span class="price mono">0.515</span><span class="size mono">$310</span></div>
+        <div class="fill-row"><span class="time">14:38:11</span><span class="market"><span class="ticker">GOOGL</span>.190</span><span class="side sell-yes">SELL YES</span><span class="price mono">0.380</span><span class="size mono">$220</span></div>
+        <div class="fill-row"><span class="time">14:37:48</span><span class="market"><span class="ticker">AAPL</span>.230</span><span class="side buy-no">BUY NO</span><span class="price mono">0.480</span><span class="size mono">$140</span></div>
+        <div class="fill-row"><span class="time">14:37:22</span><span class="market"><span class="ticker">NVDA</span>.1300</span><span class="side buy-yes">BUY YES</span><span class="price mono">0.725</span><span class="size mono">$180</span></div>
+      </div>
     </div>
 
     </div><!-- /row-2col Bell Pro + Recent Fills -->
