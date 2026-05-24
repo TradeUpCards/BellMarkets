@@ -47,7 +47,7 @@ Generated from `programs/bell-markets/idl/bell_markets.json` + cross-checked aga
 
 **Creator-gated** is a subset of user-callable: DR-008's creator rebate fires when `signer == strike_market.creator` AND `outcome == Unsettled`. This is **not a permission gate** (anyone can still mint_pair), but rather a fee-discount path. Documented separately because it's the only place `signer == specific_pubkey` semantics appear without being an admin constraint.
 
-**DR-002 status:** ENFORCED ON CHAIN. Drew's `tests/integration/live-program-call.test.ts` simulates `settle_market` with non-admin signer + asserts the handler returns a `BellMarketsError` code in 6000-6025 (range covers handler-body reverts) AND specifically NOT `NotAdmin (6001)`. The 2026-05-23 deploy-5 lifecycle run reached `PythStale (6009)` — strictly stronger evidence (handler bypassed BOTH the absent admin check AND the NotExpired check).
+**DR-002 status:** ENFORCED ON CHAIN. Drew's `tests/integration/live-program-call.test.ts` simulates `settle_market` with non-admin signer + asserts the handler returns a `BellMarketsError` code in 6000-6025 (range covers handler-body reverts) AND specifically NOT `NotAdmin (6001)`. The 2026-05-23 deploy-5 lifecycle run reached `PythStale (6009)` — strictly stronger evidence: handler bypassed the absent admin check + evaluated-and-passed the NotExpired check before reaching the Pyth staleness gate at line 103.
 
 ---
 
@@ -75,19 +75,24 @@ Generated from `programs/bell-markets/idl/bell_markets.json` + cross-checked aga
 
 ## 4. Cumulative SOL spent vs budgeted
 
-| Cost line | Devnet actual | Mainnet projection (~50× devnet rent rate) | Notes |
+**Important: Solana rent is computed identically on devnet and mainnet** (same lamports-per-byte formula in the protocol). The mainnet cost difference is the DOLLAR VALUE of SOL itself (real SOL ~$100 at the time of this writing vs free devnet airdrops), not a multiplier on SOL quantity. Sonnet-audit-5 (2026-05-23) caught an earlier draft that confused these two; this section is corrected.
+
+| Cost line | Devnet actual (SOL) | Mainnet projection (SOL — same formula) | Mainnet $ @ $100/SOL |
 |---|---|---|---|
-| 5 cumulative deploys (devnet) | 5.298 SOL | n/a — this is devnet historical | Includes ProgramData rent + tx fees |
-| Upgrade-authority current balance | 6.702 SOL | n/a | Funded 10 SOL initial + 2 SOL post-deploy-4 mid-transfer = 12 SOL gross; 5.30 spent |
-| Initial program deploy at deploy-5 size | n/a | ~5.3 SOL × ~50 = **~265 SOL ≈ $26K @ $100/SOL** | Mainnet rent calculation; not a real number until mainnet SOL price is known |
-| Annual upgrade cadence (5 upgrades/yr) | ~0.50 SOL/yr | ~25 SOL/yr ≈ $2.5K/yr | If binary stays at deploy-5 size |
-| Bram automation cron-tx | minimal devnet | ~5K txs/yr × 5K lamports = 25M lamports ≈ 0.025 SOL/yr ≈ $2.50/yr | Trivial |
-| Bram morning create-markets txs (Aria's admin) | 7-49 ix/day × ~10K lamports = ~$0.50/day | same | Mainnet ATA + Account rent uplift could push to $5-10/day |
-| User-funded strike rent (DR-005) | $0 — users pay | $0 — users pay $0.90 each | DR-005 design eliminates platform working capital |
+| 5 cumulative deploys to date | 5.298 SOL | n/a — this is devnet historical | n/a |
+| Upgrade-authority current balance | 6.702 SOL | n/a — devnet wallet | n/a |
+| Initial program deploy at deploy-5 size (~741 KB) | ~5.3 SOL (deploy-5 actual) | **~5.3 mainnet SOL** | **~$530** |
+| Annual upgrade cadence (5 upgrades/yr at +20% binary growth ea.) | ~1 SOL/yr | ~1 SOL/yr | ~$100/yr |
+| Bram automation cron tx fees | ~0.025 SOL/yr (5K txs × 5K lamports) | same | ~$2.50/yr |
+| Bram morning create-markets txs (Aria admin signs) | ~0.5 SOL/yr (rough; depends on day count + market count) | same | ~$50/yr |
+| User-funded strike rent (DR-005) | $0 to platform — users pay ~0.005 SOL each | $0 to platform — users pay ~0.005 SOL ≈ $0.50 each | DR-005 design eliminates platform working capital |
+| Phoenix v1 market rent (one per strike) | already paid by Phoenix — n/a | n/a | n/a |
 
-**Budgeted:** no formal budget locked; the 10 SOL devnet seed was the cohort-provided amount. **Spent 53% of budget across 5 days × 5 deploys.** Cushion is acceptable for the 4 more deploys realistic before submission.
+**Mainnet capital requirement:** ~5.3 SOL ≈ **$530** of working capital to fund the upgrade authority for the initial deploy. Plus ongoing tx fees (~$50-100/yr). This is **much smaller than enterprise software typically requires**; the binding cost on mainnet is actually the audit ($50-200K) + insurance, not the SOL deploy itself.
 
-**Mainnet readiness check on this line:** the ~265 SOL initial deploy is a HARD upfront cost. At $100/SOL that's $26K of working capital to even put the program on chain. Mainnet conversation should include where that comes from and the rent's recoverability story (it's NOT — ProgramData rent is locked for the program's lifetime).
+**Budgeted:** the 10 SOL devnet seed was the cohort-provided amount. **Spent 53% of budget across 5 days × 5 deploys** on devnet — cushion is acceptable for the 4 more deploys realistic before submission. Mainnet conversation should focus on the audit budget, not the SOL deploy capital.
+
+**Note on ProgramData rent recoverability:** ProgramData rent (the bulk of the deploy cost) is **rebated to the upgrade authority** if the program is later closed via `solana program close`. So even the $530 isn't permanently sunk — it's recoverable on program retirement. For a v1 mainnet that's expected to upgrade often, treat it as working capital.
 
 ---
 
@@ -208,7 +213,7 @@ Ordered by what a motivated attacker would try first.
 - [ ] DR-014 user profile system (rate-limit attack mitigation context)
 - [ ] Live MAG7 Pyth feed verification (devnet only has SOL/USD active)
 - [ ] Production-grade indexer (Helius webhook + Neon Postgres at non-free tier)
-- [ ] Mainnet rent + tx fee budget (~$30K initial deploy + ongoing ops)
+- [ ] Mainnet rent + tx fee budget (~$530 initial deploy at $100/SOL + ~$50-100/yr ongoing; main capital ask is audit budget, not deploy)
 - [ ] Insurance / coverage mechanism for the $1 invariant (today's promise is on-chain bytecode; mainnet might want explicit user-facing terms)
 
 ---

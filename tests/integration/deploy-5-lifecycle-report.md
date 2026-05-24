@@ -9,7 +9,9 @@ Per Tate's dispatch P1 (full E2E lifecycle test). What follows is honest evidenc
 
 ---
 
-## Headline: 3 of 7 dispatch steps EXECUTED LIVE OR PARTIAL-LIVE; 4 blocked by operator/coordination factors (not code bugs)
+## Headline: 1 of 7 dispatch steps reached a handler-level chain revert (simulation; no broadcast); 6 blocked by operator/coordination factors (not code bugs)
+
+**What "1 of 7" specifically means:** step 1 below produced strict-positive DR-002 chain evidence via `simulateTransaction` — the deployed program's settle_market handler returned a `Custom: 6009 (PythStale)` from inside its handler body. This is the same evidence-quality as a broadcast for a revert-path test (sim and broadcast both execute the same on-chain program). Zero transactions were actually broadcast this run. Sonnet-audit-5 caught an earlier "3 of 7" framing here that double-counted reads + sims as "live"; corrected.
 
 | Step | Status | Evidence |
 |---|---|---|
