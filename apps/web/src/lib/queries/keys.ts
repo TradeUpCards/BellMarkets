@@ -62,6 +62,18 @@ export const queryKeys = {
 
   leaderboard: (period: "weekly" | "monthly") =>
     [...queryKeys.all, "leaderboard", period] as const,
+
+  bellProSubscription: (wallet: PublicKey | string | null) =>
+    [...queryKeys.all, "bell-pro-subscription", toBase58(wallet)] as const,
+
+  profile: (wallet: PublicKey | string | null) =>
+    [...queryKeys.all, "profile", toBase58(wallet)] as const,
+
+  notificationPrefs: (wallet: PublicKey | string | null) =>
+    [...queryKeys.all, "notification-prefs", toBase58(wallet)] as const,
+
+  socialLinks: (wallet: PublicKey | string | null) =>
+    [...queryKeys.all, "social-links", toBase58(wallet)] as const,
 } as const;
 
 export type BellMarketsQueryKey = ReturnType<
@@ -76,4 +88,8 @@ export type BellMarketsQueryKey = ReturnType<
   | typeof queryKeys.rewardsPool
   | typeof queryKeys.creatorRebate
   | typeof queryKeys.leaderboard
+  | typeof queryKeys.bellProSubscription
+  | typeof queryKeys.profile
+  | typeof queryKeys.notificationPrefs
+  | typeof queryKeys.socialLinks
 >;
