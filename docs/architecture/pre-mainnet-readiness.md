@@ -234,13 +234,13 @@ Ordered by what a motivated attacker would try first.
 | DR-008 (fee math + creator rebate + 3-way split + gaming defense) | mock + 11 mocha tests | comprehensive at mock layer |
 | DR-010 (Merkle leaderboard) | mock + multi-leaf proof test + period-id isolation + tampered-amount rejection | comprehensive at mock layer |
 
-**Test totals:** 76 assertions (8 live devnet + 63 mocha eval + 5 sim modes) + 100/100 inline Rust property tests in `programs/bell-markets/src/`. 4 independent Sonnet audits applied with 11 substantive findings, all fixed.
+**Test totals:** 76 assertions (8 live devnet + 63 mocha eval + 5 sim modes) + 100/100 inline Rust property tests in `programs/bell-markets/src/`. 5 independent Sonnet audit cycles applied with 14 substantive findings, all fixed (matches the lineage header).
 
 ---
 
 ## 9. Verdict
 
-**Devnet demo: READY.** The 76-assertion test surface + 4 independent audits + live deploy verification cover every Hard YES the build committed to. The one-command demo runs in 3s offline / 10s live.
+**Devnet demo: READY (for trade-protocol invariants).** The 76-assertion test surface + 5 independent audit cycles + live deploy verification cover every Hard YES the build committed to. The one-command demo runs in 3s offline / 10s live. **Caveat:** the v8 frontend trade-execution wiring is still in progress as of 2026-05-24 (Cleo's trade-view submit handlers throw `not yet wired` for live tx paths); the demo script `docs/demo/v1-demo-script.md` walks reviewers through the visual design via the v8 mockup HTMLs + terminal-based on-chain evidence for the lifecycle proofs.
 
 **Mainnet: NOT READY.** Six specific gaps documented above. None are code defects; they're operational + audit + capital + Pyth-coverage items that mainnet conversation requires regardless of the protocol's correctness.
 
