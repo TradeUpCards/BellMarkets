@@ -27,9 +27,11 @@ import {
   insertBriefing,
   type BellProBriefingContext,
 } from "../src/ai/index.js";
+import { classifyMarketSession } from "../src/ai/briefing-prompts.js";
 import { PythClient } from "../src/clients/pyth.js";
 import { computeStrikeGrid, TICKER_DEFAULTS } from "../src/ticker-config.js";
 import { EARNINGS_DATES_2026 } from "../src/earnings-calendar.js";
+import { isTradingDay, isHalfDay, nextTradingDay, toEtDateString } from "../src/calendar.js";
 import { MAG7, type Ticker } from "../src/types.js";
 import { PYTH_HERMES_FEED_IDS, loadConfig } from "../src/config.js";
 import { createHash } from "node:crypto";
@@ -58,6 +60,14 @@ function pickEarningsDates(ticker: Ticker, today: Date): { most: string | undefi
     }
   }
   return { most, next };
+}
+
+function isSessionClosed(session: string): boolean {
+  return (
+    session === "closed-weekend" ||
+    session === "closed-holiday" ||
+    session === "closed-overnight"
+  );
 }
 
 function pickAtmStrike(spotUsd: number, ticker: Ticker): number {
@@ -95,6 +105,14 @@ async function generateForTicker(
   const atm = pickAtmStrike(spot, ticker);
   const { most, next } = pickEarningsDates(ticker, asOf);
 
+  // Market-session context — answers "is the briefing for an open market
+  // or a setup for the next session?" Pre-classified so Sonnet can't drift
+  // to "mid-session" when it's actually a Sunday morning.
+  const marketSession = classifyMarketSession(asOf, { isTradingDay, isHalfDay });
+  const nextSessionEtDate = isSessionClosed(marketSession)
+    ? toEtDateString(nextTradingDay(asOf))
+    : undefined;
+
   const context: BellProBriefingContext = {
     ticker,
     asOf,
@@ -102,9 +120,9 @@ async function generateForTicker(
     atmStrikeUsd: atm,
     mostRecentEarningsDate: most,
     nextEarningsDate: next,
-    // 5-day momentum is not yet indexed (would need historical Pyth queries);
-    // documented as v1.5 follow-up in the handoff.
     fiveDayMomentumPct: undefined,
+    marketSession,
+    nextSessionEtDate,
   };
 
   const prompt = buildBellProBriefingPrompt(context);
