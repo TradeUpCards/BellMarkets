@@ -323,6 +323,42 @@ pub const PERIOD_TYPE_MONTHLY: u8 = 1;
 /// and `monthly_distribution_bps` array length).
 pub const DISTRIBUTION_SLOTS: usize = 10;
 
+// ─── DR-015 — Multi-metric leaderboard constants ────────────────────────────
+//
+// Per DR-015 § "Verifier reads metric_id from the proven leaf": 4 distinct
+// ranking metrics share the single 32-bit `claimed_bitmap` field on each
+// LeaderboardEntry. 32 bits / 4 metrics = 8 positions per metric — claiming
+// position N for metric M is mutually exclusive only WITHIN metric M.
+// (Higher per-metric position counts would require expanding the bitmap to
+// [u32; N], which is a deferred LeaderboardEntry realloc — see the handoff
+// recommended-next-action for the migration ix sketch.)
+//
+// Bit layout: bit_index = metric_id × BITS_PER_METRIC + (position - 1)
+//   metric 0 positions 1..=8 → bits 0..=7
+//   metric 1 positions 1..=8 → bits 8..=15
+//   metric 2 positions 1..=8 → bits 16..=23
+//   metric 3 positions 1..=8 → bits 24..=31
+
+pub const METRIC_PROFIT: u8 = 0x00;
+pub const METRIC_WIN_STREAK: u8 = 0x01;
+pub const METRIC_WIN_RATE: u8 = 0x02;
+pub const METRIC_ROI: u8 = 0x03;
+
+/// Number of distinct metric_ids accepted on-chain. DR-015 § "Initial metric
+/// set (v1 launch)" defines 4. Adding metrics 5..255 in future would require
+/// only off-chain tree changes IF the bitmap can still hold them — at 4
+/// metrics × 8 positions = 32 bits we're at capacity. New metrics imply a
+/// claimed_bitmap realloc.
+pub const METRIC_COUNT: u8 = 4;
+
+/// Bits allocated per metric within the 32-bit `claimed_bitmap`.
+/// 32 / METRIC_COUNT = 8.
+pub const BITS_PER_METRIC: u8 = 32 / METRIC_COUNT;
+
+/// Positions claimable per metric per period. Same as BITS_PER_METRIC by
+/// design (each position consumes one bit).
+pub const POSITIONS_PER_METRIC: u8 = BITS_PER_METRIC;
+
 /// Max merkle-proof depth accepted by `verify_merkle_proof`. Caps CU usage
 /// (each hash step = ~600 CU). log2(2^16) = 16 leaves headroom for any
 /// reasonable leaderboard size while bounding worst-case verify cost.

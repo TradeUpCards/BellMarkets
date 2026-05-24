@@ -190,6 +190,7 @@ pub mod bell_markets {
     pub fn distribute_weekly_rewards(
         ctx: Context<DistributeWeeklyRewards>,
         period_id: u64,
+        metric_id: u8,
         position: u8,
         amount: u64,
         merkle_proof: Vec<[u8; 32]>,
@@ -197,6 +198,7 @@ pub mod bell_markets {
         instructions::distribute_weekly_rewards::handler(
             ctx,
             period_id,
+            metric_id,
             position,
             amount,
             merkle_proof,
@@ -206,6 +208,7 @@ pub mod bell_markets {
     pub fn distribute_monthly_rewards(
         ctx: Context<DistributeMonthlyRewards>,
         period_id: u64,
+        metric_id: u8,
         position: u8,
         amount: u64,
         merkle_proof: Vec<[u8; 32]>,
@@ -213,6 +216,7 @@ pub mod bell_markets {
         instructions::distribute_monthly_rewards::handler(
             ctx,
             period_id,
+            metric_id,
             position,
             amount,
             merkle_proof,

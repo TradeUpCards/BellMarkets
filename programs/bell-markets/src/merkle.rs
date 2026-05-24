@@ -19,25 +19,44 @@ use anchor_lang::solana_program::hash::hash as sha256;
 use crate::state::MERKLE_PROOF_MAX_DEPTH;
 use crate::errors::BellMarketsError;
 
-/// Compute the standard DR-010 leaf hash from (recipient, position,
-/// period_id, period_type, amount). All scalar fields encoded little-endian.
+/// Compute the DR-015 multi-metric leaf hash from (user, metric_id, rank,
+/// amount, period_id, period_type). All scalar fields encoded little-endian
+/// per the format locked in `constitution/decisions.md` DR-015 §"Decision":
 ///
-/// Recipient is the user's wallet pubkey (NOT their USDC ATA — the off-chain
-/// indexer ranks by wallet identity, and the on-chain transfer recipient
-/// account is constrained to be owned by this wallet).
+/// ```text
+/// leaf = sha256(user || metric_id || rank || amount || period_id_u32 || period_type)
+///                32  ||    1     ||  1   ||    8   ||      4        ||      1
+/// ```
+///
+/// Notes for off-chain (Bram's indexer) compatibility:
+/// - `user` is the user's wallet pubkey (NOT a token-account ATA — the
+///   on-chain transfer recipient account is constrained to be owned by this
+///   wallet).
+/// - `rank` is the position 1..=POSITIONS_PER_METRIC. Equivalent to what
+///   earlier P3 docs called "position"; DR-015 standardizes on "rank".
+/// - `period_id` is narrowed from the on-chain `LeaderboardEntry.period_id:
+///   u64` to a u32 in the hash. u32 supports 4e9 distinct periods (~82M
+///   years at weekly cadence) — trivially safe, and the narrowing is a
+///   deliberate DR-015 spec choice.
+/// - `period_type` ∈ {PERIOD_TYPE_WEEKLY, PERIOD_TYPE_MONTHLY}.
+/// - `metric_id` ∈ {METRIC_PROFIT, METRIC_WIN_STREAK, METRIC_WIN_RATE,
+///   METRIC_ROI}. New metrics added in v2+ require off-chain leaf-builder
+///   updates only IF the on-chain bitmap can still accommodate them.
 pub fn compute_leaf(
-    recipient: &Pubkey,
-    position: u8,
+    user: &Pubkey,
+    metric_id: u8,
+    rank: u8,
+    amount: u64,
     period_id: u64,
     period_type: u8,
-    amount: u64,
 ) -> [u8; 32] {
-    let mut buf = [0u8; 32 + 1 + 8 + 1 + 8];
-    buf[0..32].copy_from_slice(recipient.as_ref());
-    buf[32] = position;
-    buf[33..41].copy_from_slice(&period_id.to_le_bytes());
-    buf[41] = period_type;
-    buf[42..50].copy_from_slice(&amount.to_le_bytes());
+    let mut buf = [0u8; 32 + 1 + 1 + 8 + 4 + 1]; // = 47 bytes (DR-015 spec)
+    buf[0..32].copy_from_slice(user.as_ref());
+    buf[32] = metric_id;
+    buf[33] = rank;
+    buf[34..42].copy_from_slice(&amount.to_le_bytes());
+    buf[42..46].copy_from_slice(&(period_id as u32).to_le_bytes());
+    buf[46] = period_type;
     sha256(&buf).to_bytes()
 }
 
@@ -164,28 +183,47 @@ mod tests {
     #[test]
     fn leaf_hash_deterministic() {
         // Property: compute_leaf is a pure function — same inputs produce same hash.
-        let recipient = Pubkey::new_from_array([1u8; 32]);
-        let h1 = compute_leaf(&recipient, 1, 100, PERIOD_TYPE_WEEKLY, 1000);
-        let h2 = compute_leaf(&recipient, 1, 100, PERIOD_TYPE_WEEKLY, 1000);
+        let user = Pubkey::new_from_array([1u8; 32]);
+        let h1 = compute_leaf(&user, METRIC_PROFIT, 1, 1000, 100, PERIOD_TYPE_WEEKLY);
+        let h2 = compute_leaf(&user, METRIC_PROFIT, 1, 1000, 100, PERIOD_TYPE_WEEKLY);
         assert_eq!(h1, h2);
     }
 
     #[test]
     fn leaf_hash_changes_with_each_field() {
-        let r1 = Pubkey::new_from_array([1u8; 32]);
-        let r2 = Pubkey::new_from_array([2u8; 32]);
-        let base = compute_leaf(&r1, 1, 100, PERIOD_TYPE_WEEKLY, 1000);
-        // Different recipient
-        assert_ne!(compute_leaf(&r2, 1, 100, PERIOD_TYPE_WEEKLY, 1000), base);
-        // Different position
-        assert_ne!(compute_leaf(&r1, 2, 100, PERIOD_TYPE_WEEKLY, 1000), base);
-        // Different period_id
-        assert_ne!(compute_leaf(&r1, 1, 101, PERIOD_TYPE_WEEKLY, 1000), base);
-        // Different period_type
-        assert_ne!(compute_leaf(&r1, 1, 100, PERIOD_TYPE_MONTHLY, 1000), base);
+        let u1 = Pubkey::new_from_array([1u8; 32]);
+        let u2 = Pubkey::new_from_array([2u8; 32]);
+        let base = compute_leaf(&u1, METRIC_PROFIT, 1, 1000, 100, PERIOD_TYPE_WEEKLY);
+        // Different user
+        assert_ne!(compute_leaf(&u2, METRIC_PROFIT, 1, 1000, 100, PERIOD_TYPE_WEEKLY), base);
+        // Different metric_id
+        assert_ne!(compute_leaf(&u1, METRIC_WIN_STREAK, 1, 1000, 100, PERIOD_TYPE_WEEKLY), base);
+        assert_ne!(compute_leaf(&u1, METRIC_WIN_RATE, 1, 1000, 100, PERIOD_TYPE_WEEKLY), base);
+        assert_ne!(compute_leaf(&u1, METRIC_ROI, 1, 1000, 100, PERIOD_TYPE_WEEKLY), base);
+        // Different rank
+        assert_ne!(compute_leaf(&u1, METRIC_PROFIT, 2, 1000, 100, PERIOD_TYPE_WEEKLY), base);
         // Different amount
-        assert_ne!(compute_leaf(&r1, 1, 100, PERIOD_TYPE_WEEKLY, 1001), base);
+        assert_ne!(compute_leaf(&u1, METRIC_PROFIT, 1, 1001, 100, PERIOD_TYPE_WEEKLY), base);
+        // Different period_id
+        assert_ne!(compute_leaf(&u1, METRIC_PROFIT, 1, 1000, 101, PERIOD_TYPE_WEEKLY), base);
+        // Different period_type
+        assert_ne!(compute_leaf(&u1, METRIC_PROFIT, 1, 1000, 100, PERIOD_TYPE_MONTHLY), base);
     }
 
-    use crate::state::{PERIOD_TYPE_WEEKLY, PERIOD_TYPE_MONTHLY};
+    #[test]
+    fn leaf_hash_period_id_narrowed_to_u32() {
+        // Property (DR-015 narrowing): period_id u64 values that share the
+        // same low-32-bit pattern produce IDENTICAL leaf hashes. Confirms the
+        // documented narrowing is in effect.
+        let user = Pubkey::new_from_array([1u8; 32]);
+        let h_low = compute_leaf(&user, METRIC_PROFIT, 1, 1000, 0x0000_0000_DEAD_BEEFu64, PERIOD_TYPE_WEEKLY);
+        let h_high = compute_leaf(&user, METRIC_PROFIT, 1, 1000, 0xCAFE_BABE_DEAD_BEEFu64, PERIOD_TYPE_WEEKLY);
+        // Low 32 bits are 0xDEADBEEF in both — hashes must match.
+        assert_eq!(h_low, h_high, "u64 period_ids sharing low-32-bits should produce identical leaf hashes per DR-015 narrowing");
+    }
+
+    use crate::state::{
+        PERIOD_TYPE_WEEKLY, PERIOD_TYPE_MONTHLY,
+        METRIC_PROFIT, METRIC_WIN_STREAK, METRIC_WIN_RATE, METRIC_ROI,
+    };
 }
