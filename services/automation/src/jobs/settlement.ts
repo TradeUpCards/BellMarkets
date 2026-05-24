@@ -179,10 +179,18 @@ export async function runSettlementNudger(deps: SettlementJobDeps): Promise<Sett
 
 /**
  * Default retry policy: retry on Pyth-transient errors (`PythConfidenceTooWide`,
- * `PythStale`) per PRD, plus generic RPC blips (503 / timeout / network).
- * Everything else is non-retriable.
+ * `PythStale`) per PRD, plus generic RPC blips (503 / timeout / network /
+ * fetch-failed / blockhash).
  *
- * Exported so callers (and tests) can compose with their own policy.
+ * Caller can compose their own policy by injecting `shouldRetry` into
+ * `SettlementJobDeps`.
+ *
+ * The "fetch failed" + "blockhash" patterns were added 2026-05-24 after a
+ * real-time settle:once on devnet hit `TypeError: fetch failed` from
+ * `@solana/web3.js` Connection.getRecentBlockhash during a transient RPC
+ * blip — that's clearly retriable from the operator's perspective but
+ * wasn't matched by 503/timeout/network. See
+ * `.project/.../settle-real-time-evidence.md` for the bug report.
  */
 export function defaultShouldRetry(err: unknown): boolean {
   if (typeof err === "object" && err !== null) {
@@ -192,7 +200,15 @@ export function defaultShouldRetry(err: unknown): boolean {
   }
   if (err instanceof Error) {
     const msg = err.message.toLowerCase();
-    if (msg.includes("503") || msg.includes("timeout") || msg.includes("network")) return true;
+    if (
+      msg.includes("503") ||
+      msg.includes("timeout") ||
+      msg.includes("network") ||
+      msg.includes("fetch failed") ||
+      msg.includes("blockhash")
+    ) {
+      return true;
+    }
   }
   return false;
 }
