@@ -29,6 +29,7 @@ import {
   PERIOD_TYPE_MONTHLY,
   type PeriodTypeCode,
 } from "./merkle.js";
+import { METRIC_ABSOLUTE_PROFIT } from "./merkle-v2.js";
 import { uploadLeaderboardToArweave } from "./arweave.js";
 import type { LeaderboardEntry, LeaderboardSnapshot, PeriodKind } from "../db/types.js";
 import type { PeriodInfo } from "./periods.js";
@@ -101,6 +102,19 @@ export type CommitLeaderboardRootFn = (
 export type DistributeRewardsInput = {
   periodKind: PeriodKind;
   periodId: number;
+  /**
+   * DR-015 metric id. Required for Aria's deploy_index=6 on-chain arg order
+   * `(period_id, metric_id, position, amount, proof)`. For the legacy DR-010
+   * single-metric path (where there's only ever the profit ranking), callers
+   * pass 0 (METRIC_ABSOLUTE_PROFIT). For the DR-015 multi-metric path,
+   * `runMultiMetricDistribute` passes the actual per-leaf metric id.
+   *
+   * Note: passing a metric_id that doesn't match the leaf hashed into the
+   * Merkle tree will fail on-chain proof verification — the leaf encoding
+   * includes metric_id, so off-chain tree construction and on-chain
+   * distribute calls must agree.
+   */
+  metricId: number;
   recipient: string;
   position: number;
   /** Decimal USDC string for off-chain accounting (e.g. "25.00"). */
@@ -317,6 +331,9 @@ export async function runDistributeForPeriod(deps: DistributeForPeriodDeps): Pro
     const result = await distributeFn({
       periodKind: deps.period.kind,
       periodId: deps.period.id,
+      // DR-010 single-metric path implicitly ranked by absolute profit.
+      // For deploy-6 on-chain shape, that's metric_id = METRIC_ABSOLUTE_PROFIT (0).
+      metricId: METRIC_ABSOLUTE_PROFIT,
       recipient: entry.userPubkey,
       position,
       amountUsdc,
@@ -425,16 +442,25 @@ const stubDistributeRewards: DistributeRewardsFn = async () => ({
 });
 
 // ---------------------------------------------------------------------------
-// Live on-chain adapters (deploy #5)
+// Live on-chain adapters (target: Aria deploy #6)
 // ---------------------------------------------------------------------------
 //
-// Arg shapes match programs/bell-markets/src/instructions/{commit_leaderboard_root,distribute_*_rewards}.rs:
+// Arg shapes match Aria's deploy_index=6 program (2026-05-24, branch
+// `crt/aria-init`, slot 464517905). NOTE: as of this writing the IDL on
+// `main` is still deploy-5 shape; the call passes through Anchor's typed
+// methods which read the IDL on disk — once Aria merges + Bram pulls the
+// updated IDL, runtime serialization will match. Until then, live calls
+// against this adapter fail with an IDL-mismatch error (which is the
+// correct safe failure mode while the pool is unfunded).
 //
 //   commit_leaderboard_root(period_id u64, period_type u8,
 //                           merkle_root [u8;32], arweave_tx_id [u8;48])
-//   distribute_weekly_rewards(period_id u64, position u8, amount u64,
-//                             merkle_proof Vec<[u8;32]>)
+//   distribute_weekly_rewards(period_id u64, metric_id u8, position u8,
+//                             amount u64, merkle_proof Vec<[u8;32]>)
 //   distribute_monthly_rewards(... same shape ...)
+//
+// Deploy-5 vs deploy-6 shape diff: `metric_id u8` inserted between
+// `period_id` and `position` per DR-015. See in-flight.md Aria Day-6 row.
 
 /** ARWEAVE_TX_ID_LEN per programs/bell-markets/src/state.rs — 43 base64url +
  *  5 bytes zero-pad = 48. Off-chain we pad ASCII to 48 bytes via UTF-8. */
@@ -551,8 +577,12 @@ export function makeDistributeRewards(client: BellMarketsAnchorClient): Distribu
 
       const proofBytes = input.merkleProofHex.map((p) => Array.from(Buffer.from(p, "hex")));
 
+      // Aria deploy-6 (2026-05-24) shape: (period_id, metric_id, position, amount, proof).
+      // metric_id was inserted between period_id and position per DR-015.
+      // See .project/bell-markets/in-flight.md Aria Day-6 row.
       const txSig: string = await methods[methodName](
         new anchor.BN(input.periodId),
+        input.metricId,
         input.position,
         new anchor.BN(input.amountBaseUnits.toString()),
         proofBytes,

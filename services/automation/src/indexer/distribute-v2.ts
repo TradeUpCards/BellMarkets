@@ -307,8 +307,9 @@ export async function runMultiMetricDistribute(deps: MultiMetricDistributeDeps):
       const distResult = await distributeFn({
         periodKind: deps.period.kind,
         periodId: deps.period.id,
+        metricId, // Aria deploy-6: ix arg order is (period_id, metric_id, position, amount, proof).
         recipient: entry.recipient,
-        position: rank, // v1 ix takes `position`; v1.5 will add metricId
+        position: rank,
         amountUsdc: positionAmountUsdc,
         amountBaseUnits: entry.amountBaseUnits,
         merkleProofHex: proof,

@@ -135,6 +135,18 @@ describe("runMultiMetricDistribute — orchestration with all-injected deps", ()
     expect(commitCalls).toHaveLength(1);
     expect(distCalls).toHaveLength(4);
 
+    // Deploy-6 reconciliation: each (metric, rank) call carries the
+    // correct metric_id matching its leaf in the Merkle tree. profit
+    // bucket has 2 winners (ranks 1+2); streak has 1; winRate has 1.
+    const profitCalls = distCalls.filter((c) => (c as { metricId: number }).metricId === METRIC_ABSOLUTE_PROFIT);
+    const streakCalls = distCalls.filter((c) => (c as { metricId: number }).metricId === METRIC_WIN_STREAK);
+    const winRateCalls = distCalls.filter((c) => (c as { metricId: number }).metricId === METRIC_WIN_RATE);
+    const roiCalls = distCalls.filter((c) => (c as { metricId: number }).metricId === METRIC_ROI);
+    expect(profitCalls).toHaveLength(2);
+    expect(streakCalls).toHaveLength(1);
+    expect(winRateCalls).toHaveLength(1);
+    expect(roiCalls).toHaveLength(0);
+
     vi.restoreAllMocks();
   });
 

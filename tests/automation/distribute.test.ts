@@ -152,6 +152,15 @@ describe("runDistributeForPeriod — orchestration with all-injected deps", () =
     expect(commitCalls).toHaveLength(1);
     expect(distCalls).toHaveLength(10);
 
+    // Deploy-6 reconciliation: every v1 distribute call carries
+    // metricId = 0 (METRIC_ABSOLUTE_PROFIT) — the DR-010 single-metric
+    // path implicitly ranked by profit. Without this field, Aria's
+    // deploy-6 IDL would reject the call (period_id, position, ...)
+    // for a deploy-5-era 4-arg shape.
+    for (const call of distCalls) {
+      expect((call as { metricId: number }).metricId).toBe(0);
+    }
+
     // Sum of position amounts ≈ pool (modulo cent rounding)
     const sumCents = outcome.perPosition.reduce(
       (acc, p) => acc + Math.round(Number(p.amountUsdc) * 100),
