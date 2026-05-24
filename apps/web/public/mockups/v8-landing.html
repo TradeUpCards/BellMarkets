@@ -216,28 +216,71 @@
   }
 
   .header-right { display: flex; align-items: center; gap: 8px; }
-  .theme-toggle {
-    width: 30px; height: 30px;
+  /* Header-right elements (synced to v8-trade) */
+  .header-right { display: flex; align-items: center; gap: 10px; }
+  .icon-btn {
+    width: 40px; height: 40px;
     background: var(--panel); border: 1px solid var(--border);
-    color: var(--text-muted); border-radius: 4px;
-    transition: all 150ms;
+    color: var(--text-muted); border-radius: 6px;
     display: flex; align-items: center; justify-content: center;
-  }
-  .theme-toggle:hover { color: var(--text); border-color: var(--accent); }
-  .btn-connect {
-    background: var(--accent);
-    color: var(--accent-fg); border: none;
-    padding: 8px 18px;
-    font-family: 'IBM Plex Mono', monospace;
-    font-weight: 700; font-size: 11px;
-    letter-spacing: 0.5px; text-transform: uppercase;
-    border-radius: 4px;
     transition: all 150ms;
-    border: 1px solid var(--accent);
+    cursor: pointer;
   }
-  .btn-connect:hover {
-    box-shadow: 0 0 16px var(--accent-glow);
+  .icon-btn:hover { color: var(--text-strong); border-color: var(--accent); }
+  .session-module {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 12px;
+    display: flex; align-items: center; gap: 12px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 12px;
+    min-height: 40px; cursor: pointer;
+    transition: all 150ms;
+  }
+  .session-module:hover { border-color: var(--accent); }
+  .session-pulse {
+    width: 8px; height: 8px; background: var(--yes);
+    border-radius: 50%; box-shadow: 0 0 8px var(--yes);
+    animation: pulse 1.5s ease-in-out infinite;
+    flex-shrink: 0;
+  }
+  .session-status { color: var(--text-strong); font-weight: 600; }
+  .session-time { color: var(--text-muted); }
+  .session-expand { color: var(--text-subtle); margin-left: auto; }
+  .connect-btn {
+    background: var(--accent-gradient);
+    color: var(--accent-fg);
+    padding: 10px 16px;
+    border-radius: 6px;
+    font-weight: 600; font-size: 13px;
+    font-family: 'IBM Plex Mono', monospace;
+    letter-spacing: 0.5px;
+    min-height: 44px;
+    display: flex; align-items: center; gap: 8px;
+    transition: all 150ms;
+    border: none;
+    cursor: pointer;
+  }
+  .connect-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 16px var(--accent-glow); }
+  .go-pro-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: linear-gradient(135deg, rgba(34, 211, 238, 0.18), rgba(244, 114, 182, 0.14));
+    border: 1px solid rgba(34, 211, 238, 0.50);
+    color: var(--accent);
+    padding: 8px 14px;
+    border-radius: 6px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px; font-weight: 700;
+    letter-spacing: 0.8px; text-transform: uppercase;
+    text-decoration: none;
+    min-height: 40px;
+    transition: all 150ms;
+  }
+  .go-pro-btn:hover {
+    border-color: var(--accent);
+    background: linear-gradient(135deg, rgba(34, 211, 238, 0.30), rgba(244, 114, 182, 0.22));
     transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(34, 211, 238, 0.25);
   }
 
   /* ========== MAIN LAYOUT — LEFT RAIL + MAIN ========== */
@@ -1343,7 +1386,10 @@
 <header class="top">
   <div class="header-inner">
     <div class="brand">
-      <a href="v8-landing.html" class="logo" aria-label="BellMarkets home"><span class="logo-mark" aria-hidden="true"></span>BELL<span class="label">·</span>MARKETS</a>
+      <a href="v8-landing.html" class="logo" aria-label="BellMarkets home">
+        <span class="logo-mark" aria-hidden="true"></span>
+        <span>Bell<span class="label">.Markets</span></span>
+      </a>
       <span class="brand-divider" aria-hidden="true"></span>
       <nav class="nav" aria-label="Main">
         <a href="v8-landing.html" class="active" aria-current="page">Markets</a>
@@ -1351,7 +1397,6 @@
         <a href="#">Positions</a>
         <a href="#">Orders</a>
         <a href="#">History</a>
-        <a href="#">Docs</a>
       </nav>
     </div>
     <div class="searchbar">
@@ -1360,8 +1405,24 @@
       <span class="searchbar-kbd">⌘K</span>
     </div>
     <div class="header-right">
-      <button class="theme-toggle" onclick="toggleTheme()">◐</button>
-      <button class="btn-connect">Connect</button>
+      <button class="session-module" aria-label="Session: market open, expand for details">
+        <span class="session-pulse" aria-hidden="true"></span>
+        <span>
+          <span class="session-status">OPEN</span>
+          <span class="session-time">· 14:46 ET</span>
+        </span>
+        <span class="session-expand" aria-hidden="true">⌃</span>
+      </button>
+      <button class="icon-btn" aria-label="Notifications" title="Notifications">🔔</button>
+      <button class="icon-btn" onclick="toggleTheme()" aria-label="Toggle theme" title="Toggle theme">◐</button>
+      <a href="#pro" class="go-pro-btn" title="Bell Pro · AI briefings + analytics">
+        <span aria-hidden="true">✦</span>
+        <span>Go Pro</span>
+      </a>
+      <button class="connect-btn">
+        <span style="font-size: 14px;" aria-hidden="true">⬢</span>
+        <span>4aPZ…G2iy</span>
+      </button>
     </div>
   </div>
 </header>
