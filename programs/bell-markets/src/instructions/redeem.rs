@@ -63,6 +63,42 @@ pub struct Redeem<'info> {
     pub token_program: Program<'info, Token>,
 }
 
+/// Validate the supplied `winning_mint` pubkey matches the strike's outcome.
+///
+/// LOAD-BEARING. Unlike `redeem_pair` / `redeem_invalid` (which seed their
+/// yes/no mints via PDA constraints in the `Accounts` struct), this ix
+/// allows the caller to supply ANY mint as `winning_mint` — Anchor's PDA
+/// constraint can't statically catch the substitution because the correct
+/// mint depends on a runtime field (`strike_market.outcome`). This function
+/// IS the safety check.
+///
+/// Adversarial scenario it defeats: user holds losing-side tokens, supplies
+/// the LOSING mint as `winning_mint` to try to burn losing tokens for USDC.
+/// `redeem_wrong_mint_substitution` test below pins this.
+pub(crate) fn validate_winning_mint(
+    outcome: Outcome,
+    strike_yes_mint: Pubkey,
+    strike_no_mint: Pubkey,
+    supplied_winning_mint: Pubkey,
+) -> Result<()> {
+    let expected = match outcome {
+        Outcome::Yes => strike_yes_mint,
+        Outcome::No => strike_no_mint,
+        // Invalid + Unsettled are filtered upstream (Accounts constraint +
+        // explicit `outcome != Invalid` check in handler). Defensive: return
+        // the same error code the handler returns, so a future refactor that
+        // removes the upstream guard still fails closed.
+        Outcome::Invalid | Outcome::Unsettled => {
+            return Err(BellMarketsError::InvalidOutcomeForRedeem.into());
+        }
+    };
+    require!(
+        supplied_winning_mint == expected,
+        BellMarketsError::InvalidOutcomeForRedeem
+    );
+    Ok(())
+}
+
 pub fn handler(ctx: Context<Redeem>, amount: u64) -> Result<()> {
     require!(amount > 0, BellMarketsError::ZeroAmount);
 
@@ -71,18 +107,12 @@ pub fn handler(ctx: Context<Redeem>, amount: u64) -> Result<()> {
     // dedicated `redeem_invalid` instruction (see ../redeem_invalid.rs).
     let outcome = ctx.accounts.strike_market.outcome;
     require!(outcome != Outcome::Invalid, BellMarketsError::InvalidOutcomeForRedeem);
-    let expected_winning_mint = match outcome {
-        Outcome::Yes => ctx.accounts.strike_market.yes_mint,
-        Outcome::No => ctx.accounts.strike_market.no_mint,
-        // Unsettled is already filtered by the Accounts struct constraint
-        // (strike_market.outcome != Outcome::Unsettled). Invalid is rejected
-        // above. So we can only reach this match arm with Yes or No.
-        _ => unreachable!(),
-    };
-    require!(
-        ctx.accounts.winning_mint.key() == expected_winning_mint,
-        BellMarketsError::InvalidOutcomeForRedeem
-    );
+    validate_winning_mint(
+        outcome,
+        ctx.accounts.strike_market.yes_mint,
+        ctx.accounts.strike_market.no_mint,
+        ctx.accounts.winning_mint.key(),
+    )?;
 
     // Burn `amount` of winning_mint from user (user authority).
     token::burn(
@@ -132,4 +162,90 @@ pub fn handler(ctx: Context<Redeem>, amount: u64) -> Result<()> {
     sm.pairs_outstanding = sm.pairs_outstanding.saturating_sub(amount);
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// CANONICAL ADVERSARIAL TEST for the runtime check at `redeem.rs` lines
+    /// 82-85 (now extracted into `validate_winning_mint`). Pins the exact
+    /// attack `redeem` is hardened against: user holds losing tokens and
+    /// substitutes the losing mint pubkey for `winning_mint` to extract
+    /// USDC despite holding the wrong side.
+    ///
+    /// Why this is load-bearing: `redeem_pair` and `redeem_invalid` both
+    /// SEED their yes/no mints via PDA constraints in the `#[derive(Accounts)]`
+    /// struct, so Anchor enforces the correct mint statically. `redeem`
+    /// cannot — the correct mint depends on the dynamic `outcome` field on
+    /// `strike_market`. Anchor's static analyzer has no way to know whether
+    /// you should expect `yes_mint` or `no_mint` until runtime. This helper
+    /// IS the safety; deletion or relaxation of it = funds drain by losing
+    /// holders.
+    #[test]
+    fn redeem_wrong_mint_substitution() {
+        let yes_mint = Pubkey::new_unique();
+        let no_mint = Pubkey::new_unique();
+        let unrelated_mint = Pubkey::new_unique();
+
+        // --- Adversarial: market settled YES; attacker holding NO supplies
+        //     NO's mint as `winning_mint` to redeem losing tokens for $1.
+        assert!(
+            validate_winning_mint(Outcome::Yes, yes_mint, no_mint, no_mint).is_err(),
+            "attacker substituting NO mint when outcome=Yes MUST be rejected"
+        );
+
+        // --- Adversarial: market settled NO; attacker holding YES supplies
+        //     YES's mint as `winning_mint`.
+        assert!(
+            validate_winning_mint(Outcome::No, yes_mint, no_mint, yes_mint).is_err(),
+            "attacker substituting YES mint when outcome=No MUST be rejected"
+        );
+
+        // --- Adversarial: attacker supplies an unrelated mint (e.g., from a
+        //     different strike market) hoping to confuse the check.
+        assert!(
+            validate_winning_mint(Outcome::Yes, yes_mint, no_mint, unrelated_mint).is_err(),
+            "unrelated mint MUST be rejected on Yes outcome"
+        );
+        assert!(
+            validate_winning_mint(Outcome::No, yes_mint, no_mint, unrelated_mint).is_err(),
+            "unrelated mint MUST be rejected on No outcome"
+        );
+
+        // --- Adversarial defense-in-depth: even if the upstream Accounts
+        //     constraint somehow let an Unsettled or Invalid outcome reach
+        //     this helper (it shouldn't), the helper itself returns an error.
+        assert!(
+            validate_winning_mint(Outcome::Invalid, yes_mint, no_mint, yes_mint).is_err(),
+            "Invalid outcome MUST be rejected at the helper layer (defense in depth)"
+        );
+        assert!(
+            validate_winning_mint(Outcome::Unsettled, yes_mint, no_mint, yes_mint).is_err(),
+            "Unsettled outcome MUST be rejected at the helper layer (defense in depth)"
+        );
+
+        // --- Happy path: correct mint accepted.
+        assert!(validate_winning_mint(Outcome::Yes, yes_mint, no_mint, yes_mint).is_ok());
+        assert!(validate_winning_mint(Outcome::No, yes_mint, no_mint, no_mint).is_ok());
+    }
+
+    #[test]
+    fn redeem_wrong_mint_property_only_canonical_pair_accepted() {
+        // Property: across a sweep of (yes_mint, no_mint, supplied_mint),
+        // validate_winning_mint accepts EXACTLY the (outcome → matching mint)
+        // pair and rejects everything else.
+        let yes_mint = Pubkey::new_unique();
+        let no_mint = Pubkey::new_unique();
+        let candidates = [yes_mint, no_mint, Pubkey::new_unique(), Pubkey::default()];
+
+        for &supplied in &candidates {
+            let yes_ok = validate_winning_mint(Outcome::Yes, yes_mint, no_mint, supplied).is_ok();
+            let no_ok = validate_winning_mint(Outcome::No, yes_mint, no_mint, supplied).is_ok();
+            // Yes outcome accepts ONLY yes_mint.
+            assert_eq!(yes_ok, supplied == yes_mint, "Yes outcome decision wrong for supplied {supplied}");
+            // No outcome accepts ONLY no_mint.
+            assert_eq!(no_ok, supplied == no_mint, "No outcome decision wrong for supplied {supplied}");
+        }
+    }
 }

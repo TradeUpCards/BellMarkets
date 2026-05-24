@@ -201,9 +201,75 @@ Track scale-triggered or Phoenix-roadmap changes here:
 | Date | Change | Trigger | Authority |
 |---|---|---|---|
 | 2026-05-22 | Initial commit | DR-001 + DR-009 lock | Cory (Tate-routed) |
-| 2026-05-24 | Model D verified feasible; promoted to v1.5 P0; revenue-gap acknowledgment + path-to-close added | Aria + Bram primary-source verification (DR-009 amendment) | Cory (Tate-routed) |
+| 2026-05-23 | Model D investigation closed PARTIAL — `fee_recipient` confirmed but bind-to-existing-market path can't capture (see § "DR-009 Model D — Aria on-chain verification" below) | Tate routed Bram (off-chain research) + Aria (on-chain verification + clob/CPI design walk) | Bram (investigation) + Aria (verification + on-chain perspective) |
+| 2026-05-24 | Model D verified feasible; promoted to v1.5 P0; revenue-gap acknowledgment + path-to-close added (see top of file + constitution/decisions.md DR-009 amendment) | Aria + Bram primary-source verification → Tate locked integration plan | Cory (Tate-routed) |
 
 When daily Phoenix volume crosses a milestone ($1M, $5M, $10M) or Phoenix v2 is announced, append a row + describe what action was taken.
+
+## DR-009 Model D — Aria on-chain verification (2026-05-23)
+
+Bram's investigation in `.project/bell-markets/coordination/model-d-investigation.md` answered the 5 § "Discovery questions for Bram" against Phoenix v1 source. This section is the **independent on-chain-engineer verification** plus the program-design implications a code-side perspective adds.
+
+### Primary-source verification
+
+All five of Bram's findings independently re-verified against the canonical Phoenix v1 master branch (`Ellipsis-Labs/phoenix-v1` repo, fetched via `gh api repos/Ellipsis-Labs/phoenix-v1/contents/src/program/...`, raw bytes decoded and re-read):
+
+| Claim | Source file:line | Verified |
+|---|---|---|
+| `MarketHeader.fee_recipient: Pubkey` exists | `src/program/accounts.rs` `MarketHeader` struct, field 10 (after `authority`) | ✅ |
+| `MarketHeader.authority: Pubkey` is the "market_authority" | Same file, field 9 | ✅ |
+| `InitializeMarket = 100` (ix variant); `market_creator` is signer | `src/program/instruction.rs:191,198` (`#[account(3, writable, signer, name = "market_creator", desc = "The market_creator account must sign for the creation of new vaults")]`) | ✅ |
+| `ChangeFeeRecipient = 109` (ix variant); requires `market_authority` signer | `src/program/instruction.rs:273,275` (`#[account(3, signer, name = "market_authority", desc = "The market_authority account must sign to change the free recipient")]`) | ✅ |
+| `CollectFees = 108`; sweeper-callable (any signer); fee_recipient is writable destination | `src/program/instruction.rs:264-268` (`signer, name = "sweeper"` + `writable, name = "fee_recipient"`) | ✅ |
+| Discriminant value `8167313896524341111` (= little-endian `[0x77, 0xDF, 0x71, 0x73, 0xB7, 0x20, 0x58, 0x71]`) | `src/program/accounts.rs` `test_valid_discriminants` test asserts this exact value | ✅ — matches Aria's Day-3 verified magic-prefix in `programs/bell-markets/src/adapters/phoenix.rs` |
+
+**Verdict:** Bram's PARTIAL-feasibility finding stands without correction. The mechanism exists; the current bind-to-existing-market path can't reach it.
+
+### What's mechanically true at the on-chain layer
+
+The Phoenix `fee_recipient` is bound at two distinct points, gated by two distinct signers:
+
+1. **At `InitializeMarket` (variant 100):** `fee_recipient` is set as a parameter inside `InitializeParams`. The signer required is `market_creator`. Whoever creates the market becomes the initial `MarketHeader.authority` automatically.
+
+2. **At `ChangeFeeRecipient` (variant 109):** existing `fee_recipient` is mutated. The signer required is `market_authority` — i.e., whoever held authority at the time of the call. Authority can transfer via `NameSuccessor` (variant 102) + `ClaimAuthority` (variant 101).
+
+For BellMarkets to capture Phoenix taker fees, ONE of two must hold:
+
+- **(A)** We are `market_creator` at init time → we own `authority` → we set `fee_recipient` to our PDA.
+- **(B)** We hold `authority` (after a NameSuccessor + ClaimAuthority chain from the original creator) → we call `ChangeFeeRecipient` to point at our PDA.
+
+Today's `programs/bell-markets/src/instructions/create_strike_market.rs` does NEITHER. It calls `verify_phoenix_market` (8-byte magic prefix check) on a supplied Phoenix market account and binds its pubkey into `StrikeMarket.phoenix_market`. No `InitializeMarket` CPI, no `ChangeFeeRecipient` CPI. The Day-4 META markets bind to `CS2H8nbAVVEUHWPF5extCSymqheQdkd4d7thik6eet9N` (SOL/USDC) whose `authority` and `fee_recipient` are whoever Phoenix or Ellipsis set at devnet seed time — emphatically not us.
+
+### On-chain-engineer perspective on what Model D activation would require
+
+Beyond Bram's cross-lead checklist, the program-side considerations:
+
+1. **CPI to `InitializeMarket` is a substantial CPI** — Phoenix allocates bids/asks/seats arrays per the `MarketSizeParams { bids_size, asks_size, num_seats }` triple. A typical 500/500/100 sizing is ~80KB+ of account allocation. At 200K CU default per ix, Phoenix's init eats a significant chunk; combined with our state writes + Pyth read + Phoenix magic verify, we'd be CU-tight in a single `create_strike_market` ix. **Likely split required:** an `init_phoenix_market_for_strike` sibling ix that runs the Phoenix init separately, before our `create_strike_market` binds to it. This keeps our existing ix's CU envelope intact.
+
+2. **Authority pubkey must be a program PDA**, not an admin keypair. Concrete recommendation: `[b"phoenix_auth", strike_market.key()]` per-strike, with the on-chain init wiring `market_creator = phoenix_auth_pda` (signed via PDA seeds). Per-strike authority isolates risk — a future `ChangeFeeRecipient` for one strike can't accidentally affect another. Bumps cached on `StrikeMarket.phoenix_auth_bump` (new field; would claim 1 byte from `_reserved`).
+
+3. **`fee_recipient` is a token-account Pubkey, not a wallet Pubkey.** Phoenix sweeps to `fee_recipient` directly via SPL Token `Transfer` during `CollectFees`. So we'd pass the USDC ATA of our `MarketConfig.treasury`, not the wallet. Our existing fee-collector wallet `FAc2JccudUr9C5pqB2KAnaBaPXLuejYotvfjuuysUrjs` already has a USDC ATA (used by P2's `mint_pair` fee_collector_usdc check). Phoenix `fee_recipient = associated_token_address(treasury, usdc_mint)` works without new accounts.
+
+4. **Cleo's Day-2 mint-mismatch flag dissolves naturally.** Phoenix's existing devnet markets use Phoenix-internal quote mints (`DK1gsSV...`) that ≠ Circle USDC. If we own the market, we pass `quote_mint = MarketConfig.usdc_mint` (Circle's `4zMMC9srt...`) at InitializeMarket time. The mismatch goes away by construction — atomic Buy No / Sell Yes flows that previously needed a Jupiter swap leg become 1-CPI clean.
+
+5. **Per-strike vs per-ticker market.** Phoenix's "one market per (base, quote)" model means: one Phoenix market per strike (~50 strike-markets/day × 7 tickers = 350 Phoenix markets at full MAG7 scale), OR one Phoenix market per ticker × YES + NO sides. Decision affects rent burn (350 × ~0.6-1.4 SOL/market = ~$30K-65K at $200/SOL) vs liquidity fragmentation (350 markets each with their own order books vs 14 deeper markets). I lean per-ticker × per-side (14 total) — better liquidity, lower rent, simpler routing. Tate's call when this is dispatched.
+
+6. **`taker_fee_bps` is `u64` (no upstream cap)** — Bram noted no upstream limit. Aria's defensive recommendation: hardcode an on-chain ceiling in our `init_phoenix_market_for_strike` ix (e.g., `require!(taker_fee_bps <= 50, ...)`) so a future admin keypair compromise can't reset taker fees to 99.99%. Phoenix-protocol-level there's no guard; we add one at our wrapper.
+
+### Cost / activation triggers — unchanged from DR-009
+
+Bram's revenue math holds. Per the existing escalation tree:
+
+- Below $500K daily Phoenix volume: revenue is ~$30-91K/yr — not worth the ~6-8 hr cross-lead refactor + new audit surface (matching-engine CPI tightening is non-trivial to review).
+- $500K-$1M daily volume: revenue ~$91-183K/yr — borderline; depends on the audit budget.
+- $1M+ daily volume: revenue justifies the migration.
+- Phoenix v2 with native per-third-party fee_recipient (Bram quarterly watch): would invalidate this trade-off entirely — we'd capture fees on bound markets without owning them.
+
+### Defer decision — explicit hand-off
+
+For MVP and the next ~6 months: stay on DR-008 mint-only fee. **No on-chain change to `create_strike_market`** until either daily Phoenix volume crosses $500K-$1M OR Phoenix v2 ships with the missing primitive. Both Aria's and Bram's investigations close the open question; future-Aria can re-open by dispatching the 6-8 hr migration checklist in Bram's investigation doc + the program-side considerations above.
+
+This conclusion is documented here (canonical), in Bram's investigation doc (off-chain perspective), and in the audit log entry for the next deploy that bears on Phoenix integration (none planned without a Model D dispatch).
 
 ## References
 

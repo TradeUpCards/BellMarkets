@@ -580,6 +580,10 @@
           "type": "u64"
         },
         {
+          "name": "metric_id",
+          "type": "u8"
+        },
+        {
           "name": "position",
           "type": "u8"
         },
@@ -716,6 +720,10 @@
         {
           "name": "period_id",
           "type": "u64"
+        },
+        {
+          "name": "metric_id",
+          "type": "u8"
         },
         {
           "name": "position",

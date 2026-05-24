@@ -34,6 +34,41 @@ use anchor_spl::token::{self, CloseAccount, Mint, Token, TokenAccount};
 use crate::state::*;
 use crate::errors::BellMarketsError;
 
+/// Returns Ok iff the strike market is in the right shape for vault closure.
+/// Extracted from the handler so the dust-attack griefing path is unit-testable.
+///
+/// Three gates compose:
+///   - `outcome != Unsettled` — Accounts constraint (also enforced upstream)
+///   - `pairs_outstanding == 0` — every minted pair has been redeemed
+///   - `vault_amount == 0` — SPL Token CloseAccount requires this
+///
+/// The third gate is the load-bearing one for the dust-attack scenario:
+/// `pairs_outstanding == 0` would normally IMPLY `vault.amount == 0` under
+/// the `$1`-invariant flow, but anyone can `Token::Transfer` USDC into the
+/// public vault PDA. That dust would block the close at the SPL Token layer
+/// with `NonNativeHasBalance`. Surfacing the same condition with our own
+/// `MarketNotEmpty` error gives operators a diagnosable signal. The
+/// `close_settled_dust_attack_griefing` test below pins this.
+pub(crate) fn can_close_settled_market(
+    outcome: Outcome,
+    pairs_outstanding: u64,
+    vault_amount: u64,
+) -> Result<()> {
+    require!(
+        outcome != Outcome::Unsettled,
+        BellMarketsError::NotSettled
+    );
+    require!(
+        pairs_outstanding == 0,
+        BellMarketsError::MarketNotEmpty
+    );
+    require!(
+        vault_amount == 0,
+        BellMarketsError::MarketNotEmpty
+    );
+    Ok(())
+}
+
 #[derive(Accounts)]
 pub struct CloseSettledMarket<'info> {
     #[account(mut)]
@@ -90,17 +125,15 @@ pub struct CloseSettledMarket<'info> {
 }
 
 pub fn handler(ctx: Context<CloseSettledMarket>) -> Result<()> {
-    // Pre-check: SPL Token's CloseAccount requires `account.amount == 0`.
-    // Surfacing this with our MarketNotEmpty error gives operators a clear
-    // signal vs. the raw `TokenError::NonNativeHasBalance` from the CPI.
-    // The pairs_outstanding == 0 Accounts constraint should imply this for
-    // markets that only saw mint_pair/redeem cycles (per $1 invariant), but
-    // an attacker can dust-transfer USDC directly into the vault PDA — the
-    // explicit check catches that grief.
-    require!(
-        ctx.accounts.usdc_vault.amount == 0,
-        BellMarketsError::MarketNotEmpty
-    );
+    // All gating delegated to `can_close_settled_market` for direct
+    // unit-test coverage of every rejection branch (outcome unsettled,
+    // pairs_outstanding non-zero, vault dust). Three pure parameters
+    // → no Context needed for the test surface.
+    can_close_settled_market(
+        ctx.accounts.strike_market.outcome,
+        ctx.accounts.strike_market.pairs_outstanding,
+        ctx.accounts.usdc_vault.amount,
+    )?;
 
     // Close usdc_vault → rent lamports flow to fee_collector. Vault authority
     // is the strike_market PDA (self-authority).
@@ -131,4 +164,72 @@ pub fn handler(ctx: Context<CloseSettledMarket>) -> Result<()> {
 
     // Mints + StrikeMarket left in place. See file header for rationale.
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// ADVERSARIAL: an attacker dust-transfers 1 lamport-equivalent USDC
+    /// (i.e., 1 base unit = $0.000001) into the public vault PDA after all
+    /// legitimate users have redeemed. `pairs_outstanding == 0` (the
+    /// Accounts constraint) is satisfied; SPL Token's CloseAccount would
+    /// then return `NonNativeHasBalance` mid-CPI, which surfaces as an
+    /// opaque error code. Our explicit `vault_amount == 0` check catches
+    /// the grief BEFORE the CPI and returns our own `MarketNotEmpty` error.
+    ///
+    /// Attack outcome (current design): the vault stays open; the closer's
+    /// tx reverts with a clear error code; the dust + ~$0.23 vault rent
+    /// remain locked. No protocol funds at risk. A future sweep mechanism
+    /// could rescue the rent; not in MVP scope.
+    #[test]
+    fn close_settled_dust_attack_griefing() {
+        // --- Happy path: settled market, no outstanding pairs, empty vault.
+        assert!(can_close_settled_market(Outcome::Yes, 0, 0).is_ok());
+        assert!(can_close_settled_market(Outcome::No, 0, 0).is_ok());
+        assert!(can_close_settled_market(Outcome::Invalid, 0, 0).is_ok());
+
+        // --- Adversarial: dust attack. pairs_outstanding == 0 (every legit
+        //     user redeemed) but an attacker pushed 1 base unit into the
+        //     vault. MUST reject with MarketNotEmpty (NOT silently fall
+        //     through to the SPL Token NonNativeHasBalance error).
+        assert!(
+            can_close_settled_market(Outcome::Yes, 0, 1).is_err(),
+            "1-base-unit dust attack MUST be rejected at the helper layer"
+        );
+
+        // --- Adversarial: larger dust amounts behave the same.
+        assert!(can_close_settled_market(Outcome::Yes, 0, 1_000).is_err());
+        assert!(can_close_settled_market(Outcome::Yes, 0, u64::MAX).is_err());
+
+        // --- Other rejection branches:
+        // pairs_outstanding > 0 → market still has live positions.
+        assert!(can_close_settled_market(Outcome::Yes, 1, 0).is_err());
+        assert!(can_close_settled_market(Outcome::Yes, 100, 0).is_err());
+
+        // Unsettled → not eligible regardless of balances.
+        assert!(can_close_settled_market(Outcome::Unsettled, 0, 0).is_err());
+        assert!(can_close_settled_market(Outcome::Unsettled, 5, 1).is_err());
+    }
+
+    #[test]
+    fn close_property_only_specific_triple_passes() {
+        // Property: ONLY (outcome != Unsettled, pairs == 0, vault == 0) passes.
+        // Sweep all (outcome, pairs ∈ {0, 1, 99}, vault ∈ {0, 1, 99}) combos.
+        let outcomes = [Outcome::Unsettled, Outcome::Yes, Outcome::No, Outcome::Invalid];
+        let counts: [u64; 3] = [0, 1, 99];
+        for &outcome in &outcomes {
+            for pairs in counts {
+                for vault in counts {
+                    let result = can_close_settled_market(outcome, pairs, vault);
+                    let should_pass = outcome != Outcome::Unsettled && pairs == 0 && vault == 0;
+                    assert_eq!(
+                        result.is_ok(), should_pass,
+                        "outcome={outcome:?} pairs={pairs} vault={vault} → should_pass={should_pass} but got is_ok={}",
+                        result.is_ok()
+                    );
+                }
+            }
+        }
+    }
 }

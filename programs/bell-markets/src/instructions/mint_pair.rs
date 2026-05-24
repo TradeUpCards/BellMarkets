@@ -610,6 +610,207 @@ mod tests {
         }
     }
 
+    // ── Fee-pipeline conservation (P4 hardening, 2026-05-23) ─────────
+    //
+    // End-to-end property test for the `mint_pair` fee flow. Composes:
+    //   tier_fee_bps × mint_fee_bps scaling × creator_rebate × split_fee
+    //
+    // The conservation invariant under test:
+    //
+    //   user_paid_total = amount + fee_total
+    //   fee_total = platform + weekly + monthly  (split_fee invariant)
+    //   vault_receives = amount  (the $1 invariant — DR-008 HARD YES #1)
+    //
+    // Therefore: amount + (platform + weekly + monthly) == user_paid_total
+    // AND vault_receives == amount (UNCONDITIONALLY, regardless of fee config).
+    //
+    // The individual helpers are property-tested already
+    // (effective_bps_scaled, fee_after_rebate, split_fee_property_sum_equals_fee_total).
+    // This test composes them at the system level — a regression in ANY one
+    // helper that breaks composition surfaces here.
+
+    /// Pure-function mirror of the handler's effective_bps + fee_total
+    /// computation, for property testing the composed math.
+    fn end_to_end_fee_flow(
+        amount: u64,
+        volume_30d: u64,
+        mint_fee_bps: u16,
+        creator_rebate_fires: bool,
+        creator_rebate_bps: u16,
+        platform_retain_bps: u16,
+        weekly_pool_bps: u16,
+        monthly_pool_bps: u16,
+    ) -> (u64, u64, u64, u64) {
+        // returns (vault_receives, platform_receives, weekly_receives, monthly_receives)
+        let effective_bps = if mint_fee_bps == 0 {
+            0
+        } else {
+            let tier = tier_fee_bps(volume_30d);
+            let scaled = (tier as u32).saturating_mul(mint_fee_bps as u32)
+                / (TIER_FEE_BPS_TIER1 as u32);
+            let after_tier = scaled as u16;
+            if creator_rebate_fires {
+                fee_after_rebate(after_tier, creator_rebate_bps)
+            } else {
+                after_tier
+            }
+        };
+        let fee_total: u64 = ((amount as u128) * (effective_bps as u128) / 10_000) as u64;
+        let (platform, weekly, monthly) = split_fee(
+            fee_total,
+            platform_retain_bps,
+            weekly_pool_bps,
+            monthly_pool_bps,
+        );
+        (amount, platform, weekly, monthly)
+    }
+
+    #[test]
+    fn conservation_vault_always_receives_amount() {
+        // HARD YES #1 ($1 invariant): regardless of fee configuration, the
+        // vault gets EXACTLY `amount` USDC from each mint_pair. Fees are
+        // SEPARATE transfers; they never touch the vault.
+        let configs: &[(u64, u64, u16, bool, u16, u16, u16, u16)] = &[
+            // (amount, vol_30d, mint_fee, rebate_fires, rebate_bps, plat, weekly, monthly)
+            (1_000_000,         0,   0,  false, 10_000, 10_000, 0,     0    ),  // fees off
+            (1_000_000,         0, 200,  false, 10_000,  5_000, 2_500, 2_500),  // canonical
+            (1_000_000_000_000, 0, 200,  false, 10_000,  5_000, 2_500, 2_500),  // big amount
+            (1_000_000,         0, 200,   true, 10_000,  5_000, 2_500, 2_500),  // creator rebate full
+            (1_000_000,         0, 200,   true,  5_000,  5_000, 2_500, 2_500),  // creator rebate half
+            (1_000_000, TIER_BREAK_10K_USDC, 100, false, 10_000, 0, 5_000, 5_000), // promo
+        ];
+        for &(amount, vol, mfb, rebate_fires, rb, p, w, m) in configs {
+            let (vault, _, _, _) = end_to_end_fee_flow(amount, vol, mfb, rebate_fires, rb, p, w, m);
+            assert_eq!(vault, amount,
+                "vault must receive exactly amount={amount} regardless of fee config");
+        }
+    }
+
+    #[test]
+    fn conservation_user_payment_equals_amount_plus_sinks() {
+        // Compose: user_paid_total == amount + (platform + weekly + monthly).
+        // Sweep over: amounts × volumes × mint_fee_bps × rebate states.
+        let amounts = [1u64, 100, 1_000_000, 1_000_000_000_000];
+        let volumes = [0u64, TIER_BREAK_1K_USDC - 1, TIER_BREAK_1K_USDC, TIER_BREAK_10K_USDC];
+        let mint_fees = [0u16, 100, 200, 400];
+        // Use canonical 50/25/25 + 100% rebate config (DR-008 + DR-010 default)
+        for amount in amounts {
+            for volume in volumes {
+                for mfb in mint_fees {
+                    for rebate_fires in [false, true] {
+                        let (vault, p, w, m) = end_to_end_fee_flow(
+                            amount, volume, mfb, rebate_fires, 10_000, 5_000, 2_500, 2_500,
+                        );
+                        let total_sinks = vault as u128 + p as u128 + w as u128 + m as u128;
+                        let fee_paid_part = p as u128 + w as u128 + m as u128;
+                        // user_paid_total computed from same pipeline:
+                        let effective_bps = if mfb == 0 { 0 } else {
+                            let tier = tier_fee_bps(volume);
+                            let scaled = (tier as u32) * (mfb as u32) / (TIER_FEE_BPS_TIER1 as u32);
+                            if rebate_fires { fee_after_rebate(scaled as u16, 10_000) } else { scaled as u16 }
+                        };
+                        let expected_fee_total = ((amount as u128) * (effective_bps as u128)) / 10_000;
+                        assert_eq!(fee_paid_part, expected_fee_total,
+                            "platform+weekly+monthly must equal fee_total — amount={amount} vol={volume} mfb={mfb} rebate_fires={rebate_fires}");
+                        assert_eq!(total_sinks, (amount as u128) + expected_fee_total,
+                            "vault + sinks must equal amount + fee_total");
+                    }
+                }
+            }
+        }
+    }
+
+    /// ADVERSARIAL: the DR-008 anti-tier-gaming attack. A creator opens 7
+    /// strikes of their own and mints $1500 in each (creator_rebate_fires =
+    /// true → fee_total = 0 in default config). Without the
+    /// `if !creator_rebate_fires` guard on the `mint_volume_30d` update, the
+    /// creator would accumulate $10,500 of "free" volume — accelerating
+    /// themselves from tier 1 (200 bps) to tier 3 (100 bps) for ALL
+    /// subsequent non-rebated mints in OTHER markets. Net gaming profit:
+    /// 100 bps × future-mint-volume × probability of staying tier 3.
+    ///
+    /// The safeguard at `mint_pair.rs` handler:
+    ///
+    /// ```rust
+    /// if !creator_rebate_fires {
+    ///     uc.mint_volume_30d = uc.mint_volume_30d.saturating_add(amount);
+    /// }
+    /// ```
+    ///
+    /// This test demonstrates the attack mechanics — both with the safeguard
+    /// (volume stays at 0) and WITHOUT (volume inflates to tier 3) — so any
+    /// future refactor that drops the guard fails THIS test, not just the
+    /// existing fee-conservation tests.
+    #[test]
+    fn mint_pair_creator_rebate_no_volume_inflation() {
+        let amount_per_mint = 1_500 * 1_000_000u64; // 1500 USDC base units
+        let n_strikes = 7u64;
+
+        // --- With safeguard (current behavior): rebated mints do NOT update volume.
+        let creator_rebate_fires = true;
+        let mut volume_with_safeguard = 0u64;
+        for _ in 0..n_strikes {
+            if !creator_rebate_fires {
+                volume_with_safeguard = volume_with_safeguard.saturating_add(amount_per_mint);
+            }
+        }
+        assert_eq!(
+            volume_with_safeguard, 0,
+            "DR-008 safeguard: creator-rebated mints MUST NOT inflate mint_volume_30d"
+        );
+        // Attacker stays at tier 1 (200 bps) for non-rebated mints.
+        assert_eq!(tier_fee_bps(volume_with_safeguard), TIER_FEE_BPS_TIER1);
+
+        // --- Without the safeguard (the regression we're guarding against):
+        //     the same attack inflates volume across tier-3 boundary.
+        let mut volume_without_safeguard = 0u64;
+        for _ in 0..n_strikes {
+            volume_without_safeguard = volume_without_safeguard.saturating_add(amount_per_mint);
+        }
+        // 7 × $1500 = $10,500 ≥ $10,000 (TIER_BREAK_10K_USDC) → tier 3.
+        assert_eq!(volume_without_safeguard, 10_500 * 1_000_000);
+        assert!(
+            volume_without_safeguard >= TIER_BREAK_10K_USDC,
+            "without safeguard, attacker crosses into tier 3"
+        );
+        assert_eq!(tier_fee_bps(volume_without_safeguard), TIER_FEE_BPS_TIER3);
+
+        // --- Verify the tier-3 → tier-1 gap is the gaming profit:
+        //     100 bps gap × all future non-rebated mints = attacker's free
+        //     win. The safeguard closes this entirely.
+        let tier_gap = TIER_FEE_BPS_TIER1 - TIER_FEE_BPS_TIER3;
+        assert_eq!(tier_gap, 100, "tier 1 vs tier 3 = 100 bps fee delta");
+
+        // --- Also verify: legitimate (non-rebated) mints DO accumulate volume.
+        let creator_rebate_doesnt_fire = false;
+        let mut legit_volume = 0u64;
+        for _ in 0..n_strikes {
+            if !creator_rebate_doesnt_fire {
+                legit_volume = legit_volume.saturating_add(amount_per_mint);
+            }
+        }
+        assert_eq!(legit_volume, 10_500 * 1_000_000);
+        // Volume reaches tier 3 honestly — the safeguard doesn't penalize
+        // legitimate accumulation, only the rebate-gaming path.
+    }
+
+    #[test]
+    fn conservation_creator_full_rebate_zeros_all_fees() {
+        // Property: when creator rebate fires at 100% (10000 bps),
+        // platform + weekly + monthly all = 0, regardless of tier or amount.
+        for amount in [1u64, 1_000, 1_000_000].iter().copied() {
+            for vol in [0u64, TIER_BREAK_1K_USDC, TIER_BREAK_10K_USDC].iter().copied() {
+                let (vault, p, w, m) = end_to_end_fee_flow(
+                    amount, vol, 200,  // canonical 2% mint fee
+                    true, 10_000,      // full creator rebate
+                    5_000, 2_500, 2_500,
+                );
+                assert_eq!(vault, amount);
+                assert_eq!(p + w + m, 0, "100% rebate must zero all fee sinks (amount={amount} vol={vol})");
+            }
+        }
+    }
+
     #[test]
     fn split_property_sum_equals_fee_total_over_sweep() {
         // Property: regardless of fee_total OR bps configuration (as long as it

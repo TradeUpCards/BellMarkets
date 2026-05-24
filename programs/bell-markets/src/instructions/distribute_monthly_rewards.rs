@@ -13,7 +13,9 @@ use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 use crate::state::*;
 use crate::errors::BellMarketsError;
 use crate::merkle::{compute_leaf, verify_merkle_proof};
-use crate::instructions::distribute_weekly_rewards::{is_valid_position, is_position_claimed, position_bit};
+use crate::instructions::distribute_weekly_rewards::{
+    is_valid_metric_id, is_valid_position, is_metric_position_claimed, metric_position_bit,
+};
 
 #[derive(Accounts)]
 pub struct DistributeMonthlyRewards<'info> {
@@ -60,19 +62,22 @@ pub struct DistributeMonthlyRewards<'info> {
 pub fn handler(
     ctx: Context<DistributeMonthlyRewards>,
     period_id: u64,
+    metric_id: u8,
     position: u8,
     amount: u64,
     merkle_proof: Vec<[u8; 32]>,
 ) -> Result<()> {
+    require!(is_valid_metric_id(metric_id), BellMarketsError::InvalidDistributionPosition);
     require!(is_valid_position(position), BellMarketsError::InvalidDistributionPosition);
     require!(amount > 0, BellMarketsError::ZeroAmount);
 
     let leaf = compute_leaf(
         &ctx.accounts.recipient.key(),
+        metric_id,
         position,
+        amount,
         period_id,
         PERIOD_TYPE_MONTHLY,
-        amount,
     );
 
     let monthly_pool_bump = ctx.bumps.monthly_pool;
@@ -95,10 +100,10 @@ pub fn handler(
         );
 
         require!(
-            !is_position_claimed(entry.claimed_bitmap, position),
+            !is_metric_position_claimed(entry.claimed_bitmap, metric_id, position),
             BellMarketsError::MerkleProofInvalid
         );
-        entry.claimed_bitmap |= position_bit(position);
+        entry.claimed_bitmap |= metric_position_bit(metric_id, position);
     }
 
     let bump_arr = [monthly_pool_bump];
