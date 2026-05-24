@@ -640,36 +640,46 @@
   .btn-secondary:hover { border-color: var(--text); }
 
   /* Session block */
+  /* Session block — bigger fonts for readability (Cory feedback) */
   .session-block {
     background: var(--panel);
     border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 20px 24px;
+    border-radius: 6px;
+    padding: 16px 18px;
   }
   .session-block-h {
     font-family: 'IBM Plex Mono', monospace;
-    font-size: 9px; text-transform: uppercase;
+    font-size: 10px; text-transform: uppercase;
     letter-spacing: 1.5px; color: var(--accent);
-    font-weight: 700; margin-bottom: 14px;
+    font-weight: 700; margin-bottom: 12px;
     display: flex; align-items: center; justify-content: space-between;
   }
   .session-block-h::after {
     content: ""; flex: 1;
     height: 1px;
     background: linear-gradient(90deg, var(--border) 0%, transparent 100%);
-    margin-left: 12px;
+    margin-left: 10px;
   }
   .session-row {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 6px 0;
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 8px 0;
     border-bottom: 1px dotted var(--border);
-    font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 13px;
+    gap: 10px;
   }
   .session-row:last-child { border-bottom: none; }
-  .session-row .lbl { color: var(--text-muted); }
-  .session-row .val { color: var(--text-strong); font-weight: 700; }
+  .session-row .lbl { color: var(--text-muted); font-size: 12px; }
+  .session-row .val { color: var(--text-strong); font-weight: 700; font-size: 14px; }
   .session-row .val.amber { color: var(--amber); }
   .session-row .val.cyan { color: var(--accent); }
+  .session-row .val.small { font-size: 11px; font-weight: 500; color: var(--text); }
+  /* "big" row: settle countdown gets prominent treatment */
+  .session-row.big {
+    border-bottom: 1px solid var(--border);
+    padding: 10px 0 12px;
+    margin-bottom: 4px;
+  }
+  .session-row.big .val { font-size: 22px; letter-spacing: -0.02em; }
 
   /* ========== PROBABILITY MATRIX (BLOOMBERG SIGNATURE — color coded) ========== */
   .matrix-card {
@@ -1173,7 +1183,57 @@
   .slide-title { font-size: 20px !important; line-height: 1.15 !important; }
   .slide-body p { font-size: 12px !important; max-width: none !important; margin-bottom: 12px !important; }
   .slide-body { flex: 1; min-width: 0; position: relative; }
-  .slide-art { flex: 0 0 130px !important; height: 160px !important; padding: 8px; }
+  /* Replaced .slide-art's complex content with a clean .slide-stat focal block */
+  .slide-stat {
+    flex: 0 0 140px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 10px;
+    gap: 4px;
+    position: relative;
+    overflow: hidden;
+  }
+  .slide-stat-num {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 32px;
+    font-weight: 800;
+    color: var(--accent);
+    letter-spacing: -0.03em;
+    line-height: 1;
+  }
+  .slide-stat-lbl {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: 600;
+  }
+  .slide-stat-meta {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--text-muted);
+    align-items: center;
+  }
+  .slide-stat-meta > span { display: inline-flex; align-items: center; gap: 4px; }
+  .slide-stat-meta .dot { width: 6px; height: 6px; border-radius: 50%; }
+  /* Hide stat at very narrow widths to give body breathing room */
+  @media (max-width: 480px) {
+    .slide-stat { display: none; }
+  }
   /* Carousel controls */
   .carousel-dots {
     position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
@@ -1892,19 +1952,13 @@
               <button class="btn-secondary">How it works</button>
             </div>
           </div>
-          <div class="slide-art" style="padding: 12px; flex-direction: column; align-items: stretch; gap: 6px;">
-            <div style="font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--accent); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 4px;">MAG7 · TODAY</div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
-              <div style="display: flex; justify-content: space-between; font-family: 'IBM Plex Mono', monospace; font-size: 10px; padding: 3px 6px; background: rgba(74,222,128,0.08); border-radius: 3px;"><span style="color: var(--text);">META</span><span style="color: var(--yes); font-weight: 700;">+3.21%</span></div>
-              <div style="display: flex; justify-content: space-between; font-family: 'IBM Plex Mono', monospace; font-size: 10px; padding: 3px 6px; background: rgba(74,222,128,0.08); border-radius: 3px;"><span style="color: var(--text);">AMZN</span><span style="color: var(--yes); font-weight: 700;">+2.15%</span></div>
-              <div style="display: flex; justify-content: space-between; font-family: 'IBM Plex Mono', monospace; font-size: 10px; padding: 3px 6px; background: rgba(74,222,128,0.08); border-radius: 3px;"><span style="color: var(--text);">TSLA</span><span style="color: var(--yes); font-weight: 700;">+1.92%</span></div>
-              <div style="display: flex; justify-content: space-between; font-family: 'IBM Plex Mono', monospace; font-size: 10px; padding: 3px 6px; background: rgba(74,222,128,0.08); border-radius: 3px;"><span style="color: var(--text);">AAPL</span><span style="color: var(--yes); font-weight: 700;">+1.24%</span></div>
-              <div style="display: flex; justify-content: space-between; font-family: 'IBM Plex Mono', monospace; font-size: 10px; padding: 3px 6px; background: rgba(248,113,113,0.08); border-radius: 3px;"><span style="color: var(--text);">NVDA</span><span style="color: var(--no); font-weight: 700;">−0.85%</span></div>
-              <div style="display: flex; justify-content: space-between; font-family: 'IBM Plex Mono', monospace; font-size: 10px; padding: 3px 6px; background: rgba(248,113,113,0.08); border-radius: 3px;"><span style="color: var(--text);">GOOGL</span><span style="color: var(--no); font-weight: 700;">−0.42%</span></div>
-            </div>
-            <div style="display: flex; justify-content: space-around; padding-top: 6px; border-top: 1px solid var(--border); font-family: 'IBM Plex Mono', monospace; font-size: 10px;">
-              <span><span style="color: var(--text-muted);">vol</span> <span style="color: var(--text-strong); font-weight: 700;">$184K</span></span>
-              <span><span style="color: var(--text-muted);">trades</span> <span style="color: var(--text-strong); font-weight: 700;">2,847</span></span>
+          <div class="slide-stat">
+            <div class="slide-stat-num">49</div>
+            <div class="slide-stat-lbl">live markets</div>
+            <div class="slide-stat-meta">
+              <span><span class="dot" style="background: var(--yes);"></span> 4 up</span>
+              <span><span class="dot" style="background: var(--no);"></span> 2 down</span>
+              <span><span class="dot" style="background: var(--text-muted);"></span> 1 flat</span>
             </div>
           </div>
         </div>
@@ -1923,18 +1977,11 @@
               <button class="btn-secondary">Rules + prizes</button>
             </div>
           </div>
-          <div class="slide-art" style="flex-direction: column; padding: 16px; gap: 6px; align-items: stretch;">
-            <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: rgba(251, 191, 36, 0.10); border: 1px solid rgba(251, 191, 36, 0.30); border-radius: 4px;">
-              <span style="font-family: 'IBM Plex Mono', monospace; color: var(--amber); font-weight: 700; font-size: 11px;">#1 degen.sol</span>
-              <span style="font-family: 'IBM Plex Mono', monospace; color: var(--yes); font-weight: 700; font-size: 12px;">+$2,847</span>
-            </div>
-            <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: var(--panel-3); border: 1px solid var(--border); border-radius: 4px;">
-              <span style="font-family: 'IBM Plex Mono', monospace; color: #d4d4d4; font-weight: 700; font-size: 11px;">#2 maxprob</span>
-              <span style="font-family: 'IBM Plex Mono', monospace; color: var(--yes); font-weight: 700; font-size: 12px;">+$2,103</span>
-            </div>
-            <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: var(--panel-3); border: 1px solid var(--border); border-radius: 4px;">
-              <span style="font-family: 'IBM Plex Mono', monospace; color: #d97706; font-weight: 700; font-size: 11px;">#3 quantfox</span>
-              <span style="font-family: 'IBM Plex Mono', monospace; color: var(--yes); font-weight: 700; font-size: 12px;">+$1,876</span>
+          <div class="slide-stat">
+            <div class="slide-stat-num" style="color: var(--yes);">+$2,847</div>
+            <div class="slide-stat-lbl">leader this week</div>
+            <div class="slide-stat-meta">
+              <span style="color: var(--amber);">🏆 degen.sol</span>
             </div>
           </div>
         </div>
@@ -1953,14 +2000,11 @@
               <button class="btn-secondary">All contests</button>
             </div>
           </div>
-          <div class="slide-art" style="background: linear-gradient(135deg, rgba(244, 114, 182, 0.10), var(--panel-2));">
-            <div style="text-align: center;">
-              <div style="font-family: 'IBM Plex Mono', monospace; font-size: 34px; font-weight: 700; color: var(--amber); letter-spacing: -0.02em;">$3,400</div>
-              <div style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1.5px; margin-top: 4px;">PRIZE POOL</div>
-              <div style="margin-top: 16px; height: 6px; background: var(--panel-3); border-radius: 3px; overflow: hidden; width: 200px;">
-                <div style="height: 100%; background: linear-gradient(90deg, #22d3ee, #f472b6); width: 35%;"></div>
-              </div>
-              <div style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--text-muted); margin-top: 6px;">3d left · 187 entries</div>
+          <div class="slide-stat">
+            <div class="slide-stat-num" style="color: var(--amber);">$3,400</div>
+            <div class="slide-stat-lbl">prize pool</div>
+            <div class="slide-stat-meta">
+              <span>3d left · 187 entries</span>
             </div>
           </div>
         </div>
@@ -1979,10 +2023,11 @@
               <button class="btn-secondary">See features</button>
             </div>
           </div>
-          <div class="slide-art" style="background: linear-gradient(135deg, rgba(34, 211, 238, 0.12), var(--panel-2)); padding: 16px;">
-            <div style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--accent); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px;">AAPL — TODAY'S BRIEFING</div>
-            <div style="font-family: 'IBM Plex Sans', sans-serif; font-size: 12px; color: var(--text); line-height: 1.5;">
-              Spot $229.84 against $230 strike. Pyth-derived vol implies 47% close-above. Earnings 4 weeks out. Sector beta neutral. <span style="color: var(--text-muted);">Read full →</span>
+          <div class="slide-stat">
+            <div class="slide-stat-num" style="color: var(--accent); font-size: 36px;">7</div>
+            <div class="slide-stat-lbl">daily briefings</div>
+            <div class="slide-stat-meta">
+              <span>All MAG7 · powered by Claude</span>
             </div>
           </div>
         </div>
@@ -1993,24 +2038,18 @@
         <button class="carousel-arrow" id="prev-slide" aria-label="Previous slide">◀</button>
         <button class="carousel-arrow" id="next-slide" aria-label="Next slide">▶</button>
       </div>
-      <div class="carousel-dots" role="tablist">
-        <button class="carousel-dot active" data-dot="0" aria-label="Markets"></button>
-        <button class="carousel-dot" data-dot="1" aria-label="Leaderboard"></button>
-        <button class="carousel-dot" data-dot="2" aria-label="Contests"></button>
-        <button class="carousel-dot" data-dot="3" aria-label="Bell Pro"></button>
+      <div class="carousel-dots" role="tablist" aria-label="Carousel pages">
+        <!-- Dots generated dynamically by JS based on slidesPerView() -->
       </div>
     </div>
 
-    <!-- Session block (v7 style, sits beside carousel) -->
+    <!-- Session block — trimmed to essentials, bigger font for readability (Cory feedback) -->
     <div class="session-block">
-      <div class="session-block-h">Session · 2026-05-23 EDT</div>
+      <div class="session-block-h">Today's session</div>
+      <div class="session-row big"><span class="lbl">Settle in</span><span class="val amber">02:13:47</span></div>
       <div class="session-row"><span class="lbl">Markets active</span><span class="val cyan">49</span></div>
       <div class="session-row"><span class="lbl">Volume 24h</span><span class="val">$184,723</span></div>
-      <div class="session-row hide-mobile"><span class="lbl">Trades 24h</span><span class="val">2,847</span></div>
-      <div class="session-row hide-mobile"><span class="lbl">Active wallets</span><span class="val">127</span></div>
-      <div class="session-row hide-mobile"><span class="lbl">Open interest</span><span class="val">38,420</span></div>
-      <div class="session-row"><span class="lbl">Settle in</span><span class="val amber">02:13:47</span></div>
-      <div class="session-row"><span class="lbl">Next settle</span><span class="val">META · NVDA · AAPL · MSFT</span></div>
+      <div class="session-row"><span class="lbl">Next settle</span><span class="val small">META · NVDA · AAPL · MSFT</span></div>
     </div>
 
     </div><!-- /hero-grid -->
@@ -2553,62 +2592,74 @@
     try { const s = localStorage.getItem('bm-theme'); if (s === 'light') document.documentElement.setAttribute('data-theme', 'light'); } catch (e) {}
   })();
 
-  // ===== CAROUSEL — scroll-based with multi-card responsive =====
+  // ===== CAROUSEL — multi-card responsive with dynamic page count =====
   (function() {
     const slides = document.getElementById('slides');
-    const dots = document.querySelectorAll('.carousel-dot');
+    const dotsContainer = document.querySelector('.carousel-dots');
     const prevBtn = document.getElementById('prev-slide');
     const nextBtn = document.getElementById('next-slide');
-    if (!slides) return;
-    const slideEls = slides.querySelectorAll('.carousel-slide');
+    if (!slides || !dotsContainer) return;
+    const slideEls = Array.from(slides.querySelectorAll('.carousel-slide'));
     let autoplayId = null;
+    let currentPage = 0;
+    let pageCount = 1;
 
-    function visibleSlideIdx() {
-      // Find the slide closest to the left edge of the scroll container
-      const rect = slides.getBoundingClientRect();
-      let best = 0, bestDist = Infinity;
-      slideEls.forEach((s, i) => {
-        const sRect = s.getBoundingClientRect();
-        const dist = Math.abs(sRect.left - rect.left);
-        if (dist < bestDist) { bestDist = dist; best = i; }
-      });
-      return best;
+    function slidesPerView() {
+      // How many slides fit in the visible width (round to avoid fractional)
+      if (slideEls.length === 0) return 1;
+      const cw = slides.clientWidth;
+      const sw = slideEls[0].getBoundingClientRect().width + 12; // slide + gap
+      return Math.max(1, Math.round(cw / sw));
+    }
+    function computePages() {
+      pageCount = Math.max(1, slideEls.length - slidesPerView() + 1);
+      if (currentPage >= pageCount) currentPage = pageCount - 1;
+    }
+    function buildDots() {
+      dotsContainer.innerHTML = '';
+      for (let i = 0; i < pageCount; i++) {
+        const b = document.createElement('button');
+        b.className = 'carousel-dot' + (i === currentPage ? ' active' : '');
+        b.dataset.dot = i;
+        b.setAttribute('aria-label', 'Page ' + (i + 1));
+        b.addEventListener('click', () => {
+          goTo(i); stopAutoplay(); startAutoplay();
+        });
+        dotsContainer.appendChild(b);
+      }
     }
     function goTo(i) {
-      const idx = Math.max(0, Math.min(slideEls.length - 1, i));
-      const target = slideEls[idx];
+      currentPage = Math.max(0, Math.min(pageCount - 1, i));
+      const target = slideEls[currentPage];
       if (!target) return;
       slides.scrollTo({ left: target.offsetLeft, behavior: 'smooth' });
+      dotsContainer.querySelectorAll('.carousel-dot').forEach((d, idx) => d.classList.toggle('active', idx === currentPage));
     }
-    function nextSlide() { goTo(visibleSlideIdx() + 1); }
-    function prevSlide() { goTo(visibleSlideIdx() - 1); }
+    function nextPage() { goTo(currentPage >= pageCount - 1 ? 0 : currentPage + 1); }
+    function prevPage() { goTo(currentPage <= 0 ? pageCount - 1 : currentPage - 1); }
     function startAutoplay() {
       stopAutoplay();
-      autoplayId = setInterval(() => {
-        const cur = visibleSlideIdx();
-        const next = cur >= slideEls.length - 1 ? 0 : cur + 1;
-        goTo(next);
-      }, 6000);
+      autoplayId = setInterval(nextPage, 6000);
     }
     function stopAutoplay() {
       if (autoplayId) { clearInterval(autoplayId); autoplayId = null; }
     }
 
-    dots.forEach(d => d.addEventListener('click', () => {
-      goTo(parseInt(d.dataset.dot, 10));
-      stopAutoplay();
-      startAutoplay();
-    }));
-    if (prevBtn) prevBtn.addEventListener('click', () => { prevSlide(); stopAutoplay(); startAutoplay(); });
-    if (nextBtn) nextBtn.addEventListener('click', () => { nextSlide(); stopAutoplay(); startAutoplay(); });
+    if (prevBtn) prevBtn.addEventListener('click', () => { prevPage(); stopAutoplay(); startAutoplay(); });
+    if (nextBtn) nextBtn.addEventListener('click', () => { nextPage(); stopAutoplay(); startAutoplay(); });
 
-    // Update active dot based on scroll position
+    // Track active page via scroll position
     let scrollTimer;
     slides.addEventListener('scroll', () => {
       clearTimeout(scrollTimer);
       scrollTimer = setTimeout(() => {
-        const idx = visibleSlideIdx();
-        dots.forEach((d, i) => d.classList.toggle('active', i === idx));
+        const sl = slides.scrollLeft;
+        const sw = slideEls[0].getBoundingClientRect().width + 12;
+        const page = Math.round(sl / sw);
+        if (page !== currentPage) {
+          currentPage = Math.max(0, Math.min(pageCount - 1, page));
+          dotsContainer.querySelectorAll('.carousel-dot').forEach((d, idx) => d.classList.toggle('active', idx === currentPage));
+        }
       }, 80);
     });
 
@@ -2617,6 +2668,14 @@
       carousel.addEventListener('mouseenter', stopAutoplay);
       carousel.addEventListener('mouseleave', startAutoplay);
     }
+
+    function init() { computePages(); buildDots(); }
+    init();
+    window.addEventListener('resize', () => {
+      const prev = pageCount;
+      computePages();
+      if (pageCount !== prev) buildDots();
+    });
     startAutoplay();
   })();
 </script>
