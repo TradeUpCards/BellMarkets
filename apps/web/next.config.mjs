@@ -14,11 +14,23 @@ const nextConfig = {
     "@solana/wallet-adapter-phantom",
     "@solana/wallet-adapter-solflare",
     "@ellipsis-labs/phoenix-sdk",
+    // Workspace TS-source packages — Next compiles their .ts directly.
+    "@bell-markets/automation",
   ],
   webpack: (config) => {
     config.resolve.fallback = {
       ...config.resolve.fallback,
       fs: false,
+    };
+    // Workspace package @bell-markets/automation uses NodeNext-style `.js`
+    // import specifiers that point at TS sources (e.g. `import './foo.js'`
+    // resolves to `./foo.ts`). Webpack needs the alias to follow the
+    // convention; otherwise the dev server throws "Can't resolve './types.js'"
+    // at import time. Safe across all consumers (real `.js` still resolves
+    // first via the array order).
+    config.resolve.extensionAlias = {
+      ...(config.resolve.extensionAlias ?? {}),
+      ".js": [".ts", ".tsx", ".js"],
     };
     return config;
   },

@@ -1,11 +1,16 @@
 {
   "name": "@bell-markets/automation",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
-  "description": "BellMarkets automation service — morning create-markets (~8am ET) + settlement nudger (~4:05pm ET) via Trigger.dev. Permissionless convenience caller; not an authority (DR-002).",
+  "description": "BellMarkets automation service — morning create-markets (~8am ET) + settlement nudger (~4:05pm ET) via Trigger.dev, plus DR-014 NextAuth options + AI v2 briefings/PNL digests consumed by apps/web. Permissionless convenience caller; not an authority (DR-002).",
   "license": "Apache-2.0",
   "type": "module",
   "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./ai": "./src/ai/index.ts",
+    "./auth": "./src/auth/index.ts"
+  },
   "scripts": {
     "dev": "trigger dev",
     "deploy": "trigger deploy",
