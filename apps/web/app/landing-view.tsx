@@ -27,6 +27,8 @@ const TICKERS = [
   { sym: "TSLA", spot: "$261.04", chg: "−0.70%", up: false },
 ];
 
+// STATIC FIXTURE — wire to useAllMarkets() + useOrderBook() per row, post-MVP.
+// (Strikes are real per-ticker shapes from the v8 mockup.)
 const MATRIX_ROWS = [
   {
     sym: "META",
@@ -156,6 +158,7 @@ const MATRIX_ROWS = [
   },
 ];
 
+// STATIC FIXTURE — wire to useLeaderboard() once Bram's indexer URL ships.
 const LEADERS = [
   { rank: 1, rankCls: "gold", name: "degen.sol", avatar: "DG", profit: "+$2,847", trades: "47 · 32W 15L", winRate: "68%", streak: "9W" },
   { rank: 2, rankCls: "silver", name: "maxprob.eth", avatar: "MP", profit: "+$2,103", trades: "39 · 28W 11L", winRate: "72%", streak: "6W" },
@@ -164,6 +167,7 @@ const LEADERS = [
   { rank: 5, rankCls: "", name: "you", avatar: "YU", profit: "+$1,247", trades: "18 · 13W 5L", winRate: "72%", streak: "3W", isYou: true },
 ];
 
+// STATIC FIXTURE — wire to a real fills feed (Helius webhook or program log subscription) post-MVP.
 const FILLS = [
   { time: "14:46:31", market: "META.680", side: "BUY", price: "$0.520", size: 200 },
   { time: "14:46:18", market: "NVDA.1340", side: "SELL", price: "$0.485", size: 125 },

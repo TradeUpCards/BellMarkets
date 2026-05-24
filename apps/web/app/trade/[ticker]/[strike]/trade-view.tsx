@@ -107,7 +107,9 @@ export function TradeView({ ticker, strike }: TradeViewParams) {
     );
   }, [allMarkets, strikeNum]);
 
-  // Mock position until usePosition is wired against a real strike-market PDA.
+  // STATIC FIXTURE — wire to usePosition(wallet, liveMarket.pda) once cost-basis tracking lands.
+  // Today the on-chain side only stores current balances; cost basis comes from an off-chain
+  // tx history index (Bram's indexer scope).
   const position = useMemo(
     () => ({
       yes: { contracts: 5, avgEntry: 0.62, costBasis: 3.10 },
@@ -658,8 +660,17 @@ export function TradeView({ ticker, strike }: TradeViewParams) {
 
                       {submitResult && (
                         <div
-                          className={submitResult.ok ? "funds-warning" : "funds-warning"}
-                          style={{ marginTop: 8, color: submitResult.ok ? undefined : undefined }}
+                          className="funds-warning"
+                          style={{
+                            marginTop: 8,
+                            // Success → green Yes-token border + tint; error keeps the
+                            // amber warning treatment from .funds-warning. Distinct
+                            // demo signal (audit P1 fix).
+                            borderColor: submitResult.ok ? "var(--yes)" : undefined,
+                            background: submitResult.ok ? "var(--yes-bg)" : undefined,
+                            color: submitResult.ok ? "var(--yes)" : undefined,
+                          }}
+                          data-submit-state={submitResult.ok ? "success" : "error"}
                         >
                           <span aria-hidden="true">{submitResult.ok ? "✓" : "⚠"}</span>
                           <span>{submitResult.msg}</span>
@@ -786,9 +797,10 @@ function RailTickers({ active }: { active: string }) {
   );
 }
 
+// STATIC FIXTURE — wire to useAllMarkets × usePosition(wallet) post-MVP for live rail.
 function RailPositions() {
   return (
-    <details className="rail-section" id="rail-positions" open>
+    <details className="rail-section" id="rail-positions" open data-mock="true">
       <summary className="rail-section-h">
         <span className="rail-section-title">My positions · 3</span>
         <span className="rail-chevron" aria-hidden="true">▾</span>
@@ -823,9 +835,10 @@ function RailPositions() {
   );
 }
 
+// STATIC FIXTURE — wire to useLeaderboard("weekly") once Bram's indexer URL ships.
 function RailLeaders() {
   return (
-    <details className="rail-section" id="rail-leaders" open>
+    <details className="rail-section" id="rail-leaders" open data-mock="true">
       <summary className="rail-section-h">
         <span className="rail-section-title">🏆 Weekly leaders</span>
         <Link href="/leaderboard" className="rail-section-link" onClick={(e) => e.stopPropagation()}>
