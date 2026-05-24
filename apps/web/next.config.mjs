@@ -8,6 +8,7 @@ const nextConfig = {
   // indefinitely on this on Windows. Force Phoenix through Next's transpile
   // pipeline so its module graph is normalized at build time.
   transpilePackages: [
+    "@bell-markets/automation",
     "@solana/wallet-adapter-base",
     "@solana/wallet-adapter-react",
     "@solana/wallet-adapter-react-ui",
@@ -19,6 +20,14 @@ const nextConfig = {
     config.resolve.fallback = {
       ...config.resolve.fallback,
       fs: false,
+    };
+    // @bell-markets/automation is "type": "module" with `.js` import suffixes
+    // pointing at `.ts` source files. Strip the `.js` → `.ts` so webpack can
+    // follow the barrel through the package's source tree without a build step.
+    config.resolve.extensionAlias = {
+      ...(config.resolve.extensionAlias ?? {}),
+      ".js": [".ts", ".tsx", ".js"],
+      ".mjs": [".mts", ".mjs"],
     };
     return config;
   },

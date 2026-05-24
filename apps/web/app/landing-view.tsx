@@ -10,12 +10,21 @@
  * navigation enhancement, not a load-bearing surface).
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useBellProSubscription, isBellProActive } from "@/hooks/use-bell-pro-subscription";
 
 type MetricTab = "profit" | "streak" | "winrate";
 type PeriodTab = "weekly" | "monthly";
+
+const BELL_PRO_DEFAULT_TICKER = "AAPL";
+
+type LiveBriefing = {
+  ticker: string;
+  body: string;
+  model: string;
+  generatedAt: string;
+};
 
 const TICKERS = [
   { sym: "AAPL", spot: "$229.84", chg: "+0.54%", up: true },
@@ -184,6 +193,27 @@ export function LandingView() {
   const [metric, setMetric] = useState<MetricTab>("profit");
   const { data: sub } = useBellProSubscription();
   const proActive = isBellProActive(sub);
+
+  // P1 — pull the freshest Sonnet briefing for the default ticker on mount.
+  // Falls back to the static bullets if the endpoint 404s, errors, or hasn't
+  // had a briefing generated yet. Server-only DB read sits behind the route.
+  const [briefing, setBriefing] = useState<LiveBriefing | null>(null);
+  useEffect(() => {
+    const ctrl = new AbortController();
+    fetch(`/api/briefings/${BELL_PRO_DEFAULT_TICKER}`, { signal: ctrl.signal })
+      .then(async (res) => {
+        if (!res.ok) return null;
+        const json = (await res.json()) as { briefing?: LiveBriefing | null };
+        return json.briefing ?? null;
+      })
+      .then((b) => {
+        if (b) setBriefing(b);
+      })
+      .catch(() => {
+        // Network error / abort — leave the static fallback in place.
+      });
+    return () => ctrl.abort();
+  }, []);
 
   return (
     <>
@@ -425,26 +455,63 @@ export function LandingView() {
               <span className="link mono">{proActive ? "Active" : "$9 / mo"}</span>
             </div>
             <div className="bellpro-card half-card">
-              <div className="bellpro-bullets">
-                <div className="bellpro-bullet">
-                  <span className="bullet-mark">→</span>
-                  Daily AI briefings on the 7 MAG7 names — earnings, options
-                  flow, recent news.
+              {briefing ? (
+                <div className="bellpro-bullets">
+                  <div
+                    className="bellpro-bullet"
+                    style={{ display: "flex", justifyContent: "space-between", gap: 12 }}
+                  >
+                    <span className="bullet-mark">✦</span>
+                    <span style={{ flex: 1 }}>
+                      <strong>{briefing.ticker}</strong> · today&apos;s briefing
+                    </span>
+                    <span
+                      className="mono"
+                      style={{ fontSize: 11, opacity: 0.6 }}
+                      title={`Generated ${briefing.generatedAt} · ${briefing.model}`}
+                    >
+                      {new Date(briefing.generatedAt).toLocaleDateString("en-US", {
+                        timeZone: "America/New_York",
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      lineHeight: 1.55,
+                      whiteSpace: "pre-wrap",
+                      maxHeight: 200,
+                      overflowY: "auto",
+                      paddingRight: 6,
+                    }}
+                  >
+                    {briefing.body}
+                  </div>
                 </div>
-                <div className="bellpro-bullet">
-                  <span className="bullet-mark">→</span>
-                  Bell Sense — surface markets where your size+conviction
-                  outperforms the crowd.
+              ) : (
+                <div className="bellpro-bullets">
+                  <div className="bellpro-bullet">
+                    <span className="bullet-mark">→</span>
+                    Daily AI briefings on the 7 MAG7 names — earnings, options
+                    flow, recent news.
+                  </div>
+                  <div className="bellpro-bullet">
+                    <span className="bullet-mark">→</span>
+                    Bell Sense — surface markets where your size+conviction
+                    outperforms the crowd.
+                  </div>
+                  <div className="bellpro-bullet">
+                    <span className="bullet-mark">→</span>
+                    Win-streak boosts + extra contest entries.
+                  </div>
+                  <div className="bellpro-bullet">
+                    <span className="bullet-mark">→</span>
+                    Priority support + custom Discord channel.
+                  </div>
                 </div>
-                <div className="bellpro-bullet">
-                  <span className="bullet-mark">→</span>
-                  Win-streak boosts + extra contest entries.
-                </div>
-                <div className="bellpro-bullet">
-                  <span className="bullet-mark">→</span>
-                  Priority support + custom Discord channel.
-                </div>
-              </div>
+              )}
               <div className="bellpro-cta-row">
                 {proActive ? (
                   <span className="hero-cta primary">You&apos;re Pro ✓</span>
