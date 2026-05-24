@@ -12,10 +12,11 @@
 //   - After 15min exhaustion, the market stays Unsettled; admin can call
 //     `admin_settle` after the on-chain ≥1hr override window opens.
 //
-// Cron: `5 21 * * 1-5` = 4:05 PM ET on US weekdays during EDT (UTC-4).
-// DST flip same known issue as morning.ts.
-
-import { schedules } from "@trigger.dev/sdk/v3";
+// Cron: NO LONGER A STANDALONE CRON.  DR-006 wraps settlement into Phase 1
+// (4:05 PM ET full days) + Phase 1b (1:05 PM ET half-days) — see
+// jobs/grid-evolution.ts.  This module retains `runSettlementNudger` as the
+// pure orchestration function those wrappers call, plus the operator script
+// `scripts/run-settle-once.ts`.
 
 import { loadConfig, type AutomationConfig } from "../config.js";
 import { BellMarketsAnchorClient } from "../clients/anchor.js";
@@ -25,17 +26,6 @@ import { retryUntilDeadline } from "../lib/retry.js";
 export const SETTLE_RETRY_INTERVAL_MS = 30_000;
 /** 15 minutes — PRD-mandated retry-deadline window. */
 export const SETTLE_RETRY_DEADLINE_MS = 15 * 60 * 1000;
-
-export const settlementNudgerJob = schedules.task({
-  id: "settlement-nudger",
-  cron: "5 21 * * 1-5",
-  maxDuration: 900, // 15min — matches the PRD-mandated retry window
-  run: async (payload, { ctx }) =>
-    runSettlementNudger({
-      runAt: payload.timestamp,
-      ctxRunId: ctx.run.id,
-    }),
-});
 
 export type OpenMarketRef = {
   pubkey: string;
@@ -189,10 +179,18 @@ export async function runSettlementNudger(deps: SettlementJobDeps): Promise<Sett
 
 /**
  * Default retry policy: retry on Pyth-transient errors (`PythConfidenceTooWide`,
- * `PythStale`) per PRD, plus generic RPC blips (503 / timeout / network).
- * Everything else is non-retriable.
+ * `PythStale`) per PRD, plus generic RPC blips (503 / timeout / network /
+ * fetch-failed / blockhash).
  *
- * Exported so callers (and tests) can compose with their own policy.
+ * Caller can compose their own policy by injecting `shouldRetry` into
+ * `SettlementJobDeps`.
+ *
+ * The "fetch failed" + "blockhash" patterns were added 2026-05-24 after a
+ * real-time settle:once on devnet hit `TypeError: fetch failed` from
+ * `@solana/web3.js` Connection.getRecentBlockhash during a transient RPC
+ * blip — that's clearly retriable from the operator's perspective but
+ * wasn't matched by 503/timeout/network. See
+ * `.project/.../settle-real-time-evidence.md` for the bug report.
  */
 export function defaultShouldRetry(err: unknown): boolean {
   if (typeof err === "object" && err !== null) {
@@ -202,7 +200,15 @@ export function defaultShouldRetry(err: unknown): boolean {
   }
   if (err instanceof Error) {
     const msg = err.message.toLowerCase();
-    if (msg.includes("503") || msg.includes("timeout") || msg.includes("network")) return true;
+    if (
+      msg.includes("503") ||
+      msg.includes("timeout") ||
+      msg.includes("network") ||
+      msg.includes("fetch failed") ||
+      msg.includes("blockhash")
+    ) {
+      return true;
+    }
   }
   return false;
 }

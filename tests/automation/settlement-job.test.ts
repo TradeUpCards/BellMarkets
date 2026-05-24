@@ -99,6 +99,23 @@ describe("defaultShouldRetry — PRD retry policy", () => {
     expect(defaultShouldRetry(new Error("network unreachable"))).toBe(true);
   });
 
+  it("retries on `TypeError: fetch failed` (Node fetch transient blip)", () => {
+    // Real error observed 2026-05-24 in live settle:once — Node fetch fails
+    // on TCP reset / TLS handshake / DNS hiccup. See
+    // .project/.../settle-real-time-evidence.md for the bug-report context.
+    expect(defaultShouldRetry(new TypeError("fetch failed"))).toBe(true);
+  });
+
+  it("retries on `failed to get recent blockhash` (Connection.getRecentBlockhash transient)", () => {
+    // Web3.js wraps fetch failures during getRecentBlockhash with this prefix.
+    // Same root cause as fetch-failed; treat as retriable.
+    expect(
+      defaultShouldRetry(
+        new Error("failed to get recent blockhash: TypeError: fetch failed"),
+      ),
+    ).toBe(true);
+  });
+
   it("does NOT retry on arbitrary unknown errors", () => {
     expect(defaultShouldRetry(new Error("something exploded"))).toBe(false);
     expect(defaultShouldRetry("string error")).toBe(false);

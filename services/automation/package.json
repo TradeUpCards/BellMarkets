@@ -14,22 +14,40 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "morning:once": "tsx --env-file=.env scripts/run-morning-once.ts",
-    "settle:once": "tsx --env-file=.env scripts/run-settle-once.ts"
+    "settle:once": "tsx --env-file=.env scripts/run-settle-once.ts",
+    "distribute:once": "tsx --env-file=.env scripts/run-distribute-once.ts",
+    "briefings:gen": "tsx --env-file=.env --env-file=.env.local scripts/gen-briefings.ts",
+    "pnl-digest:gen": "tsx --env-file=.env --env-file=.env.local scripts/gen-pnl-digest.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
     "@coral-xyz/anchor": "0.30.1",
+    "@neondatabase/serverless": "^0.10.4",
     "@solana/spl-token": "^0.4.9",
     "@solana/web3.js": "^1.95.4",
     "@trigger.dev/sdk": "^4.0.0",
+    "arweave": "^1.15.5",
     "axios": "^1.7.7",
-    "dotenv": "^16.4.5"
+    "bs58": "^6.0.0",
+    "discord.js": "^14.16.3",
+    "dotenv": "^16.4.5",
+    "keccak256": "^1.0.6",
+    "merkletreejs": "^0.4.0",
+    "next-auth": "^4.24.10",
+    "tweetnacl": "^1.0.3",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@trigger.dev/build": "^4.0.0",
     "@types/node": "^20.14.10",
+    "@types/web-push": "^3.6.4",
     "dotenv-cli": "^7.4.2",
+    "next": "14.2.18",
     "tsx": "^4.19.2",
     "typescript": "^5.5.4",
     "vitest": "^2.1.5"
+  },
+  "peerDependencies": {
+    "next": "^14.2.0"
   }
 }

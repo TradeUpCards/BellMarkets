@@ -28,7 +28,6 @@ export {
 } from "./clients/anchor.js";
 export type { AnchorClientOptions } from "./clients/anchor.js";
 export {
-  morningCreateMarketsJob,
   runMorningCreateMarkets,
   scaleStrikeToI64,
 } from "./jobs/morning.js";
@@ -41,7 +40,6 @@ export type {
   TickerOutcome,
 } from "./jobs/morning.js";
 export {
-  settlementNudgerJob,
   runSettlementNudger,
   defaultShouldRetry,
   SETTLE_RETRY_INTERVAL_MS,
@@ -56,3 +54,171 @@ export type {
 } from "./jobs/settlement.js";
 export { retryUntilDeadline } from "./lib/retry.js";
 export type { RetryOptions, RetryResult, RetryDeps } from "./lib/retry.js";
+
+// DR-005 / DR-006 — strike-grid evolution
+export {
+  TICKER_DEFAULTS,
+  computeStrikeGrid,
+  driftBps,
+  expandedStrikeGrid,
+  roundToTick,
+  phaseLabelToOnChainCode,
+} from "./ticker-config.js";
+export type {
+  PhaseLabel,
+  TickerConfigView,
+  TickerDefaults,
+} from "./ticker-config.js";
+export {
+  runAnchorPhase,
+  runWildSwingPhase,
+  isInPhaseWindow,
+  isRegularTradingDay,
+} from "./grid-evolution.js";
+export type {
+  GridPhaseDeps,
+  GridPhaseOutcome,
+  PerTickerOutcome,
+  UpdateTickerConfigInput,
+  UpdateTickerConfigResult,
+  UpdateTickerConfigFn,
+  ReadTickerConfigFn,
+} from "./grid-evolution.js";
+
+// DR-007 — trading calendar
+export {
+  isTradingDay,
+  isHalfDay,
+  getCloseTime,
+  nextTradingDay,
+  previousTradingDay,
+  toEtDateString,
+} from "./calendar.js";
+
+// DR-011 — earnings calendar
+export {
+  EARNINGS_DATES_2026,
+  EARNINGS_PREEXPAND_BPS,
+  tickersReportingOn,
+  isEarningsDay,
+  tickersToPreExpand,
+  tickersToRestore,
+  listMalformedEarningsDates,
+  listInvalidExpansionCaps,
+} from "./earnings-calendar.js";
+export { runEarningsCronOnce } from "./earnings-evolution.js";
+export type { EarningsCronDeps, EarningsCronOutcome, EarningsActionOutcome } from "./earnings-evolution.js";
+
+// DR-010 — win-streak indexer
+export { getSqlClient, setSqlClientForTesting, IndexerDbError } from "./db/client.js";
+export type { SqlClient } from "./db/client.js";
+export * from "./db/types.js";
+export {
+  insertSettleEvent,
+  insertUserMarketHold,
+  applyResultToUserStreak,
+  getUserStreak,
+  topNLeaderboard,
+  insertSnapshot,
+  insertDistribution,
+  getSettleEventByTxSig,
+  getHoldsForSettleEvent,
+} from "./db/queries.js";
+export {
+  determineResult,
+  handleSettleEvent,
+} from "./indexer/settle-event-handler.js";
+export type {
+  TokenHolder,
+  FetchTokenHoldersFn,
+  HandleSettleEventInput,
+  HandleSettleEventDeps,
+  HandleSettleEventResult,
+} from "./indexer/settle-event-handler.js";
+export {
+  hashLeaf,
+  buildLeaderboardMerkleTree,
+  verifyLeafProof,
+} from "./indexer/merkle.js";
+export type { LeaderboardLeaf, LeaderboardMerkleTree } from "./indexer/merkle.js";
+export {
+  isoWeekInfo,
+  isoWeekId,
+  weeklyPeriodStartUtc,
+  weeklyPeriodEndUtc,
+  monthlyPeriodId,
+  monthlyPeriodStartUtc,
+  monthlyPeriodEndUtc,
+  lastFridayOfMonth,
+  isLastTradingFridayOfMonth,
+  periodForDate,
+} from "./indexer/periods.js";
+export type { PeriodInfo } from "./indexer/periods.js";
+export { uploadLeaderboardToArweave, ArweaveError } from "./indexer/arweave.js";
+export type { ArweaveUploadResult, ArweaveDeps } from "./indexer/arweave.js";
+export {
+  DEFAULT_DISTRIBUTION_BPS,
+  runDistributeForPeriod,
+  applyDeterministicTiebreaker,
+} from "./indexer/distribute.js";
+export type {
+  DistributeForPeriodDeps,
+  DistributeOutcome,
+  CommitLeaderboardRootFn,
+  CommitLeaderboardRootInput,
+  CommitLeaderboardRootResult,
+  DistributeRewardsFn,
+  DistributeRewardsInput,
+  DistributeRewardsResult,
+  ReadPoolBalanceFn,
+} from "./indexer/distribute.js";
+export {
+  parseHeliusSettleWebhook,
+  SETTLE_MARKET_DISCRIMINATOR_BASE58,
+} from "./indexer/helius-webhook.js";
+export type { HeliusEnhancedTx, ParsedSettleEvent } from "./indexer/helius-webhook.js";
+
+// DR-014 — user profiles + social linking + notification channels
+export * from "./auth/index.js";
+
+// DR-015 — multi-metric leaderboard (4 metrics in one Merkle tree per period)
+export {
+  hashLeafV2,
+  buildMultiMetricMerkleTree,
+  verifyMultiMetricLeafProof,
+  DEFAULT_METRIC_POOL_SPLIT_BPS,
+  METRIC_ABSOLUTE_PROFIT,
+  METRIC_WIN_STREAK,
+  METRIC_WIN_RATE,
+  METRIC_ROI,
+  METRIC_NAMES,
+} from "./indexer/merkle-v2.js";
+export type {
+  MetricId,
+  MetricLeaderboardEntry,
+  MultiMetricLeaderboard,
+  MultiMetricLeaf,
+  MultiMetricMerkleTree,
+} from "./indexer/merkle-v2.js";
+export {
+  runMultiMetricDistribute,
+  assignAmountsToRanks,
+} from "./indexer/distribute-v2.js";
+export type {
+  MultiMetricDistributeDeps,
+  MultiMetricDistributeOutcome,
+  MultiMetricDistributePosition,
+  MetricSegmentedManifest,
+} from "./indexer/distribute-v2.js";
+export {
+  fetchAllMetricLeaderboards,
+  topProfitLeaderboard,
+  topStreakLeaderboard,
+  topWinRateLeaderboard,
+  topRoiLeaderboard,
+  WIN_RATE_MIN_TRADES,
+} from "./indexer/metric-leaderboards.js";
+export type { FourMetricLeaderboard, PeriodWindow } from "./indexer/metric-leaderboards.js";
+
+// AI v2 phase-0/1 — news ingestion + Anthropic SDK wrapper + classifier + briefing prompts
+export * from "./ai/index.js";

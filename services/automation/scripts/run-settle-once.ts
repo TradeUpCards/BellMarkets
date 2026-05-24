@@ -4,10 +4,16 @@
 //
 // Usage:
 //   pnpm --filter @bell-markets/automation settle:once
+//   pnpm --filter @bell-markets/automation settle:once -- --at=2026-05-23T20:00:00Z
+//   pnpm --filter @bell-markets/automation settle:once -- --at=1748030400
 //
-// Day-4 (2026-05-22) intent: prove the on-chain enumeration + retry harness
-// against the live program. With no Unsettled+expired markets present, this
-// is a no-op that exits ok with perMarket: [] — the right outcome.
+// The optional `--at=<iso|unix>` arg overrides the off-chain `runAt` that
+// the open-markets SCAN filters against. Useful to validate the scan path
+// pre-expiry (e.g. "show me the markets that WOULD be picked up at 4pm ET
+// today"). NOTE: this DOES NOT change on-chain semantics — `settle_market`
+// itself enforces `expiry <= clock.unix_timestamp` against the real chain
+// clock, so any tx sent before actual expiry will revert NotExpired (6003)
+// and surface as `non-retriable-error` in the per-market outcome.
 //
 // Coordinate with Drew before running if you suspect she may be running a
 // settle simulation against the same markets (avoid double-settle races).
@@ -15,19 +21,42 @@
 import { runSettlementNudger } from "../src/jobs/settlement.js";
 import { loadConfig } from "../src/config.js";
 
+function parseAtArg(): Date {
+  for (const arg of process.argv.slice(2)) {
+    if (arg.startsWith("--at=")) {
+      const raw = arg.slice("--at=".length);
+      // Try unix seconds first (integer), then ISO 8601.
+      if (/^\d+$/.test(raw)) {
+        const seconds = Number(raw);
+        return new Date(seconds * 1000);
+      }
+      const d = new Date(raw);
+      if (Number.isNaN(d.getTime())) {
+        throw new Error(`Invalid --at value "${raw}". Use ISO 8601 or unix seconds.`);
+      }
+      return d;
+    }
+  }
+  return new Date();
+}
+
 async function main() {
   const config = loadConfig();
+  const runAt = parseAtArg();
   console.error(
     JSON.stringify({
       event: "operator.run-settle-once.start",
       programId: config.bellMarketsProgramId,
       idlPath: config.bellMarketsIdlPath,
+      runAt: runAt.toISOString(),
+      runAtUnix: Math.floor(runAt.getTime() / 1000),
+      isWallClockOverride: runAt.getTime() !== Date.now() && Math.abs(runAt.getTime() - Date.now()) > 60_000,
     }),
   );
 
   try {
     const outcome = await runSettlementNudger({
-      runAt: new Date(),
+      runAt,
       ctxRunId: `operator-${Date.now()}`,
       config,
     });

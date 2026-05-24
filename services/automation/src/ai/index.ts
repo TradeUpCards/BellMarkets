@@ -1,0 +1,58 @@
+// AI v2 phase-0/1 barrel.
+
+export * from "./types.js";
+export {
+  callAnthropic,
+  AnthropicWrapperError,
+} from "./anthropic-client.js";
+export type {
+  AnthropicCallInput,
+  AnthropicCallResult,
+  AnthropicCallError,
+} from "./anthropic-client.js";
+export {
+  insertNewsArticle,
+  listUnclassifiedArticles,
+  insertNewsClassification,
+  logAiOutput,
+  rowToNewsClassification,
+  insertBriefing,
+  getLatestBriefing,
+  listLatestBriefings,
+  insertPnlDigest,
+  getLatestPnlDigest,
+  listUserPositionsInPeriod,
+} from "./db.js";
+export type {
+  AiDbDeps,
+  ClassificationInput,
+  BriefingInput,
+  BriefingRecord,
+  PnlDigestInput,
+  PnlDigestRecord,
+  UserPositionInPeriod,
+} from "./db.js";
+export {
+  classifyArticle,
+  classifyPendingArticles,
+  parseClassificationJson,
+  DEFAULT_CLASSIFIER_MODEL,
+} from "./classify.js";
+export type { ClassifyArticleResult } from "./classify.js";
+export {
+  buildDailyTickerBriefingPrompt,
+  buildBellProBriefingPrompt,
+  buildPnlDigestPrompt,
+  classifyMarketSession,
+  formatEtWallClock,
+  formatEtDate,
+  DEFAULT_BRIEFING_MODEL,
+} from "./briefing-prompts.js";
+export type {
+  DailyBriefingInput,
+  BellProBriefingContext,
+  PnlDigestContext,
+  PnlDigestPosition,
+  PnlDigestStats,
+  MarketSession,
+} from "./briefing-prompts.js";
