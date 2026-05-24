@@ -27,10 +27,10 @@ import { PublicKey, Transaction } from "@solana/web3.js";
 
 import { useUserConfig } from "@/hooks/use-user-config";
 import { useBellProSubscription } from "@/hooks/use-bell-pro-subscription";
+import { useMarketConfig } from "@/hooks/use-market-config";
+import { useAllMarkets } from "@/hooks/use-all-markets";
 import { useBellMarketsProgram } from "@/lib/solana/anchor";
 import { buildMintPairTx } from "@/lib/tx/build-mint-pair";
-import { buildRedeemTx } from "@/lib/tx/build-redeem";
-import { projectMintFee } from "@/lib/fees";
 
 export interface TradeViewParams {
   ticker: string;
@@ -87,7 +87,25 @@ export function TradeView({ ticker, strike }: TradeViewParams) {
   const { connection } = useConnection();
   const program = useBellMarketsProgram();
   const { derived: userConfigDerived } = useUserConfig(wallet.publicKey ?? null);
-  const { data: bellPro } = useBellProSubscription();
+  useBellProSubscription();
+  const { data: marketConfig } = useMarketConfig();
+  const { data: allMarkets } = useAllMarkets();
+
+  // Match the URL strike to an on-chain StrikeMarket. Strike on chain is in
+  // Pyth-feed-exponent micros (typically expo=-8 → strike × 1e8). We try both
+  // the e-6 (USDC-like) and e-8 (Pyth-like) scaling so the lookup works no
+  // matter what the deployed markets were created with.
+  const liveMarket = useMemo(() => {
+    if (!allMarkets) return null;
+    const strikeE6 = BigInt(strikeNum) * 1_000_000n;
+    const strikeE8 = BigInt(strikeNum) * 100_000_000n;
+    return (
+      allMarkets.find((m) => {
+        const sp = BigInt(m.data.strikePrice.toString());
+        return sp === strikeE6 || sp === strikeE8;
+      }) ?? null
+    );
+  }, [allMarkets, strikeNum]);
 
   // Mock position until usePosition is wired against a real strike-market PDA.
   const position = useMemo(
@@ -198,29 +216,61 @@ export function TradeView({ ticker, strike }: TradeViewParams) {
       return;
     }
     if (!program) {
-      setSubmitResult({ ok: false, msg: "Anchor program not yet loaded. Wait a beat." });
+      setSubmitResult({ ok: false, msg: "Anchor program loading — wait a beat." });
       return;
     }
     if (sellEmpty) {
       setSubmitResult({ ok: false, msg: "No contracts to sell." });
       return;
     }
+
+    // v1 demo enables Buy×Yes via mint_pair. The atomic Buy×No / Sell×Yes
+    // / Sell×No flows require a loaded Phoenix MarketState — Phoenix is not
+    // yet bound to BellMarkets strikes on devnet (mint-mismatch flag, Day-3
+    // handoff). Surface a clear "Phoenix CLOB pending" message rather than
+    // pretend to submit.
+    if (!(side === "buy" && outcome === "yes")) {
+      setSubmitResult({
+        ok: false,
+        msg:
+          "Phoenix CLOB binding pending — Buy YES via mint_pair is the live demo path. The other three actions ship in v1.1.",
+      });
+      return;
+    }
+
+    if (!marketConfig) {
+      setSubmitResult({ ok: false, msg: "Market config loading — wait a beat." });
+      return;
+    }
+    if (!liveMarket) {
+      setSubmitResult({
+        ok: false,
+        msg: `No on-chain StrikeMarket found for ${tickerUpper} @ $${strikeNum}. Bram's morning job creates these daily.`,
+      });
+      return;
+    }
+
     setSubmitting(true);
     try {
-      // For v1 demo: route Buy×Yes through mint_pair (the Phoenix swap leg
-      // requires a live MarketState which is gated on a real Phoenix v1
-      // market existing for this strike). Other side+outcome paths use the
-      // appropriate composite builder once Phoenix is wired.
-      if (side === "buy" && outcome === "yes") {
-        // Placeholder: needs the real strikeMarket PDA + treasury pubkey.
-        // For now, throw a friendly error so the path is visible.
-        throw new Error(
-          "buildMintPairTx needs the strikeMarket PDA + treasury pubkey from the live market — wiring lands in the same session.",
-        );
-      }
-      throw new Error(
-        `${side.toUpperCase()} ${outcome.toUpperCase()} via ${orderType} not yet wired. Builder ready in apps/web/src/lib/tx/ — wiring next.`,
-      );
+      const contractAmount = BigInt(Math.max(1, buy.contracts));
+      const built = await buildMintPairTx({
+        program,
+        user: wallet.publicKey,
+        marketPda: liveMarket.pda,
+        usdcMint: marketConfig.usdcMint,
+        treasury: marketConfig.treasury,
+        amount: contractAmount * 1_000_000n, // mint_pair takes USDC micros = pair count
+      });
+      const { blockhash } = await connection.getLatestBlockhash("confirmed");
+      built.tx.recentBlockhash = blockhash;
+      built.tx.feePayer = wallet.publicKey;
+      const sig = await wallet.sendTransaction(built.tx, connection, {
+        skipPreflight: false,
+      });
+      setSubmitResult({
+        ok: true,
+        msg: `Submitted! ${sig.slice(0, 16)}… (confirming)`,
+      });
     } catch (err) {
       setSubmitResult({
         ok: false,
