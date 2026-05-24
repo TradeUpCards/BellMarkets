@@ -1,0 +1,2225 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BellMarkets — v10 Linear Quality · Trade · META &gt; $680</title>
+<!--
+  v10-trade — Linear-quality design + v7 cyan palette.
+  Same structure & content as v8-trade; new visual treatment:
+  - Inter Variable (700/600/500); mono only for numerics
+  - Cyan #22d3ee accent on dark #060810; green/red yes/no
+  - 8px grid, hairline borders, no glow, restrained ornament
+-->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root[data-theme="dark"] {
+    --bg: #060810;
+    --bg-2: #0a0d16;
+    --surface: #0c1018;
+    --surface-2: #11151e;
+    --surface-3: #161a24;
+    --hairline: rgba(255, 255, 255, 0.06);
+    --hairline-strong: rgba(255, 255, 255, 0.10);
+    --text: #e8edf7;
+    --text-strong: #ffffff;
+    --text-muted: #9aa6c0;
+    --text-subtle: #6b7794;
+    --accent: #22d3ee;
+    --accent-2: #67e8f9;
+    --accent-soft: rgba(34, 211, 238, 0.10);
+    --accent-soft-2: rgba(34, 211, 238, 0.16);
+    --accent-fg: #060810;
+    --yes: #4ade80;
+    --yes-soft: rgba(74, 222, 128, 0.10);
+    --yes-strong: #22c55e;
+    --no: #f87171;
+    --no-soft: rgba(248, 113, 113, 0.10);
+    --no-strong: #ef4444;
+    --amber: #fbbf24;
+    --pink: #f472b6;
+    --row-hover: rgba(255, 255, 255, 0.025);
+  }
+  :root[data-theme="light"] {
+    --bg: #ffffff;
+    --bg-2: #fafbfc;
+    --surface: #ffffff;
+    --surface-2: #f7f8fa;
+    --surface-3: #f0f2f5;
+    --hairline: rgba(0, 0, 0, 0.07);
+    --hairline-strong: rgba(0, 0, 0, 0.12);
+    --text: #1a1f2e;
+    --text-strong: #000000;
+    --text-muted: #5a6478;
+    --text-subtle: #8b94a8;
+    --accent: #0891b2;
+    --accent-soft: rgba(8, 145, 178, 0.08);
+    --accent-soft-2: rgba(8, 145, 178, 0.14);
+    --accent-fg: #ffffff;
+    --yes: #16a34a;
+    --yes-soft: rgba(22, 163, 74, 0.08);
+    --no: #dc2626;
+    --no-soft: rgba(220, 38, 38, 0.08);
+    --amber: #d97706;
+    --pink: #db2777;
+    --row-hover: rgba(0, 0, 0, 0.025);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.55;
+    letter-spacing: -0.005em;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  }
+  .mono {
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+  a { color: inherit; text-decoration: none; }
+  button { font-family: inherit; cursor: pointer; background: none; border: none; color: inherit; }
+  button:focus-visible, a:focus-visible, input:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--accent);
+    border-radius: 4px;
+  }
+  @keyframes pulse-soft {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  /* ========== TOP STATUS BAR ========== */
+  .top-status {
+    border-bottom: 1px solid var(--hairline);
+    padding: 6px 24px;
+    display: flex;
+    gap: 24px;
+    align-items: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-subtle);
+  }
+  .top-status > div { display: flex; align-items: center; gap: 6px; }
+  .top-status .label { color: var(--text-subtle); }
+  .top-status .val { color: var(--text); font-weight: 500; }
+  .top-status .val.green { color: var(--yes); }
+  .top-status .val.cyan { color: var(--accent); }
+  .top-status .val.amber { color: var(--amber); }
+  .top-status .pulse {
+    width: 6px; height: 6px; background: var(--yes);
+    border-radius: 50%;
+    animation: pulse-soft 2s ease-in-out infinite;
+  }
+
+  /* ========== HEADER ========== */
+  header.top {
+    background: var(--bg);
+    border-bottom: 1px solid var(--hairline);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(12px);
+  }
+  .header-inner {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 32px;
+    align-items: center;
+    padding: 16px 24px;
+    max-width: 1600px;
+    margin: 0 auto;
+  }
+  .brand { display: flex; align-items: center; gap: 32px; }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    color: var(--text-strong);
+  }
+  .logo-mark {
+    width: 22px; height: 22px;
+    background: var(--accent);
+    border-radius: 5px;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .logo-mark::before {
+    content: "B";
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 600; font-size: 13px;
+    color: var(--accent-fg);
+  }
+  .logo .dot { color: var(--text-subtle); margin: 0 1px; }
+  .logo .label { color: var(--text-muted); font-weight: 500; }
+  .nav { display: flex; gap: 4px; }
+  .nav a {
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 500;
+    padding: 8px 12px;
+    border-radius: 6px;
+    transition: color 120ms, background 120ms;
+  }
+  .nav a:hover { color: var(--text-strong); background: var(--row-hover); }
+  .nav a.active { color: var(--text-strong); }
+  .searchbar { position: relative; max-width: 380px; margin: 0 auto; width: 100%; }
+  .searchbar input {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    color: var(--text);
+    padding: 8px 12px 8px 34px;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 13px;
+    letter-spacing: -0.005em;
+  }
+  .searchbar input:focus { outline: none; border-color: var(--hairline-strong); }
+  .searchbar input::placeholder { color: var(--text-subtle); }
+  .searchbar-icon {
+    position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+    color: var(--text-subtle); font-size: 13px;
+  }
+  .searchbar-kbd {
+    position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    color: var(--text-subtle);
+    padding: 2px 5px; border: 1px solid var(--hairline); border-radius: 3px;
+  }
+  .header-right { display: flex; align-items: center; gap: 6px; }
+  .icon-btn {
+    width: 34px; height: 34px;
+    color: var(--text-muted);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    transition: color 120ms, background 120ms;
+    font-size: 15px;
+  }
+  .icon-btn:hover { color: var(--text-strong); background: var(--row-hover); }
+  .session-module {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 10px;
+    border-radius: 6px;
+    transition: background 120ms;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .session-module:hover { background: var(--row-hover); }
+  .session-pulse {
+    width: 6px; height: 6px;
+    background: var(--yes);
+    border-radius: 50%;
+    animation: pulse-soft 2s ease-in-out infinite;
+  }
+  .session-status { color: var(--text-strong); font-weight: 500; }
+  .session-time { color: var(--text-muted); }
+  .go-pro-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    color: var(--accent);
+    padding: 7px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    transition: background 120ms;
+  }
+  .go-pro-btn:hover { background: var(--accent-soft); }
+  .connect-btn {
+    background: var(--accent);
+    color: var(--accent-fg);
+    padding: 8px 14px;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 13px;
+    display: flex; align-items: center; gap: 8px;
+    transition: opacity 120ms, transform 120ms;
+  }
+  .connect-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+  .connect-btn .addr { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 500; }
+
+  /* ========== MARKET HEADER ========== */
+  .market-header {
+    border-bottom: 1px solid var(--hairline);
+    padding: 20px 24px;
+    max-width: 1600px;
+    margin: 0 auto;
+    width: 100%;
+  }
+  .market-header-top {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .market-id { display: flex; align-items: center; gap: 14px; }
+  .market-id-mark {
+    width: 36px; height: 36px;
+    background: var(--surface-2);
+    border: 1px solid var(--hairline);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace; font-weight: 600;
+    font-size: 14px; color: var(--accent);
+    flex-shrink: 0;
+  }
+  .market-id-title {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--text-strong);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .market-id-title .gt { color: var(--text-subtle); font-weight: 500; }
+  .market-id-sub {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-left: 8px;
+  }
+  .market-id-sub .chip {
+    padding: 3px 8px;
+    border: 1px solid var(--hairline);
+    border-radius: 4px;
+    color: var(--text);
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .market-id-sub .chip.live {
+    color: var(--yes);
+    display: flex; align-items: center; gap: 5px;
+  }
+  .market-id-sub .chip.live::before {
+    content: ""; width: 5px; height: 5px;
+    background: var(--yes); border-radius: 50%;
+    animation: pulse-soft 2s ease-in-out infinite;
+  }
+  .market-id-sub .chip-link { color: var(--text-muted); transition: color 120ms, border-color 120ms; }
+  .market-id-sub .chip-link:hover { color: var(--accent); border-color: var(--hairline-strong); }
+
+  .strike-pills-inline {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    overflow-x: auto;
+    flex: 0 1 auto;
+    margin-left: auto;
+  }
+  .strike-pills-inline::-webkit-scrollbar { height: 0; }
+  .strike-pill {
+    flex-shrink: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    padding: 7px 12px;
+    border-radius: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    transition: background 120ms, color 120ms;
+  }
+  .strike-pill:hover { background: var(--row-hover); }
+  .strike-pill .px {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+  .strike-pill .prob {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .strike-pill.active {
+    background: var(--accent-soft);
+  }
+  .strike-pill.active .px { color: var(--accent); }
+  .strike-pill.active .prob { color: var(--accent); }
+  .strike-pill.itm .prob { color: var(--yes); }
+  .strike-pill.otm .prob { color: var(--no); opacity: 0.85; }
+  .strike-dropdown {
+    display: none;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    color: var(--text-strong);
+    padding: 10px 14px;
+    border-radius: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 500;
+    min-height: 44px;
+    flex: 1;
+  }
+
+  /* ========== LAYOUT ========== */
+  .layout {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    gap: 0;
+    max-width: 1600px;
+    margin: 0 auto;
+  }
+  .left-rail {
+    border-right: 1px solid var(--hairline);
+    padding: 24px 0;
+  }
+  .rail-section { padding: 0 0 8px; margin-bottom: 8px; }
+  .rail-section + .rail-section {
+    border-top: 1px solid var(--hairline);
+    padding-top: 16px;
+  }
+  .rail-section > summary { list-style: none; }
+  .rail-section > summary::-webkit-details-marker { display: none; }
+  .rail-section-h {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-subtle);
+    padding: 4px 20px 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    user-select: none;
+  }
+  .rail-section-link {
+    color: var(--accent);
+    font-size: 11px;
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 500;
+  }
+  .rail-chevron {
+    font-size: 10px;
+    color: var(--text-subtle);
+    transition: transform 150ms;
+    transform: rotate(-90deg);
+  }
+  .rail-section[open] > .rail-section-h .rail-chevron { transform: rotate(0deg); }
+  .rail-section-body { padding: 0 12px; }
+  .rail-ticker-list { display: flex; flex-direction: column; gap: 1px; }
+  .rail-ticker {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+    align-items: center;
+    padding: 7px 10px;
+    border-radius: 5px;
+    transition: background 120ms;
+    cursor: pointer;
+  }
+  .rail-ticker:hover { background: var(--row-hover); }
+  .rail-ticker.active { background: var(--accent-soft); }
+  .rail-ticker-info { display: flex; flex-direction: column; gap: 1px; }
+  .rail-ticker-sym {
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--text-strong);
+    letter-spacing: -0.01em;
+  }
+  .rail-ticker-spot {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+  .rail-ticker-chg {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .rail-ticker-chg.up { color: var(--yes); }
+  .rail-ticker-chg.down { color: var(--no); }
+  .rail-position {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 10px;
+    border-radius: 5px;
+    transition: background 120ms;
+  }
+  .rail-position:hover { background: var(--row-hover); }
+  .rail-position-market {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text);
+  }
+  .rail-position-side {
+    font-size: 11px;
+    color: var(--text-subtle);
+  }
+  .rail-position-pnl {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .rail-position-pnl.up { color: var(--yes); }
+  .rail-position-pnl.down { color: var(--no); }
+
+  /* leaderboard rows in rail */
+  .rail-lb-row {
+    display: grid;
+    grid-template-columns: 24px 1fr auto;
+    gap: 8px;
+    align-items: center;
+    padding: 6px 10px;
+    border-radius: 5px;
+    font-size: 12px;
+  }
+  .rail-lb-row.you { background: var(--accent-soft); }
+  .rail-lb-row .rank {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+  .rail-lb-row .rank.gold { color: var(--amber); }
+  .rail-lb-row .rank.silver { color: #cbd5e1; }
+  .rail-lb-row .rank.bronze { color: #d97706; }
+  .rail-lb-row.you .rank { color: var(--accent); }
+  .rail-lb-row .name {
+    font-size: 12px;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .rail-lb-row.you .name { color: var(--accent); }
+  .rail-lb-row .pnl {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--yes);
+    font-weight: 600;
+    font-size: 11px;
+  }
+  .rail-contest {
+    padding: 10px;
+    border: 1px solid var(--hairline);
+    border-radius: 6px;
+    margin-bottom: 6px;
+  }
+  .rail-contest-title {
+    font-size: 12px;
+    color: var(--text-strong);
+    font-weight: 500;
+    margin-bottom: 4px;
+  }
+  .rail-contest-pool {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--amber);
+    font-weight: 600;
+  }
+  .rail-contest-meta {
+    font-size: 11px;
+    color: var(--text-subtle);
+    margin-top: 2px;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  /* ========== MAIN ========== */
+  main { padding: 24px; }
+  .trade-grid {
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: 24px;
+  }
+  .left-col, .right-col {
+    display: flex; flex-direction: column; gap: 24px;
+    min-width: 0;
+  }
+
+  /* ========== CHART CARD ========== */
+  .chart-card {
+    border: 1px solid var(--hairline);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .chart-h {
+    padding: 18px 24px;
+    border-bottom: 1px solid var(--hairline);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .chart-headline {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+  .chart-price {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 26px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: var(--text-strong);
+    line-height: 1;
+  }
+  .chart-delta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .chart-delta.up { color: var(--yes); }
+  .chart-delta.down { color: var(--no); }
+  .chart-quick-stats {
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+  }
+  .chart-quick-stats > div {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+  }
+  .chart-quick-stats .lbl {
+    font-size: 11px;
+    color: var(--text-subtle);
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+  .chart-quick-stats .val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--text);
+    font-weight: 500;
+  }
+  .chart-controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .chart-tabs {
+    display: flex;
+    gap: 2px;
+    padding: 2px;
+    background: var(--surface-2);
+    border-radius: 6px;
+  }
+  .chart-tab {
+    padding: 5px 10px;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 500;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    transition: color 120ms, background 120ms;
+  }
+  .chart-tab:hover:not(.active) { color: var(--text-strong); }
+  .chart-tab.active { background: var(--bg); color: var(--text-strong); }
+  .chart-icons {
+    display: flex; gap: 2px;
+    padding: 2px;
+    background: var(--surface-2);
+    border-radius: 6px;
+  }
+  .chart-icon-btn {
+    width: 26px; height: 26px;
+    color: var(--text-muted);
+    border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .chart-icon-btn svg { width: 14px; height: 14px; }
+  .chart-icon-btn:hover { color: var(--text-strong); }
+  .chart-icon-btn.active { background: var(--bg); color: var(--text-strong); }
+  .chart-watch-btn {
+    width: 30px; height: 30px;
+    color: var(--text-muted);
+    border-radius: 6px;
+    transition: color 120ms, background 120ms;
+    font-size: 14px;
+  }
+  .chart-watch-btn:hover { color: var(--amber); background: var(--row-hover); }
+
+  .chart-viz {
+    height: 440px;
+    position: relative;
+    background: var(--bg);
+  }
+  .chart-grid-bg {
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(0deg, var(--hairline) 1px, transparent 1px),
+      linear-gradient(90deg, var(--hairline) 1px, transparent 1px);
+    background-size: 80px 44px;
+    opacity: 0.5;
+  }
+  .chart-y-axis {
+    position: absolute; right: 8px; top: 12px; bottom: 12px;
+    display: flex; flex-direction: column; justify-content: space-between;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-subtle);
+    text-align: right;
+  }
+  .chart-y-axis div { padding: 0 4px; }
+  .chart-y-axis div.current {
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .chart-strike-line {
+    position: absolute; left: 0; right: 50px;
+    height: 1px;
+    border-top: 1px dashed var(--amber);
+    opacity: 0.5;
+  }
+  .chart-strike-label {
+    position: absolute; right: 50px; transform: translateY(-50%);
+    color: var(--amber);
+    padding: 2px 6px;
+    border: 1px solid var(--amber);
+    border-radius: 3px;
+    background: var(--bg);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
+  }
+
+  /* ========== INFO CARDS ========== */
+  .info-grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+  .info-card {
+    border: 1px solid var(--hairline);
+    border-radius: 10px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .info-card-h {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--hairline);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .info-card-h h3 {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-strong);
+    letter-spacing: -0.005em;
+  }
+  .info-card-h .live-badge {
+    display: flex; align-items: center; gap: 5px;
+    color: var(--yes);
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .info-card-h .live-badge::before {
+    content: ""; width: 5px; height: 5px;
+    background: var(--yes); border-radius: 50%;
+    animation: pulse-soft 2s ease-in-out infinite;
+  }
+
+  /* Position */
+  .pos-body { padding: 16px 20px; }
+  .pos-summary-compact {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .pos-side-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px;
+    border-radius: 5px;
+    background: var(--yes-soft);
+    color: var(--yes);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  .pos-stat-inline {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 6px;
+  }
+  .pos-stat-inline .lbl {
+    color: var(--text-subtle);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+  .pos-stat-inline .val {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-strong);
+    font-weight: 600;
+    font-size: 13px;
+  }
+  .pos-stat-age {
+    color: var(--text-muted);
+    font-size: 11px;
+  }
+  .pos-pnl-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    margin-left: auto;
+  }
+  .pos-pnl-val.up { color: var(--yes); }
+  .pos-pnl-val.down { color: var(--no); }
+  .pos-pnl-pct {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 500;
+  }
+  .pos-pnl-pct.up { color: var(--yes); }
+  .pos-pnl-pct.down { color: var(--no); }
+
+  .info-card-subsection {
+    border-top: 1px solid var(--hairline);
+  }
+  .info-card-subsection-h {
+    padding: 12px 20px 8px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .info-card-subsection-h .subsection-title {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-subtle);
+  }
+  .info-card-subsection-h .subsection-meta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-subtle);
+  }
+  .settle-body { padding: 0 20px 14px; }
+  .scenario-line {
+    display: grid;
+    grid-template-columns: 8px 1fr auto auto;
+    gap: 12px;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--hairline);
+  }
+  .scenario-line:last-child { border-bottom: none; }
+  .scenario-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+  }
+  .scenario-line.exit .scenario-dot { background: var(--accent); }
+  .scenario-line.hold-win .scenario-dot { background: var(--yes); }
+  .scenario-line.hold-lose .scenario-dot { background: var(--no); }
+  .scenario-line .scenario-label {
+    color: var(--text-strong);
+    font-weight: 500;
+    font-size: 13px;
+  }
+  .scenario-line .scenario-prob {
+    color: var(--text-subtle);
+    font-weight: 500;
+    font-size: 12px;
+    margin-left: 4px;
+  }
+  .scenario-line .scenario-action {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-muted);
+    font-size: 11px;
+    text-align: right;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .scenario-line .scenario-pnl {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    font-size: 14px;
+    letter-spacing: -0.01em;
+  }
+  .scenario-line .scenario-pnl.up { color: var(--yes); }
+  .scenario-line .scenario-pnl.down { color: var(--no); }
+
+  /* Orders/Trades tabbed card */
+  .orders-trades-card { display: flex; flex-direction: column; }
+  .orders-trades-h { padding: 0 !important; }
+  .orders-trades-tabs {
+    display: flex; width: 100%;
+  }
+  .otab {
+    flex: 1;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 500;
+    padding: 14px;
+    transition: color 120ms, background 120ms;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    border-bottom: 1px solid transparent;
+  }
+  .otab:hover { color: var(--text-strong); }
+  .otab.active {
+    color: var(--text-strong);
+    border-bottom-color: var(--accent);
+  }
+  .otab-count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-subtle);
+    padding: 1px 6px;
+    border: 1px solid var(--hairline);
+    border-radius: 999px;
+  }
+  .otab.active .otab-count { color: var(--accent); border-color: var(--accent); }
+  .otab-live {
+    width: 6px; height: 6px;
+    background: var(--yes); border-radius: 50%;
+    animation: pulse-soft 2s ease-in-out infinite;
+  }
+  .ot-content[hidden] { display: none; }
+  .ot-content.ot-scroll {
+    max-height: 320px;
+    overflow-y: auto;
+  }
+  .ot-footer {
+    padding: 12px 20px;
+    text-align: center;
+    border-top: 1px solid var(--hairline);
+  }
+  .ot-link {
+    font-size: 12px;
+    color: var(--accent);
+    font-weight: 500;
+  }
+  .ot-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+  .order-row-trade {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 12px;
+    align-items: center;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--hairline);
+    transition: background 120ms;
+  }
+  .order-row-trade:last-child { border-bottom: none; }
+  .order-row-trade:hover { background: var(--row-hover); }
+  .order-side-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 3px 7px;
+    border-radius: 3px;
+    letter-spacing: 0.04em;
+  }
+  .order-side-tag.yes { color: var(--yes); background: var(--yes-soft); }
+  .order-side-tag.no { color: var(--no); background: var(--no-soft); }
+  .order-detail-text {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--text);
+  }
+  .order-detail-text .px { color: var(--text-strong); font-weight: 600; }
+  .order-detail-text .fill-state {
+    color: var(--text-subtle);
+    font-size: 11px;
+  }
+  .cancel-btn {
+    color: var(--text-muted);
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    transition: color 120ms, background 120ms;
+  }
+  .cancel-btn:hover { color: var(--no); background: var(--no-soft); }
+
+  /* Trade rows in tabbed view */
+  .ot-content .trade-rows-h {
+    display: grid;
+    grid-template-columns: 60px 1fr 60px 60px 50px;
+    padding: 8px 20px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--text-subtle);
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--hairline);
+    position: sticky; top: 0;
+    background: var(--bg);
+    z-index: 1;
+  }
+  .ot-content .trade-rows-h > div:nth-child(3),
+  .ot-content .trade-rows-h > div:nth-child(4),
+  .ot-content .trade-rows-h > div:last-child { text-align: right; }
+  .trade-row-tab {
+    display: grid;
+    grid-template-columns: 60px 1fr 60px 60px 50px;
+    padding: 8px 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    border-bottom: 1px solid var(--hairline);
+    align-items: center;
+    transition: background 120ms;
+  }
+  .trade-row-tab:hover { background: var(--row-hover); }
+  .trade-row-tab .time { color: var(--text-subtle); font-size: 11px; }
+  .trade-row-tab .mkt { color: var(--text); font-weight: 500; font-size: 11px; }
+  .trade-row-tab .price { text-align: right; font-weight: 500; }
+  .trade-row-tab .price.up { color: var(--yes); }
+  .trade-row-tab .price.down { color: var(--no); }
+  .trade-row-tab .size { text-align: right; color: var(--text-muted); }
+  .trade-row-tab .side {
+    text-align: right; font-weight: 600; font-size: 10px;
+    letter-spacing: 0.04em;
+  }
+  .trade-row-tab .side.buy { color: var(--yes); }
+  .trade-row-tab .side.sell { color: var(--no); }
+
+  .orders-trades-card[data-tab="orders"] .ot-content[data-ot-content="orders"] { display: block; }
+  .orders-trades-card[data-tab="orders"] .ot-content[data-ot-content="trades"] { display: none; }
+  .orders-trades-card[data-tab="trades"] .ot-content[data-ot-content="orders"] { display: none; }
+  .orders-trades-card[data-tab="trades"] .ot-content[data-ot-content="trades"] { display: block; }
+
+  /* ========== TRADE CARD ========== */
+  .trade-card {
+    border: 1px solid var(--hairline);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .trade-tabs {
+    display: grid; grid-template-columns: 1fr 1fr;
+    border-bottom: 1px solid var(--hairline);
+  }
+  .trade-tab {
+    padding: 14px;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    transition: color 120ms;
+    position: relative;
+    border-bottom: 1px solid transparent;
+  }
+  .trade-tab:hover:not(.active) { color: var(--text-strong); }
+  .trade-tab.active { color: var(--text-strong); }
+  .trade-tab.buy.active { border-bottom-color: var(--yes); }
+  .trade-tab.sell.active { border-bottom-color: var(--no); }
+
+  .yes-no-toggle {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    padding: 16px 16px 0;
+  }
+  .yn-tab {
+    padding: 16px 12px;
+    border: 1px solid var(--hairline);
+    color: var(--text-muted);
+    border-radius: 8px;
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    transition: border-color 120ms, color 120ms, background 120ms;
+  }
+  .yn-tab.yes.active {
+    background: var(--yes-soft);
+    border-color: var(--yes);
+    color: var(--yes);
+  }
+  .yn-tab.no.active {
+    background: var(--no-soft);
+    border-color: var(--no);
+    color: var(--no);
+  }
+  .yn-tab .lbl {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+  .yn-tab .price {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+  .yn-tab .sub {
+    font-size: 11px;
+    color: var(--text-subtle);
+    font-weight: 500;
+  }
+  .yn-tab.active .sub { color: inherit; opacity: 0.85; }
+
+  .trade-form { padding: 16px; }
+  .order-type-row {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    background: var(--surface-2);
+    padding: 3px;
+    border-radius: 6px;
+    margin-bottom: 16px;
+  }
+  .order-type-btn {
+    padding: 7px;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 500;
+    border-radius: 4px;
+    transition: color 120ms, background 120ms;
+  }
+  .order-type-btn.active {
+    background: var(--bg);
+    color: var(--text-strong);
+  }
+  .field { margin-bottom: 14px; }
+  .field-label {
+    display: flex; justify-content: space-between;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+  .field-label .available {
+    color: var(--text-subtle);
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 500;
+  }
+  .input-wrap {
+    display: flex; align-items: center;
+    background: var(--surface-2);
+    border: 1px solid var(--hairline);
+    border-radius: 6px;
+    padding: 0 12px;
+    transition: border-color 120ms;
+  }
+  .input-wrap:focus-within { border-color: var(--hairline-strong); }
+  .input-wrap input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text);
+    padding: 12px 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 16px;
+    font-weight: 600;
+  }
+  .input-wrap .suffix {
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 500;
+  }
+  .quick-amounts {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+    margin-top: 8px;
+  }
+  .quick-amount {
+    padding: 7px 4px;
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    border-radius: 5px;
+    background: var(--surface-2);
+    transition: color 120ms, background 120ms;
+  }
+  .quick-amount:hover { color: var(--text-strong); background: var(--surface-3); }
+  .quick-amount.active { color: var(--accent); background: var(--accent-soft); }
+
+  .unit-toggle {
+    display: flex;
+    background: var(--surface-2);
+    border-radius: 6px;
+    padding: 3px;
+    margin-bottom: 8px;
+    gap: 2px;
+  }
+  .unit-btn {
+    flex: 1;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    padding: 6px;
+    border-radius: 4px;
+    transition: color 120ms, background 120ms;
+  }
+  .unit-btn:hover { color: var(--text-strong); }
+  .unit-btn.active { background: var(--bg); color: var(--text-strong); }
+
+  /* Submit button — minimal Linear style */
+  .submit-btn.primary-cta {
+    width: 100%;
+    padding: 14px;
+    background: var(--accent);
+    color: var(--accent-fg);
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    min-height: 48px;
+    transition: opacity 120ms, transform 120ms;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    flex-wrap: wrap;
+  }
+  .submit-btn.primary-cta:hover { opacity: 0.9; transform: translateY(-1px); }
+  .sb-action {
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: 0.04em;
+  }
+  .sb-outcome {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 9px;
+    border-radius: 4px;
+    font-weight: 700;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    background: rgba(6, 8, 16, 0.45);
+    border: 1px solid;
+  }
+  .sb-outcome.yes { color: var(--yes); border-color: var(--yes); }
+  .sb-outcome.no { color: var(--no); border-color: var(--no); }
+  .sb-detail {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 500;
+    font-size: 12px;
+    opacity: 0.95;
+  }
+
+  .trade-summary-wrap {
+    margin-top: 12px;
+    border: 1px solid var(--hairline);
+    border-radius: 6px;
+  }
+  .trade-summary-wrap > summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 10px 14px;
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 12px;
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+    transition: color 120ms;
+  }
+  .trade-summary-wrap > summary::-webkit-details-marker { display: none; }
+  .trade-summary-wrap > summary:hover { color: var(--text-strong); }
+  .ts-chevron {
+    font-size: 10px;
+    transition: transform 150ms;
+    transform: rotate(-90deg);
+  }
+  .trade-summary-wrap[open] > summary .ts-chevron { transform: rotate(0deg); }
+  .trade-summary-wrap[open] > summary {
+    border-bottom: 1px solid var(--hairline);
+    color: var(--text-strong);
+  }
+  .trade-summary {
+    padding: 12px 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+  }
+  .summary-row {
+    display: flex; justify-content: space-between;
+    padding: 4px 0;
+    color: var(--text-muted);
+  }
+  .summary-row .v { color: var(--text-strong); font-weight: 600; }
+  .summary-row.payout .v { color: var(--yes); font-size: 13px; }
+  .summary-row.profit .v { color: var(--yes); }
+  .summary-row.fee .v { color: var(--amber); }
+  .summary-divider { height: 1px; background: var(--hairline); margin: 8px 0; }
+
+  /* Slippage */
+  .slip-row {
+    margin: 14px 0;
+    padding: 12px;
+    background: var(--surface-2);
+    border-radius: 6px;
+  }
+  .slip-head {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    font-weight: 600;
+    margin-bottom: 10px;
+  }
+  .slip-head .computed {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--accent);
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 500;
+    font-size: 11px;
+  }
+  .slip-presets {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1.6fr;
+    gap: 6px;
+  }
+  .slip-preset {
+    background: var(--bg);
+    border: 1px solid var(--hairline);
+    color: var(--text-muted);
+    padding: 8px 4px;
+    border-radius: 5px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 500;
+    min-height: 34px;
+    transition: color 120ms, background 120ms, border-color 120ms;
+  }
+  .slip-preset:hover { color: var(--text-strong); border-color: var(--hairline-strong); }
+  .slip-preset.active {
+    background: var(--accent-soft);
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+  .slip-custom-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    background: var(--bg);
+    border: 1px solid var(--hairline);
+    border-radius: 5px;
+    padding: 0 8px;
+  }
+  .slip-custom-wrap:focus-within { border-color: var(--hairline-strong); }
+  .slip-custom {
+    flex: 1;
+    width: 100%;
+    background: transparent;
+    border: none;
+    color: var(--text-strong);
+    padding: 8px 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 500;
+    outline: none;
+    min-width: 0;
+  }
+  .slip-custom::placeholder { color: var(--text-subtle); }
+  .slip-custom-suffix {
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+  }
+
+  /* ========== ORDER BOOK ========== */
+  .ob-card {
+    border: 1px solid var(--hairline);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .ob-h {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--hairline);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .ob-h h3 {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-strong);
+  }
+  .ob-pick {
+    display: flex;
+    gap: 2px;
+    padding: 2px;
+    background: var(--surface-2);
+    border-radius: 5px;
+  }
+  .ob-pick button {
+    padding: 4px 10px;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 500;
+    border-radius: 3px;
+    font-family: 'JetBrains Mono', monospace;
+    transition: color 120ms, background 120ms;
+  }
+  .ob-pick button.active { background: var(--bg); color: var(--text-strong); }
+
+  .ob-rows-h {
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    padding: 8px 18px;
+    font-size: 10px;
+    color: var(--text-subtle);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 600;
+  }
+  .ob-rows-h > div:nth-child(2), .ob-rows-h > div:nth-child(3) { text-align: right; }
+  .ob-row {
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    padding: 5px 18px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    position: relative;
+    transition: background 120ms;
+  }
+  .ob-row .depth-bar { position: absolute; right: 0; top: 0; bottom: 0; opacity: 0.5; }
+  .ob-row.ask .price { color: var(--no); font-weight: 600; }
+  .ob-row.ask .depth-bar { background: linear-gradient(90deg, transparent, var(--no-soft)); }
+  .ob-row.bid .price { color: var(--yes); font-weight: 600; }
+  .ob-row.bid .depth-bar { background: linear-gradient(90deg, transparent, var(--yes-soft)); }
+  .ob-row .size, .ob-row .total { text-align: right; color: var(--text-muted); }
+  .ob-row:hover { background: var(--row-hover); }
+  .ob-spread {
+    padding: 10px 18px;
+    border-top: 1px solid var(--hairline);
+    border-bottom: 1px solid var(--hairline);
+    display: flex; justify-content: space-between;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    background: var(--surface-2);
+  }
+  .ob-spread .last { font-weight: 600; color: var(--text-strong); }
+  .ob-spread .spread { color: var(--text-muted); }
+
+  .ob-both {
+    display: flex;
+    flex-direction: column;
+  }
+  .ob-both[hidden] { display: none; }
+  .ob-card[data-view="both"] .ob-single { display: none; }
+  .ob-card[data-view="both"] .ob-both { display: flex; }
+  .ob-both-col {
+    border-bottom: 1px solid var(--hairline);
+  }
+  .ob-both-col:last-child { border-bottom: none; }
+  .ob-both-h {
+    padding: 8px 18px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-strong);
+    border-bottom: 1px solid var(--hairline);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .ob-both-col:first-child .ob-both-h { color: var(--yes); }
+  .ob-both-col:nth-child(3) .ob-both-h { color: var(--no); }
+  .ob-both-h-meta {
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: 0;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .ob-both-explain {
+    padding: 10px 18px;
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.5;
+    border-bottom: 1px solid var(--hairline);
+  }
+  .ob-section-label {
+    padding: 6px 18px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    border-top: 1px solid var(--hairline);
+    border-bottom: 1px solid var(--hairline);
+  }
+  .ob-section-label.asks { color: var(--no); }
+  .ob-section-label.bids { color: var(--yes); }
+
+  /* ========== TOOLTIP ========== */
+  .tip {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    border: 1px solid var(--text-subtle);
+    color: var(--text-subtle);
+    font-size: 9px; font-weight: 600;
+    cursor: help;
+    margin-left: 4px;
+  }
+  .tip:hover { color: var(--accent); border-color: var(--accent); }
+
+  /* ========== MOCKUP BADGE ========== */
+  .mockup-badge {
+    position: fixed;
+    bottom: 16px; left: 16px;
+    z-index: 100;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    color: var(--text-muted);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .mockup-badge::before {
+    content: "";
+    width: 6px; height: 6px;
+    background: var(--accent);
+    border-radius: 50%;
+    animation: pulse-soft 2s ease-in-out infinite;
+  }
+
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--hairline-strong); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-subtle); }
+
+  /* ========== BOTTOM TABS (mobile) ========== */
+  .bottom-tabs {
+    display: none;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: var(--bg);
+    border-top: 1px solid var(--hairline);
+    z-index: 100;
+    grid-template-columns: repeat(4, 1fr);
+    padding: 6px 0 calc(6px + env(safe-area-inset-bottom));
+  }
+  .bottom-tab {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 8px 4px;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 500;
+    min-height: 56px;
+    justify-content: center;
+  }
+  .bottom-tab.active { color: var(--accent); }
+  .bottom-tab svg { width: 20px; height: 20px; }
+
+  /* ========== RESPONSIVE ========== */
+  @media (max-width: 1100px) {
+    .info-grid-2 { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 1024px) {
+    .layout { grid-template-columns: 1fr; }
+    .left-rail { display: none; }
+    .trade-grid { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 768px) {
+    body { padding-bottom: 60px; }
+    .top-status { display: none; }
+    .header-inner { grid-template-columns: auto auto; gap: 12px; padding: 12px 16px; }
+    .searchbar, .nav { display: none; }
+    .market-header { padding: 14px 16px; }
+    .market-header-top { flex-direction: column; align-items: stretch; gap: 12px; }
+    .market-id-mark { display: none; }
+    .market-id-title { font-size: 18px; }
+    .strike-pills-inline { display: none; }
+    .strike-dropdown { display: block; width: 100%; }
+    main { padding: 16px; }
+    .trade-grid { display: flex; flex-direction: column; gap: 12px; }
+    .left-col, .right-col { display: contents; }
+    .chart-card { order: 1; }
+    .trade-card { order: 2; }
+    .info-grid-2 { order: 3; }
+    .ob-card { order: 4; }
+    .chart-viz { height: 220px; }
+    .chart-quick-stats { display: none; }
+    .chart-icons { display: none; }
+    .chart-watch-btn { display: none; }
+    .bottom-tabs { display: grid; }
+  }
+</style>
+</head>
+<body>
+
+<div class="top-status">
+  <div><span class="pulse"></span><span class="label">CONN</span><span class="val green">DEVNET</span></div>
+  <div><span class="label">LAT</span><span class="val">42ms</span></div>
+  <div><span class="label">PYTH</span><span class="val green">FRESH·12s</span></div>
+  <div><span class="label">SLOT</span><span class="val cyan">312,847,193</span></div>
+  <div><span class="label">PROG</span><span class="val">599h7V…kS7uV</span></div>
+  <div><span class="label">USDC</span><span class="val">4zMMC9…DncDU</span></div>
+  <div><span class="label">SETTLE</span><span class="val amber">02:13:47</span></div>
+  <div style="margin-left: auto;"><span class="label">TIME</span><span class="val">14:46:13 ET</span></div>
+</div>
+
+<header class="top">
+  <div class="header-inner">
+    <div class="brand">
+      <a href="v10-landing.html" class="logo" aria-label="BellMarkets home">
+        <span class="logo-mark" aria-hidden="true"></span>
+        <span>Bell<span class="dot">.</span><span class="label">Markets</span></span>
+      </a>
+      <nav class="nav" aria-label="Main">
+        <a href="v10-landing.html">Markets</a>
+        <a href="v10-trade.html" class="active" aria-current="page">Trade</a>
+        <a href="#">Positions</a>
+        <a href="#">Orders</a>
+        <a href="#">History</a>
+      </nav>
+    </div>
+    <div class="searchbar">
+      <span class="searchbar-icon">⌕</span>
+      <input type="text" placeholder="Switch market — META.680, NVDA.1340..." />
+      <span class="searchbar-kbd">⌘K</span>
+    </div>
+    <div class="header-right">
+      <button class="session-module">
+        <span class="session-pulse" aria-hidden="true"></span>
+        <span class="session-status">OPEN</span>
+        <span class="session-time">14:46 ET</span>
+      </button>
+      <button class="icon-btn" aria-label="Notifications">🔔</button>
+      <button class="icon-btn" onclick="toggleTheme()" aria-label="Toggle theme">◐</button>
+      <a href="#pro" class="go-pro-btn">Pro</a>
+      <button class="connect-btn">
+        <span class="addr">4aPZ…G2iy</span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- MARKET HEADER -->
+<div class="market-header">
+  <div class="market-header-top">
+    <div class="market-id">
+      <div class="market-id-mark">M</div>
+      <div class="market-id-title">
+        META <span class="gt">›</span> $680
+        <span class="market-id-sub">
+          <span class="chip live">Live</span>
+          <span class="chip">Expires 4 PM ET</span>
+          <a href="#verify" class="chip chip-link">Verify on-chain ↗</a>
+        </span>
+      </div>
+    </div>
+    <div class="strike-pills-inline">
+      <button class="strike-pill itm"><span class="px">$620</span><span class="prob">92%</span></button>
+      <button class="strike-pill itm"><span class="px">$640</span><span class="prob">84%</span></button>
+      <button class="strike-pill itm"><span class="px">$660</span><span class="prob">71%</span></button>
+      <button class="strike-pill active"><span class="px">$680</span><span class="prob">50%</span></button>
+      <button class="strike-pill otm"><span class="px">$700</span><span class="prob">28%</span></button>
+      <button class="strike-pill otm"><span class="px">$720</span><span class="prob">14%</span></button>
+      <button class="strike-pill otm"><span class="px">$740</span><span class="prob">6%</span></button>
+    </div>
+    <select class="strike-dropdown" aria-label="Select strike">
+      <option>$620 · 92% YES</option>
+      <option>$640 · 84% YES</option>
+      <option>$660 · 71% YES</option>
+      <option selected>$680 · 50% YES (ATM)</option>
+      <option>$700 · 28% YES</option>
+      <option>$720 · 14% YES</option>
+      <option>$740 · 6% YES</option>
+    </select>
+  </div>
+</div>
+
+<div class="layout">
+
+  <!-- LEFT RAIL -->
+  <aside class="left-rail">
+
+    <details class="rail-section" open>
+      <summary class="rail-section-h">
+        <span>Tickers</span>
+        <span class="rail-chevron">▾</span>
+      </summary>
+      <div class="rail-section-body">
+        <div class="rail-ticker-list">
+          <div class="rail-ticker active">
+            <div class="rail-ticker-info"><span class="rail-ticker-sym">META</span><span class="rail-ticker-spot">$679.84</span></div>
+            <span class="rail-ticker-chg up">+0.32%</span>
+          </div>
+          <div class="rail-ticker">
+            <div class="rail-ticker-info"><span class="rail-ticker-sym">NVDA</span><span class="rail-ticker-spot">$1,342.71</span></div>
+            <span class="rail-ticker-chg up">+1.39%</span>
+          </div>
+          <div class="rail-ticker">
+            <div class="rail-ticker-info"><span class="rail-ticker-sym">AAPL</span><span class="rail-ticker-spot">$229.84</span></div>
+            <span class="rail-ticker-chg up">+0.54%</span>
+          </div>
+          <div class="rail-ticker">
+            <div class="rail-ticker-info"><span class="rail-ticker-sym">MSFT</span><span class="rail-ticker-spot">$441.62</span></div>
+            <span class="rail-ticker-chg up">+0.73%</span>
+          </div>
+          <div class="rail-ticker">
+            <div class="rail-ticker-info"><span class="rail-ticker-sym">GOOGL</span><span class="rail-ticker-spot">$184.27</span></div>
+            <span class="rail-ticker-chg down">−0.50%</span>
+          </div>
+          <div class="rail-ticker">
+            <div class="rail-ticker-info"><span class="rail-ticker-sym">AMZN</span><span class="rail-ticker-spot">$201.13</span></div>
+            <span class="rail-ticker-chg up">+0.20%</span>
+          </div>
+          <div class="rail-ticker">
+            <div class="rail-ticker-info"><span class="rail-ticker-sym">TSLA</span><span class="rail-ticker-spot">$261.04</span></div>
+            <span class="rail-ticker-chg down">−0.70%</span>
+          </div>
+        </div>
+      </div>
+    </details>
+
+    <details class="rail-section" open>
+      <summary class="rail-section-h">
+        <span>My positions · 3</span>
+        <span class="rail-chevron">▾</span>
+      </summary>
+      <div class="rail-section-body">
+        <div class="rail-position">
+          <div><span class="rail-position-market">META.680.YES</span><br><span class="rail-position-side">5 · entry $0.62</span></div>
+          <span class="rail-position-pnl down">−$0.50</span>
+        </div>
+        <div class="rail-position">
+          <div><span class="rail-position-market">NVDA.1340.NO</span><br><span class="rail-position-side">3 · entry $0.50</span></div>
+          <span class="rail-position-pnl down">−$0.06</span>
+        </div>
+        <div class="rail-position">
+          <div><span class="rail-position-market">AAPL.230.YES</span><br><span class="rail-position-side">8 · entry $0.42</span></div>
+          <span class="rail-position-pnl up">+$2.80</span>
+        </div>
+      </div>
+    </details>
+
+    <details class="rail-section" open>
+      <summary class="rail-section-h">
+        <span>Weekly leaders</span>
+        <a href="#" class="rail-section-link" onclick="event.stopPropagation();">All →</a>
+        <span class="rail-chevron">▾</span>
+      </summary>
+      <div class="rail-section-body">
+        <div class="rail-lb-row">
+          <span class="rank gold">#1</span>
+          <span class="name">degen.sol</span>
+          <span class="pnl">+$2,847</span>
+        </div>
+        <div class="rail-lb-row">
+          <span class="rank silver">#2</span>
+          <span class="name">maxprob.eth</span>
+          <span class="pnl">+$2,103</span>
+        </div>
+        <div class="rail-lb-row">
+          <span class="rank bronze">#3</span>
+          <span class="name">quantfox</span>
+          <span class="pnl">+$1,876</span>
+        </div>
+        <div class="rail-lb-row you">
+          <span class="rank">#5</span>
+          <span class="name">you</span>
+          <span class="pnl">+$1,247</span>
+        </div>
+      </div>
+    </details>
+
+    <details class="rail-section" open>
+      <summary class="rail-section-h">
+        <span>Contests · 3 active</span>
+        <a href="#" class="rail-section-link" onclick="event.stopPropagation();">All →</a>
+        <span class="rail-chevron">▾</span>
+      </summary>
+      <div class="rail-section-body">
+        <div class="rail-contest">
+          <div class="rail-contest-title">NVDA Earnings · 3d left</div>
+          <div class="rail-contest-pool">$3,400 pool</div>
+          <div class="rail-contest-meta">
+            <span>187 entries</span>
+            <span>Join →</span>
+          </div>
+        </div>
+        <div class="rail-contest">
+          <div class="rail-contest-title">May Top-10 · 8d left</div>
+          <div class="rail-contest-pool">$12,500 pool</div>
+          <div class="rail-contest-meta">
+            <span>you · #5</span>
+            <span>View →</span>
+          </div>
+        </div>
+      </div>
+    </details>
+
+  </aside>
+
+  <!-- MAIN -->
+  <main>
+    <div class="trade-grid">
+
+      <!-- LEFT COL -->
+      <div class="left-col">
+
+        <!-- Chart -->
+        <div class="chart-card">
+          <div class="chart-h">
+            <div class="chart-headline">
+              <div class="chart-price">$0.520</div>
+              <span class="chart-delta up">+$0.04 · +8.3%</span>
+            </div>
+            <div class="chart-quick-stats">
+              <div><span class="lbl">O</span><span class="val">0.480</span></div>
+              <div><span class="lbl">H</span><span class="val">0.545</span></div>
+              <div><span class="lbl">L</span><span class="val">0.460</span></div>
+              <div><span class="lbl">VWAP</span><span class="val">0.504</span></div>
+              <div><span class="lbl">Spread</span><span class="val">7.7%</span></div>
+            </div>
+            <div class="chart-controls">
+              <div class="chart-tabs">
+                <button class="chart-tab">1m</button>
+                <button class="chart-tab">5m</button>
+                <button class="chart-tab">15m</button>
+                <button class="chart-tab active">1h</button>
+                <button class="chart-tab">4h</button>
+                <button class="chart-tab">1d</button>
+              </div>
+              <div class="chart-icons">
+                <button class="chart-icon-btn active" title="Line chart" aria-label="Line chart">
+                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1,12 5,8 9,10 14,3"/></svg>
+                </button>
+                <button class="chart-icon-btn" title="Candle chart" aria-label="Candle chart">
+                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="6" width="3" height="6"/><line x1="4.5" y1="3" x2="4.5" y2="6"/><line x1="4.5" y1="12" x2="4.5" y2="14"/><rect x="10" y="4" width="3" height="7"/><line x1="11.5" y1="2" x2="11.5" y2="4"/><line x1="11.5" y1="11" x2="11.5" y2="13"/></svg>
+                </button>
+                <button class="chart-icon-btn" title="Depth chart" aria-label="Depth chart">
+                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M1,14 L1,9 L4,9 L4,6 L7,6 L7,4 L8,4 L8,6 L11,6 L11,9 L14,9 L14,14 Z"/></svg>
+                </button>
+              </div>
+              <button class="chart-watch-btn" title="Watch this market">★</button>
+            </div>
+          </div>
+          <div class="chart-viz">
+            <div class="chart-grid-bg"></div>
+            <svg viewBox="0 0 800 440" preserveAspectRatio="none" style="position: absolute; inset: 0; padding: 12px 50px 12px 12px;">
+              <polyline points="0,360 40,350 80,340 120,345 160,325 200,320 240,300 280,305 320,285 360,270 400,275 440,250 480,255 520,225 560,215 600,195 640,185 680,165 720,155 760,135 800,120" fill="none" stroke="#22d3ee" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+              <circle cx="800" cy="120" r="3" fill="#22d3ee"/>
+            </svg>
+            <div class="chart-strike-line" style="top: 50%;"></div>
+            <div class="chart-strike-label" style="top: 50%;">$680 ATM</div>
+            <div class="chart-y-axis">
+              <div>0.70</div>
+              <div>0.65</div>
+              <div>0.60</div>
+              <div>0.55</div>
+              <div class="current">0.52</div>
+              <div>0.50</div>
+              <div>0.45</div>
+              <div>0.40</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- info-grid-2 -->
+        <div class="info-grid-2">
+
+          <div class="info-card">
+            <div class="info-card-h">
+              <h3>Your position</h3>
+              <span class="live-badge">P&amp;L live</span>
+            </div>
+            <div class="pos-body">
+              <div class="pos-summary-compact">
+                <span class="pos-side-badge">↑ YES · 5</span>
+                <span class="pos-stat-inline"><span class="lbl">Cost</span><span class="val">$3.10</span></span>
+                <span class="pos-stat-inline"><span class="lbl">Value</span><span class="val">$2.60</span></span>
+                <span class="pos-stat-inline"><span class="lbl">Avg</span><span class="val">$0.62</span></span>
+                <span class="pos-stat-age">32m ago</span>
+                <span class="pos-pnl-val down">−$0.50</span>
+                <span class="pos-pnl-pct down">−16.1%</span>
+              </div>
+            </div>
+            <div class="info-card-subsection">
+              <div class="info-card-subsection-h">
+                <span class="subsection-title">Settlement preview · 3 scenarios</span>
+                <span class="subsection-meta">vs current</span>
+              </div>
+              <div class="settle-body">
+                <div class="scenario-line exit">
+                  <span class="scenario-dot"></span>
+                  <span class="scenario-label">Exit now</span>
+                  <span class="scenario-action">sell 5 YES @ $0.500</span>
+                  <span class="scenario-pnl down">−$0.60</span>
+                </div>
+                <div class="scenario-line hold-win">
+                  <span class="scenario-dot"></span>
+                  <span class="scenario-label">Hold · YES wins <span class="scenario-prob">52%</span></span>
+                  <span class="scenario-action">META ≥ $680 @ 4PM</span>
+                  <span class="scenario-pnl up">+$1.90</span>
+                </div>
+                <div class="scenario-line hold-lose">
+                  <span class="scenario-dot"></span>
+                  <span class="scenario-label">Hold · YES loses <span class="scenario-prob">48%</span></span>
+                  <span class="scenario-action">META &lt; $680 @ 4PM</span>
+                  <span class="scenario-pnl down">−$3.10</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="info-card orders-trades-card" data-tab="orders">
+            <div class="info-card-h orders-trades-h">
+              <div class="orders-trades-tabs" role="tablist">
+                <button class="otab active" data-ot-tab="orders" role="tab" aria-selected="true">
+                  Open orders <span class="otab-count">2</span>
+                </button>
+                <button class="otab" data-ot-tab="trades" role="tab" aria-selected="false">
+                  Recent trades <span class="otab-live"></span>
+                </button>
+              </div>
+            </div>
+
+            <div class="ot-content" data-ot-content="orders">
+              <div class="order-row-trade">
+                <span class="order-side-tag yes">YES</span>
+                <span class="order-detail-text">
+                  META.680 · 50 @ <span class="px">$0.55</span><br>
+                  <span class="fill-state">30/50 filled · 4m ago</span>
+                </span>
+                <button class="cancel-btn">Cancel</button>
+              </div>
+              <div class="order-row-trade">
+                <span class="order-side-tag no">NO</span>
+                <span class="order-detail-text">
+                  AAPL.230 · 100 @ <span class="px">$0.20</span><br>
+                  <span class="fill-state">pending · 12m ago</span>
+                </span>
+                <button class="cancel-btn">Cancel</button>
+              </div>
+              <div class="ot-footer">
+                <a href="#" class="ot-link">View all orders →</a>
+              </div>
+            </div>
+
+            <div class="ot-content ot-scroll" data-ot-content="trades" hidden>
+              <div class="trade-rows-h"><div>Time</div><div>Market</div><div>Price</div><div>Size</div><div>Side</div></div>
+              <div class="trade-row-tab"><span class="time">14:46:31</span><span class="mkt">META.680</span><span class="price up">0.520</span><span class="size">200</span><span class="side buy">BUY</span></div>
+              <div class="trade-row-tab"><span class="time">14:46:18</span><span class="mkt">NVDA.1340</span><span class="price down">0.485</span><span class="size">125</span><span class="side sell">SELL</span></div>
+              <div class="trade-row-tab"><span class="time">14:46:11</span><span class="mkt">META.680</span><span class="price down">0.480</span><span class="size">500</span><span class="side sell">SELL</span></div>
+              <div class="trade-row-tab"><span class="time">14:45:54</span><span class="mkt">AAPL.230</span><span class="price up">0.420</span><span class="size">100</span><span class="side buy">BUY</span></div>
+              <div class="trade-row-tab"><span class="time">14:45:32</span><span class="mkt">META.680</span><span class="price up">0.510</span><span class="size">75</span><span class="side buy">BUY</span></div>
+              <div class="trade-row-tab"><span class="time">14:45:08</span><span class="mkt">META.680</span><span class="price down">0.500</span><span class="size">320</span><span class="side sell">SELL</span></div>
+              <div class="trade-row-tab"><span class="time">14:44:51</span><span class="mkt">NVDA.1340</span><span class="price up">0.518</span><span class="size">180</span><span class="side buy">BUY</span></div>
+              <div class="trade-row-tab"><span class="time">14:44:33</span><span class="mkt">META.680</span><span class="price down">0.490</span><span class="size">450</span><span class="side sell">SELL</span></div>
+              <div class="trade-row-tab"><span class="time">14:44:12</span><span class="mkt">AAPL.230</span><span class="price up">0.418</span><span class="size">90</span><span class="side buy">BUY</span></div>
+              <div class="trade-row-tab"><span class="time">14:43:48</span><span class="mkt">META.680</span><span class="price up">0.515</span><span class="size">300</span><span class="side buy">BUY</span></div>
+              <div class="trade-row-tab"><span class="time">14:43:21</span><span class="mkt">NVDA.1340</span><span class="price down">0.482</span><span class="size">220</span><span class="side sell">SELL</span></div>
+              <div class="trade-row-tab"><span class="time">14:42:58</span><span class="mkt">META.680</span><span class="price down">0.495</span><span class="size">410</span><span class="side sell">SELL</span></div>
+              <div class="trade-row-tab"><span class="time">14:42:34</span><span class="mkt">META.680</span><span class="price up">0.508</span><span class="size">155</span><span class="side buy">BUY</span></div>
+              <div class="trade-row-tab"><span class="time">14:42:11</span><span class="mkt">AAPL.230</span><span class="price up">0.422</span><span class="size">240</span><span class="side buy">BUY</span></div>
+              <div class="trade-row-tab"><span class="time">14:41:47</span><span class="mkt">META.680</span><span class="price down">0.503</span><span class="size">90</span><span class="side sell">SELL</span></div>
+              <div class="trade-row-tab"><span class="time">14:41:22</span><span class="mkt">NVDA.1340</span><span class="price up">0.521</span><span class="size">175</span><span class="side buy">BUY</span></div>
+              <div class="trade-row-tab"><span class="time">14:40:59</span><span class="mkt">META.680</span><span class="price up">0.512</span><span class="size">385</span><span class="side buy">BUY</span></div>
+              <div class="trade-row-tab"><span class="time">14:40:33</span><span class="mkt">META.680</span><span class="price down">0.498</span><span class="size">270</span><span class="side sell">SELL</span></div>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- RIGHT COL -->
+      <aside class="right-col">
+
+        <div class="trade-card" data-side="buy" data-outcome="yes">
+          <div class="trade-tabs">
+            <button class="trade-tab buy active" data-side="buy">Buy</button>
+            <button class="trade-tab sell" data-side="sell">Sell</button>
+          </div>
+          <div class="yes-no-toggle">
+            <button class="yn-tab yes active" data-outcome="yes">
+              <span class="lbl">YES</span>
+              <span class="price">$0.52</span>
+              <span class="sub">52% implied <span class="tip" title="Contract price implies market probability that META closes ≥ $680 at 4 PM ET.">?</span></span>
+            </button>
+            <button class="yn-tab no" data-outcome="no">
+              <span class="lbl">NO</span>
+              <span class="price">$0.48</span>
+              <span class="sub">48% implied <span class="tip" title="Contract price implies market probability that META closes &lt; $680 at 4 PM ET.">?</span></span>
+            </button>
+          </div>
+          <div class="trade-form" data-order-type="market">
+            <div class="order-type-row">
+              <button class="order-type-btn active" data-order="market">Market</button>
+              <button class="order-type-btn" data-order="limit">Limit</button>
+            </div>
+
+            <div class="field">
+              <div class="field-label">
+                <span>Amount</span>
+                <span class="available">$123.45 avail</span>
+              </div>
+              <div class="unit-toggle" role="tablist" aria-label="Amount unit">
+                <button class="unit-btn active" data-unit="usdc">USDC</button>
+                <button class="unit-btn" data-unit="contracts">Contracts</button>
+              </div>
+              <div class="input-wrap">
+                <input value="200" placeholder="0">
+                <span class="suffix">USDC</span>
+              </div>
+              <div class="quick-amounts">
+                <button class="quick-amount">25%</button>
+                <button class="quick-amount">50%</button>
+                <button class="quick-amount">75%</button>
+                <button class="quick-amount">MAX</button>
+              </div>
+            </div>
+
+            <div class="slip-row">
+              <div class="slip-head">
+                <span>Slippage tolerance</span>
+                <span class="computed">0.50% · max $0.523</span>
+              </div>
+              <div class="slip-presets">
+                <button class="slip-preset">0.1%</button>
+                <button class="slip-preset active">0.5%</button>
+                <button class="slip-preset">1.0%</button>
+                <div class="slip-custom-wrap">
+                  <input type="number" class="slip-custom" placeholder="Custom" min="0" max="100" step="0.1" aria-label="Custom slippage %">
+                  <span class="slip-custom-suffix">%</span>
+                </div>
+              </div>
+            </div>
+
+            <button class="submit-btn primary-cta">
+              <span class="sb-action">BUY</span>
+              <span class="sb-outcome yes">YES</span>
+              <span class="sb-detail">384 @ $0.520 · $107.28 total</span>
+            </button>
+
+            <details class="trade-summary-wrap">
+              <summary>
+                <span>Order details · Cost $107.28 · Max payout $200.00</span>
+                <span class="ts-chevron">▾</span>
+              </summary>
+              <div class="trade-summary">
+                <div class="summary-row">
+                  <span>Avg. price</span>
+                  <span class="v">$0.520</span>
+                </div>
+                <div class="summary-row">
+                  <span>Cost</span>
+                  <span class="v">$104.00</span>
+                </div>
+                <div class="summary-row fee">
+                  <span>Fee (Tier-1 · 2.00%)</span>
+                  <span class="v">+$2.08</span>
+                </div>
+                <div class="summary-row">
+                  <span>Slippage est.</span>
+                  <span class="v">+$1.20</span>
+                </div>
+                <div class="summary-divider"></div>
+                <div class="summary-row payout">
+                  <span>Max payout if YES</span>
+                  <span class="v">$200.00</span>
+                </div>
+                <div class="summary-row profit">
+                  <span>Net profit if won</span>
+                  <span class="v">+$92.72</span>
+                </div>
+              </div>
+            </details>
+          </div>
+        </div>
+
+        <!-- Order book -->
+        <div class="ob-card" data-view="both">
+          <div class="ob-h">
+            <h3>Order book</h3>
+            <div class="ob-pick" role="tablist">
+              <button data-ob-view="yes">YES</button>
+              <button data-ob-view="no">NO</button>
+              <button class="active" data-ob-view="both">BOTH</button>
+            </div>
+          </div>
+
+          <div class="ob-single">
+            <div class="ob-rows-h"><div>Price</div><div>Size</div><div>Total</div></div>
+            <div class="ob-row ask"><div class="depth-bar" style="width: 18%"></div><span class="price">0.555</span><span class="size">490</span><span class="total">1,964</span></div>
+            <div class="ob-row ask"><div class="depth-bar" style="width: 14%"></div><span class="price">0.550</span><span class="size">375</span><span class="total">1,474</span></div>
+            <div class="ob-row ask"><div class="depth-bar" style="width: 26%"></div><span class="price">0.545</span><span class="size">722</span><span class="total">1,099</span></div>
+            <div class="ob-row ask"><div class="depth-bar" style="width: 12%"></div><span class="price">0.540</span><span class="size">377</span><span class="total">377</span></div>
+            <div class="ob-spread">
+              <span class="last">$0.520 ↑</span>
+              <span class="spread">spread 0.040 · 7.7%</span>
+            </div>
+            <div class="ob-row bid"><div class="depth-bar" style="width: 20%"></div><span class="price">0.500</span><span class="size">560</span><span class="total">560</span></div>
+            <div class="ob-row bid"><div class="depth-bar" style="width: 16%"></div><span class="price">0.495</span><span class="size">440</span><span class="total">1,000</span></div>
+            <div class="ob-row bid"><div class="depth-bar" style="width: 30%"></div><span class="price">0.490</span><span class="size">830</span><span class="total">1,830</span></div>
+            <div class="ob-row bid"><div class="depth-bar" style="width: 10%"></div><span class="price">0.485</span><span class="size">270</span><span class="total">2,100</span></div>
+          </div>
+
+          <div class="ob-both" hidden>
+            <div class="ob-both-explain">
+              YES and NO are separate tradeable contracts. Prices sum to ~$1 (binary payoff). Watch for gaps — that's where arbitrage lives.
+            </div>
+            <div class="ob-both-col">
+              <div class="ob-both-h">
+                <span>YES</span>
+                <span class="ob-both-h-meta">last $0.520 · spread 7.7%</span>
+              </div>
+              <div class="ob-rows-h"><div>Price</div><div>Size</div><div>Total</div></div>
+              <div class="ob-section-label asks">Asks (selling YES)</div>
+              <div class="ob-row ask"><div class="depth-bar" style="width: 18%"></div><span class="price">0.555</span><span class="size">490</span><span class="total">1,964</span></div>
+              <div class="ob-row ask"><div class="depth-bar" style="width: 14%"></div><span class="price">0.550</span><span class="size">375</span><span class="total">1,474</span></div>
+              <div class="ob-row ask"><div class="depth-bar" style="width: 26%"></div><span class="price">0.545</span><span class="size">722</span><span class="total">1,099</span></div>
+              <div class="ob-row ask"><div class="depth-bar" style="width: 12%"></div><span class="price">0.540</span><span class="size">377</span><span class="total">377</span></div>
+              <div class="ob-section-label bids">Bids (buying YES)</div>
+              <div class="ob-row bid"><div class="depth-bar" style="width: 20%"></div><span class="price">0.500</span><span class="size">560</span><span class="total">560</span></div>
+              <div class="ob-row bid"><div class="depth-bar" style="width: 16%"></div><span class="price">0.495</span><span class="size">440</span><span class="total">1,000</span></div>
+              <div class="ob-row bid"><div class="depth-bar" style="width: 30%"></div><span class="price">0.490</span><span class="size">830</span><span class="total">1,830</span></div>
+              <div class="ob-row bid"><div class="depth-bar" style="width: 10%"></div><span class="price">0.485</span><span class="size">270</span><span class="total">2,100</span></div>
+            </div>
+            <div class="ob-both-col">
+              <div class="ob-both-h">
+                <span>NO</span>
+                <span class="ob-both-h-meta">last $0.480 · spread 8.3%</span>
+              </div>
+              <div class="ob-rows-h"><div>Price</div><div>Size</div><div>Total</div></div>
+              <div class="ob-section-label asks">Asks (selling NO)</div>
+              <div class="ob-row ask"><div class="depth-bar" style="width: 20%"></div><span class="price">0.515</span><span class="size">560</span><span class="total">2,100</span></div>
+              <div class="ob-row ask"><div class="depth-bar" style="width: 16%"></div><span class="price">0.510</span><span class="size">440</span><span class="total">1,540</span></div>
+              <div class="ob-row ask"><div class="depth-bar" style="width: 30%"></div><span class="price">0.505</span><span class="size">830</span><span class="total">1,100</span></div>
+              <div class="ob-row ask"><div class="depth-bar" style="width: 10%"></div><span class="price">0.500</span><span class="size">270</span><span class="total">270</span></div>
+              <div class="ob-section-label bids">Bids (buying NO)</div>
+              <div class="ob-row bid"><div class="depth-bar" style="width: 18%"></div><span class="price">0.460</span><span class="size">490</span><span class="total">490</span></div>
+              <div class="ob-row bid"><div class="depth-bar" style="width: 14%"></div><span class="price">0.455</span><span class="size">375</span><span class="total">865</span></div>
+              <div class="ob-row bid"><div class="depth-bar" style="width: 26%"></div><span class="price">0.450</span><span class="size">722</span><span class="total">1,587</span></div>
+              <div class="ob-row bid"><div class="depth-bar" style="width: 12%"></div><span class="price">0.445</span><span class="size">377</span><span class="total">1,964</span></div>
+            </div>
+          </div>
+        </div>
+
+      </aside>
+
+    </div>
+  </main>
+</div>
+
+<nav class="bottom-tabs" aria-label="Mobile navigation">
+  <a href="v10-landing.html" class="bottom-tab">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+    Markets
+  </a>
+  <a href="#" class="bottom-tab active" aria-current="page">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M17 7h4v4"/></svg>
+    Trade
+  </a>
+  <a href="#" class="bottom-tab">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 12h8M12 8v8"/></svg>
+    Positions
+  </a>
+  <a href="#" class="bottom-tab">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/></svg>
+    Profile
+  </a>
+</nav>
+
+<div class="mockup-badge">v10 · linear quality · v7 cyan palette · trade</div>
+
+<script>
+  function toggleTheme() {
+    const root = document.documentElement;
+    const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('bm-theme', next); } catch (e) {}
+  }
+  (function() {
+    try { const s = localStorage.getItem('bm-theme'); if (s === 'light') document.documentElement.setAttribute('data-theme', 'light'); } catch (e) {}
+  })();
+
+  // Order type toggle
+  (function() {
+    const form = document.querySelector('.trade-form');
+    if (!form) return;
+    const buttons = form.querySelectorAll('.order-type-btn');
+    buttons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        buttons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        form.dataset.orderType = btn.dataset.order;
+      });
+    });
+  })();
+
+  // BUY / SELL tabs
+  (function() {
+    const card = document.querySelector('.trade-card');
+    if (!card) return;
+    card.querySelectorAll('.trade-tab').forEach(t => {
+      t.addEventListener('click', () => {
+        card.querySelectorAll('.trade-tab').forEach(x => x.classList.remove('active'));
+        t.classList.add('active');
+        card.dataset.side = t.dataset.side;
+      });
+    });
+    // YES / NO toggle
+    card.querySelectorAll('.yn-tab').forEach(t => {
+      t.addEventListener('click', () => {
+        card.querySelectorAll('.yn-tab').forEach(x => x.classList.remove('active'));
+        t.classList.add('active');
+        card.dataset.outcome = t.dataset.outcome;
+        const sbOutcome = card.querySelector('.sb-outcome');
+        if (sbOutcome) {
+          sbOutcome.textContent = t.dataset.outcome.toUpperCase();
+          sbOutcome.classList.toggle('yes', t.dataset.outcome === 'yes');
+          sbOutcome.classList.toggle('no', t.dataset.outcome === 'no');
+        }
+      });
+    });
+    // Unit toggle
+    card.querySelectorAll('.unit-btn').forEach(b => {
+      b.addEventListener('click', () => {
+        card.querySelectorAll('.unit-btn').forEach(x => x.classList.remove('active'));
+        b.classList.add('active');
+        card.dataset.unit = b.dataset.unit;
+      });
+    });
+  })();
+
+  // Orders / Trades tabs
+  (function() {
+    const card = document.querySelector('.orders-trades-card');
+    if (!card) return;
+    const tabs = card.querySelectorAll('.otab');
+    tabs.forEach(t => {
+      t.addEventListener('click', () => {
+        tabs.forEach(x => { x.classList.remove('active'); x.setAttribute('aria-selected', 'false'); });
+        t.classList.add('active');
+        t.setAttribute('aria-selected', 'true');
+        card.dataset.tab = t.dataset.otTab;
+      });
+    });
+  })();
+
+  // OB view toggle
+  (function() {
+    const card = document.querySelector('.ob-card');
+    if (!card) return;
+    const buttons = card.querySelectorAll('.ob-pick button');
+    buttons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        buttons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        card.dataset.view = btn.dataset.obView;
+      });
+    });
+  })();
+
+  // Slippage presets
+  (function() {
+    const presets = document.querySelectorAll('.slip-preset');
+    presets.forEach(btn => {
+      btn.addEventListener('click', () => {
+        presets.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      });
+    });
+  })();
+</script>
+
+</body>
+</html>
