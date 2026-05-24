@@ -1,4 +1,4 @@
-//! SHA256 binary-tree merkle proof verifier (DR-010).
+//! SHA256 binary-tree merkle proof verifier (DR-010 + DR-015 multi-metric).
 //!
 //! Standard "sorted-pair" pattern (matches OpenZeppelin's
 //! `MerkleProof.verify`): at each level, the two siblings are concatenated
@@ -8,7 +8,9 @@
 //!
 //! Off-chain (Bram's indexer) MUST use the identical pattern when building
 //! the tree:
-//!   - leaves = sha256(recipient || position || period_id || period_type || amount)
+//!   - leaves = sha256(user || metric_id || rank || amount || period_id_u32 || period_type)
+//!     (see `compute_leaf` below for byte offsets; DR-015 § "Decision" locks
+//!     this exact 47-byte format. period_id narrowed u64 → u32.)
 //!   - internal nodes = sha256(min(a,b) || max(a,b))
 //!   - empty siblings (odd-leaf-count leveling): duplicate the orphan leaf
 //!
@@ -220,6 +222,35 @@ mod tests {
         let h_high = compute_leaf(&user, METRIC_PROFIT, 1, 1000, 0xCAFE_BABE_DEAD_BEEFu64, PERIOD_TYPE_WEEKLY);
         // Low 32 bits are 0xDEADBEEF in both — hashes must match.
         assert_eq!(h_low, h_high, "u64 period_ids sharing low-32-bits should produce identical leaf hashes per DR-015 narrowing");
+    }
+
+    #[test]
+    fn leaf_hash_period_id_wraps_at_u32_max_boundary() {
+        // Boundary regression (P2-audit G1): the wrap-from-u32::MAX-to-zero
+        // behavior of `period_id as u32` is deterministic in Rust. An
+        // off-chain implementer using `period_id mod 2^32` would AGREE; one
+        // taking the LOW 4 BYTES LE (truncation) ALSO agrees; the two
+        // approaches diverge only on negative integers (n/a for u64).
+        //
+        // This test pins both edges of the boundary:
+        //   period_id = u32::MAX as u64           → leaf encodes 0xFFFFFFFF
+        //   period_id = (u32::MAX as u64) + 1     → leaf encodes 0x00000000 (wrap)
+        // The two leaves MUST differ — an off-chain bug that emitted
+        // 8-byte LE instead of 4-byte LE would coincidentally match the
+        // 4-byte case on the high-zero side but diverge on the low side.
+        let user = Pubkey::new_from_array([1u8; 32]);
+        let h_max = compute_leaf(&user, METRIC_PROFIT, 1, 1000,
+            u32::MAX as u64, PERIOD_TYPE_WEEKLY);
+        let h_wrap = compute_leaf(&user, METRIC_PROFIT, 1, 1000,
+            (u32::MAX as u64) + 1, PERIOD_TYPE_WEEKLY);
+        assert_ne!(h_max, h_wrap,
+            "u32::MAX and u32::MAX+1 must hash differently — the latter wraps to 0");
+
+        // Sanity: u32::MAX+1 (= 2^32) hashes the same as period_id = 0,
+        // because both truncate to 0 in the leaf encoding.
+        let h_zero = compute_leaf(&user, METRIC_PROFIT, 1, 1000, 0u64, PERIOD_TYPE_WEEKLY);
+        assert_eq!(h_wrap, h_zero,
+            "(u32::MAX as u64)+1 must hash same as period_id=0 — both encode 0x00000000");
     }
 
     use crate::state::{

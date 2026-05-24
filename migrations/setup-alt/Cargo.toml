@@ -1,0 +1,21 @@
+# Standalone sub-workspace for the DR-015 § "Defensive: Address Lookup Tables"
+# one-shot. Same rationale as `bootstrap-config/Cargo.toml` and
+# `bootstrap-p5/Cargo.toml` — keep host-side deps (solana-client / tokio /
+# reqwest) out of the BPF program's compile path.
+
+[workspace]
+
+[package]
+name = "setup-alt"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "setup-alt"
+path = "src/main.rs"
+
+[dependencies]
+solana-client = "2.3"
+solana-sdk = "2.3"
+solana-program = "2.3"

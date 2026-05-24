@@ -1,18 +1,36 @@
 //! `distribute_weekly_rewards` — admin transfers `amount` USDC from the
 //! WeeklyRewardsPool to a recipient, gated by a Merkle proof against the
-//! committed root for (period_id, PERIOD_TYPE_WEEKLY).
+//! committed root for (period_id, PERIOD_TYPE_WEEKLY) AND the per-metric
+//! claim guard (DR-015).
 //!
-//! Per-position single-claim semantics: `LeaderboardEntry.claimed_bitmap`
-//! tracks which of the 10 positions (bits 0..9) have been distributed. A
-//! second distribute for the same (period, position) reverts with
-//! `MerkleProofInvalid` (we treat double-claim as proof failure for the
-//! generic invariant "this distribution is unique per period/position").
+//! ## Per-metric single-claim semantics (DR-015)
 //!
-//! Leaf format (from `merkle::compute_leaf`):
-//!   sha256(recipient || position || period_id || period_type || amount)
+//! `LeaderboardEntry.claimed_bitmap: u32` is partitioned into 4 disjoint
+//! per-metric segments of 8 bits each:
 //!
-//! Bram's indexer builds the off-chain tree using the same leaf shape +
-//! sorted-pair internal-node concat (see `merkle.rs`).
+//!   bit_index = metric_id × BITS_PER_METRIC + (position - 1)
+//!
+//!   metric 0 (PROFIT)     positions 1..=8 → bits 0..=7
+//!   metric 1 (WIN_STREAK) positions 1..=8 → bits 8..=15
+//!   metric 2 (WIN_RATE)   positions 1..=8 → bits 16..=23
+//!   metric 3 (ROI)        positions 1..=8 → bits 24..=31
+//!
+//! A second distribute for the same (period, metric, position) reverts with
+//! `MerkleProofInvalid`. Claiming (METRIC_PROFIT, position=1) does NOT mark
+//! (METRIC_WIN_STREAK, position=1) as claimed — different bit indices.
+//!
+//! ## Leaf format (DR-015 — read carefully; Bram's indexer must mirror EXACTLY)
+//!
+//! From `merkle::compute_leaf`:
+//!
+//!   sha256(user || metric_id || rank || amount || period_id_u32 || period_type)
+//!          32   ||    1     ||  1   ||    8   ||      4        ||      1
+//!   = 47 bytes
+//!
+//! NOTE: `period_id` is narrowed from on-chain `u64` to `u32` (low 4 bytes
+//! LE) in the leaf hash. u32 supports 4e9 distinct periods (~82M years at
+//! weekly cadence). Off-chain indexer must encode `period_id as u32`, not
+//! the full u64 — a width mismatch produces silently-failing proofs.
 
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Token, TokenAccount, Transfer};
