@@ -136,6 +136,111 @@ export async function logAiOutput(input: AiOutputLogInput, deps?: AiDbDeps): Pro
 }
 
 // ---------------------------------------------------------------------------
+// briefings — daily MAG7 Sonnet briefings (ai-v2-plan §4 phase 0)
+// ---------------------------------------------------------------------------
+
+export type BriefingInput = {
+  ticker: string;
+  model: string;
+  body: string;
+  promptHash: string;
+  requestId?: string;
+  costCents?: number;
+  context?: Record<string, unknown>;
+};
+
+export type BriefingRecord = {
+  id: number;
+  ticker: string;
+  model: string;
+  body: string;
+  generatedAt: Date;
+  promptHash: string;
+  requestId: string | undefined;
+  costCents: number | undefined;
+  context: Record<string, unknown> | undefined;
+};
+
+export async function insertBriefing(input: BriefingInput, deps?: AiDbDeps): Promise<number> {
+  const sql = clientOf(deps);
+  const rows = (await sql`
+    INSERT INTO briefings (ticker, model, body, prompt_hash, request_id, cost_cents, context)
+    VALUES (
+      ${input.ticker}, ${input.model}, ${input.body}, ${input.promptHash},
+      ${input.requestId ?? null}, ${input.costCents ?? null},
+      ${input.context ? JSON.stringify(input.context) : null}::jsonb
+    )
+    RETURNING id
+  `) as Array<{ id: number }>;
+  const row = rows[0];
+  if (!row) throw new Error("insertBriefing: no rows returned");
+  return row.id;
+}
+
+/**
+ * Read the most recent briefing for a ticker. Cleo's GET /api/briefings/:ticker
+ * calls this; returns undefined if no briefing has been generated yet
+ * (callers can serve a sensible empty state).
+ */
+export async function getLatestBriefing(
+  ticker: string,
+  deps?: AiDbDeps,
+): Promise<BriefingRecord | undefined> {
+  const sql = clientOf(deps);
+  const rows = (await sql`
+    SELECT id, ticker, model, body, generated_at, prompt_hash, request_id, cost_cents, context
+    FROM briefings
+    WHERE ticker = ${ticker}
+    ORDER BY generated_at DESC
+    LIMIT 1
+  `) as Array<RawBriefing>;
+  return rows[0] ? rowToBriefing(rows[0]) : undefined;
+}
+
+export async function listLatestBriefings(
+  tickers: ReadonlyArray<string>,
+  deps?: AiDbDeps,
+): Promise<BriefingRecord[]> {
+  if (tickers.length === 0) return [];
+  const sql = clientOf(deps);
+  // Per-ticker latest via DISTINCT ON
+  const rows = (await sql`
+    SELECT DISTINCT ON (ticker)
+      id, ticker, model, body, generated_at, prompt_hash, request_id, cost_cents, context
+    FROM briefings
+    WHERE ticker = ANY(${tickers as unknown as string[]})
+    ORDER BY ticker, generated_at DESC
+  `) as Array<RawBriefing>;
+  return rows.map(rowToBriefing);
+}
+
+type RawBriefing = {
+  id: number;
+  ticker: string;
+  model: string;
+  body: string;
+  generated_at: string;
+  prompt_hash: string;
+  request_id: string | null;
+  cost_cents: string | number | null;
+  context: Record<string, unknown> | null;
+};
+
+function rowToBriefing(r: RawBriefing): BriefingRecord {
+  return {
+    id: r.id,
+    ticker: r.ticker,
+    model: r.model,
+    body: r.body,
+    generatedAt: new Date(r.generated_at),
+    promptHash: r.prompt_hash,
+    requestId: r.request_id ?? undefined,
+    costCents: r.cost_cents !== null && r.cost_cents !== undefined ? Number(r.cost_cents) : undefined,
+    context: r.context ?? undefined,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Row mappers
 // ---------------------------------------------------------------------------
 

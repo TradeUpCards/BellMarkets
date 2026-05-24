@@ -16,8 +16,11 @@ export {
   insertNewsClassification,
   logAiOutput,
   rowToNewsClassification,
+  insertBriefing,
+  getLatestBriefing,
+  listLatestBriefings,
 } from "./db.js";
-export type { AiDbDeps, ClassificationInput } from "./db.js";
+export type { AiDbDeps, ClassificationInput, BriefingInput, BriefingRecord } from "./db.js";
 export {
   classifyArticle,
   classifyPendingArticles,
@@ -27,6 +30,7 @@ export {
 export type { ClassifyArticleResult } from "./classify.js";
 export {
   buildDailyTickerBriefingPrompt,
+  buildBellProBriefingPrompt,
   DEFAULT_BRIEFING_MODEL,
 } from "./briefing-prompts.js";
-export type { DailyBriefingInput } from "./briefing-prompts.js";
+export type { DailyBriefingInput, BellProBriefingContext } from "./briefing-prompts.js";
