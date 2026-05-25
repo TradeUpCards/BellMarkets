@@ -29,6 +29,7 @@ import {
   isBellProActive,
   useBellProSubscription,
 } from "@/hooks/use-bell-pro-subscription";
+import { useEnsureUser } from "@/hooks/use-ensure-user";
 import { useSocialLinks } from "@/hooks/use-social-links";
 import type { SocialProvider } from "@/types/profile";
 
@@ -150,6 +151,10 @@ export function UserMenu() {
   const { data: sub } = useBellProSubscription();
   const proActive = isBellProActive(sub);
   const { links, unlink } = useSocialLinks();
+  // Fanalytics-pattern auto-create-on-wallet-connect. Surfaces the
+  // auto-generated handle in the chip + dropdown so a user sees an
+  // identity immediately (before they OAuth-link).
+  const { user: ensuredUser } = useEnsureUser();
 
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -237,7 +242,9 @@ export function UserMenu() {
             display: "inline-block",
           }}
         />
-        <span>{fmtPubkey(pubkey)}</span>
+        <span title={pubkey}>
+          {ensuredUser?.handle ?? fmtPubkey(pubkey)}
+        </span>
         {proActive && (
           <span
             style={{
@@ -295,7 +302,9 @@ export function UserMenu() {
               }}
             />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 12, fontWeight: 600 }}>{walletName}</div>
+              <div style={{ fontSize: 12, fontWeight: 600 }}>
+                {ensuredUser?.handle ?? walletName}
+              </div>
               <div
                 style={{
                   fontSize: 11,
