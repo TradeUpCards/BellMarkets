@@ -148,6 +148,9 @@ pub enum BellMarketsError {
     #[msg("Maker payout account not owned by the SPL Token program (DR-020 H-1: prevents book-lock DoS via spoofed account).")]
     ClobMakerNotSplOwned,
 
+    #[msg("Maker payout account not writable (defense-in-depth: a read-only account would block the SPL Token transfer CPI).")]
+    ClobMakerNotWritable,
+
     #[msg("Maker payout token account is frozen (DR-020 M-1: rejects frozen-account matching DoS).")]
     ClobMakerFrozen,
 
@@ -165,4 +168,12 @@ pub enum BellMarketsError {
 
     #[msg("Order book back-reference does not match the supplied strike_market account.")]
     OrderBookMarketMismatch,
+
+    // ─── deploy_index=8 — reinit_rewards_pools errors ───────────────────────
+
+    #[msg("Reward pool has non-zero balance; drain to admin before reinit (admin manual SPL transfer).")]
+    PoolNotEmpty,
+
+    #[msg("Reward pool authority does not match its own pubkey (self-authority pattern from initialize_rewards_pools).")]
+    WrongPoolAuthority,
 }
