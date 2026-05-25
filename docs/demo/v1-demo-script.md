@@ -5,22 +5,38 @@
 **Length:** 3-5 minutes (target 4:00)
 **Format:** Live walkthrough preferred; pre-recorded backup at `docs/demo/recording-assets/v1-demo.mp4` (TODO Sat night)
 
-**SHIPPED-STATE HONESTY HEADER (Sat 2026-05-24 evening — re-evaluate before Sunday recording):**
+**FINAL FLOW DECISION (Sun 2026-05-25, post-deploy_index=8 smoke against main `ca3c2e1`):**
 
-Cleo is mid-ship of the v8 frontend. As of this revision, the following is true and a presenter MUST know it before recording:
-- **The v8 trade page is shipped at `localhost:3000/trade/[ticker]/[strike]`** — but the trade-submit handler currently throws `not yet wired` for every Buy/Sell × Yes/No × Market/Limit path. Phantom approval cannot complete a trade in the running app today.
-- **Landing page at `localhost:3000/`** renders a `Coming soon` scaffold — no carousel, no probability matrix, no Bell Pro panel, no leaderboard. Those views exist only in `apps/web/public/mockups/v8-landing.html` (a static HTML mockup), not in the Next.js app.
-- **`/markets` route** renders `Market list placeholder — coming Day 2.` Same caveat.
-- **Bell Pro briefings:** the generator script `pnpm briefings:gen` exists (operator-run) but the morning cron is NOT registered to call it. No "each morning" automation today.
-- **Leaderboard ROI metric** is an explicit stub (`metric-leaderboards.ts:topRoiLeaderboard()` returns `[]` until v1.5).
+> **Flow B is the chosen flow — full live execution against deploy_index=8.** All 4 trade paths now broadcast against the deployed in-program CLOB (DR-020) on devnet bUSDC. Three demo strikes are seeded with $0.40–$0.50 bid ladder + $0.55–$0.65 ask ladder (50 YES per rung, $0.05 inside spread): **META @ $610**, **NVDA @ $215**, **AAPL @ $309**. Live smoke `LIVE_DEVNET=1 pnpm --filter @bell-markets/tests test:contracts` returns 17/17 (3 oracle byte-parity + 14 DR-020 CLOB: vault invariant through cross/cancel flurry, escrow reconciliation with rounding, all 4 trade paths execute + vault invariant preserved, 9 adversarial cases incl. IOC empty-book reverts + BookFull at N=128, 2 meta-tests).
 
-This script is **structured into three flows** that a presenter chooses between based on what's actually live by Sunday:
+**Demo strike: META @ $610** (Bram's primary). Other 2 seeded strikes (NVDA $215, AAPL $309) are presenter-fallback if META Phantom flow flakes mid-run.
 
-- **Flow A — Mockup walk-through** (current default, if trade-view submit handlers still throw on Sun): walk reviewers through the v8 mockup HTML files for the visual design, demonstrate the actually-shipped trade-view UI rendering, and pivot to terminal evidence for the on-chain lifecycle proofs.
-- **Flow B — Live trade flow** (if Cleo lands the trade-submit wiring by Sun morning): the full Buy YES → Confirm → Settle → Redeem path in the running app.
-- **Flow C — Hybrid** (most likely): Flow A for landing + Bell Pro + leaderboard (mockup), Flow B for trade page (if wired by Sun).
+What this means for the presenter:
+- **Scenes 1–9 all run LIVE** on `localhost:3000/` (landing) + `localhost:3000/trade/META/610` (trade).
+- **Scene 4** = **Buy YES Market** (taker bid crosses $0.55 ask) → Phantom approve → fill broadcasts → position updates.
+- **Scene 5** = **Sell YES Market** (taker ask crosses $0.50 bid) → Phantom approve → fill broadcasts → position updates.
+- **Scene 6** = **Limit toggle** on Buy YES → place a $0.45 limit that rests on the book (now LIVE — DR-020 ships limit orders); toggle to Sell NO and observe the Limit option is grayed-out per DR-019 (NO-side trades are market-only).
+- **Scene 6b** = **Buy NO Market** on a separate small-size click (e.g. 10 contracts) — atomic mint_pair + sell-YES against best bid; user wallet shows NO balance, no orphan YES.
+- **Scene 6c** = **Sell NO Market** — atomic burn-pair flow; presenter narrates the redeem_pair leg.
 
-Drew's working assumption: Flow A or C. The script below is written for Flow A with [BRACKETED FLOW-B SWAP] markers where the live-app version would substitute. A presenter rehearses 24h before with whichever flow matches reality.
+**The bUSDC narrative** (Scene 4 first mention, then again if asked):
+> "BellMarkets runs on `bUSDC` for this devnet demo — a self-controlled SPL mint at `5vq2oah...KtBZp`, 1:1 with USDC, with unlimited supply so we can fund judge wallets instantly. The protocol is mint-agnostic via the `update_usdc_mint` admin instruction — production deploys against Circle USDC. We migrated devnet from Circle USDC → bUSDC mid-build via two instructions: `update_usdc_mint` and `reinit_rewards_pools` (deploy_index=8). The vault math, the $1 invariant, the redeem path — all identical."
+
+**"Get demo USDC" narration** (use if presenter wants to fund a judge wallet mid-demo):
+> "Tate can run `pnpm mint-demo-usdc <judge-wallet> 100` from terminal — that drops 100 bUSDC into the judge's wallet in one tx. Try the demo yourselves."
+
+**Caveats the presenter must NOT skip (Bell Pro card + leaderboard):**
+- Bell Pro card on the landing shows the upgrade pitch + 4 feature bullets (Cleo's paired-sprint ship added a live `/api/briefings/AAPL` route that overrides the card body with a Sonnet-generated briefing on hover/mount — verify in pre-flight). The Sonnet-generated briefings DO exist (Bram's `pnpm briefings:gen` populates Neon table `briefings`).
+- Probability matrix + leaderboard + Recent Fills on the landing are STATIC FIXTURE data (Cleo's own `STATIC FIXTURE` code comments at `landing-view.tsx:30, 161`). The visual design ships; the wire-to-live `useAllMarkets() / useLeaderboard() / useFills()` lands v1.5.
+- Leaderboard ROI metric is an explicit stub (`metric-leaderboards.ts:topRoiLeaderboard()` returns `[]` until v1.5 mint-volume capital indexing).
+
+**Fallback to Flow C** (live Buy×Yes only + narration for the other 3 paths) ONLY needed if: the live dev server fails to start, OR Cleo's UI wire-in for the new place_order path regressed after the deploy_index=8 IDL refresh, OR Phantom approval flow breaks. Pre-flight checks below cover these gates.
+
+The three flow definitions are preserved for the record:
+
+- **Flow A — Mockup walk-through** (last-resort fallback): walk reviewers through the v8 mockup HTML files for the visual design, terminal-based on-chain evidence for the lifecycle proofs.
+- **Flow B — Full live trade flow** (CHOSEN — what we run): all 4 trade paths broadcast on `localhost:3000/trade/META/610` against deploy_index=8 + bUSDC + seeded books.
+- **Flow C — Hybrid** (intermediate fallback): live Buy×Yes only + narration for Sell/No (the previous flow choice before deploy_index=8 + Bram's re-seed unlocked the other 3).
 
 **Pair with:**
 - `docs/demo/cron-failure-path.md` — HY-5 evidence (run as Q&A response if asked)
@@ -46,14 +62,23 @@ Drew's working assumption: Flow A or C. The script below is written for Flow A w
   ```
   node -e "fetch('https://api.devnet.solana.com',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'getBalance',params:['CJBLhJwTFndhGPvGU4fdoXtWmZHKNmkSn6bEa5MBsYVe']})}).then(r=>r.json()).then(j=>console.log(j.result.value/1e9,'SOL'))"
   ```
-- [ ] If Flow B: presenter's demo wallet has SOL + USDC + ATAs for at least one StrikeMarket's YES + NO mints
+- [ ] **Presenter's demo wallet funded** (Flow B requirement):
+  - SOL ≥ 0.05 SOL for tx fees + ATA rent
+  - bUSDC ≥ 20 (run `pnpm --filter @bell-markets/automation mint-demo-usdc <presenter-pubkey> 100` from terminal — Tate signs as platform admin)
+  - The first Buy YES tx auto-creates the YES ATA; no manual ATA prep needed
+- [ ] **Verify seeded books are intact** (run from a terminal):
+  ```
+  node -e "import('@solana/web3.js').then(async w=>{const c=new w.Connection('https://api.devnet.solana.com');const ob=await c.getAccountInfo(new w.PublicKey('XWEymjgovx7F1uHNb24mFoMHsNTMNkij6t1Jywk4YvB'));console.log('META OrderBook bytes:',ob?.data?.length ?? 'NOT FOUND')})"
+  ```
+  Expected: `META OrderBook bytes: 16448` (zero_copy account). If `NOT FOUND` → Bram's re-seed didn't land cleanly; fall back to Flow C.
 
 ### Browser + viewport
 - [ ] Fresh Chrome window (no extensions other than Phantom)
-- [ ] Phantom wallet on devnet
+- [ ] Phantom wallet on devnet, switched to the demo wallet pubkey
 - [ ] Viewport: 1440×900; devtools ready to flip to 375px on request
 - [ ] Screen recorder: 1080p, 30 fps (OBS or Loom)
-- [ ] **Two browser tabs open** if Flow A: tab 1 = `localhost:3000/trade/META/700` (shipped v8 trade UI), tab 2 = `apps/web/public/mockups/v8-landing.html` opened via `file://` for the carousel/matrix/Bell Pro/leaderboard scenes
+- [ ] **One browser tab open** (Flow B — chosen): `localhost:3000/` (v8 landing live; navigates to trade page from matrix click in Scene 3). Trade page = `localhost:3000/trade/META/610` (matches Bram's seeded strike).
+- [ ] **Verify the actual dev-server port.** `pnpm dev` on a clean machine picks 3000; on a multi-worktree dev machine it may pick 3001/3002/3003. Confirm + update the URLs you'll demo with before you go live.
 
 ### Apps / services up
 - [ ] `pnpm --filter @bell-markets/web dev` running on localhost:3000
@@ -74,7 +99,7 @@ Drew's working assumption: Flow A or C. The script below is written for Flow A w
 
 ### Scene 1 — Open + connect wallet (0:00 - 0:25)
 
-**On screen:** Browser tab 1 (`localhost:3000/trade/META/700`). v8-themed trade page renders.
+**On screen:** Browser tab 1 (`localhost:3000/`). v8 landing page renders (Scene 1 starts on landing, navigates to trade via Scene 3 matrix click).
 
 **Action:** Click "Connect Wallet" in top-right → Phantom popup → approve → wallet pubkey shows.
 
@@ -85,13 +110,11 @@ Drew's working assumption: Flow A or C. The script below is written for Flow A w
 
 ---
 
-### Scene 2 — Landing carousel + session block (0:25 - 1:00)  **[FLOW A: mockup HTML]**
+### Scene 2 — Landing hero + ticker marquee (0:25 - 1:00)  **[FLOW B: live Next.js]**
 
-**On screen:** Switch to browser tab 2 (`file://.../apps/web/public/mockups/v8-landing.html`). Hero-grid carousel (4 slides: Markets, Leaderboard, Contests, Bell Pro). Session block on the right shows static settle countdown. Probability matrix below.
+**On screen:** Navigate to `localhost:3000/` (v8 landing — shipped in Next.js as of merge `13a8481`). CNBC-style ticker marquee at top scrolls 7 MAG7 names. Hero card centerpiece below. **Note: dev server may pick a port other than 3000 if other workspaces hold it; check the actual port from `pnpm dev` output.**
 
-**[FLOW B SWAP if Cleo ships v8 landing in Next.js by Sun]:** Stay on `localhost:3000/` instead of the file:// mockup.
-
-**Action:** Auto-rotate carousel through Markets → Leaderboard → Contests → Bell Pro (or use arrow controls). Pause briefly on Leaderboard to show the metric tabs.
+**Action:** Let the ticker marquee play for ~3 seconds (each MAG7 ticker + spot + day-change scrolls past). Scroll down past the hero card to reveal the probability matrix below.
 
 **Talking points (pick 2):**
 - "Bloomberg-style left rail navigates markets by ticker — MAG7 grouped at the top. Top tickers show spot + implied YES% for the ATM strike."
@@ -100,11 +123,13 @@ Drew's working assumption: Flow A or C. The script below is written for Flow A w
 
 ---
 
-### Scene 3 — Probability matrix → trade page (1:00 - 1:30)  **[FLOW A: mockup → real]**
+### Scene 3 — Probability matrix → trade page (1:00 - 1:30)  **[FLOW B: live Next.js]**
 
-**On screen:** Still in mockup tab. Probability matrix renders 7 MAG7 × ~7 strikes = ~49 cells. Each cell shows the implied YES% for that strike. Color-coded heat.
+**On screen:** Still on `localhost:3000/`, scrolled to the probability matrix. 4 MAG7 rows × 7 strikes = 28 cells visible (META, NVDA, AAPL, MSFT). Each cell shows implied YES% for that strike. Color-coded heat (deep green at high probability → red at low). ATM strike highlighted.
 
-**Action:** Hover one cell → tooltip shows mid/bid/ask + volume. Click the META $700 cell → switch back to browser tab 1 (`localhost:3000/trade/META/700`) which already shows that route.
+**Action:** Hover the **META $610 cell** (ATM strike, ~52% implied). Click — navigate to `localhost:3000/trade/META/610` (matches Bram's seeded strike + book; Scene 4 lands here).
+
+**Caveat to narrate (optional, if reviewer asks):** "The matrix data is currently a static fixture — the design ships today; the wire-to-live `useAllMarkets()` per row is v1.5 work. The trade-page route IS live and reads from chain."
 
 **Talking points (pick 2):**
 - "Whole MAG7 strike grid on one screen — pick any ticker × strike combo in two clicks. The matrix IS the trading entry point."
@@ -113,65 +138,75 @@ Drew's working assumption: Flow A or C. The script below is written for Flow A w
 
 ---
 
-### Scene 4 — Trade page Buy YES (1:30 - 2:15)  **[FLOW A: walk UI, do NOT submit; FLOW B: submit + approve]**
+### Scene 4 — Buy YES Market — LIVE BROADCAST against in-program CLOB (1:30 - 2:15)  **[FLOW B: full live]**
 
-**On screen:** `localhost:3000/trade/META/700`. The v8 trade UI renders: left has order book (showing sample data — Cleo's `data-mock` attribute marks visual fixtures vs live data), right has the trade panel with Buy/Sell + Yes/No toggles + amount field + estimated cost + Submit button.
+**On screen:** `localhost:3000/trade/META/610`. v8 trade UI: left = live order book reading from the OrderBook PDA `XWEymjgovx7F1uHNb24mFoMHsNTMNkij6t1Jywk4YvB` (Bram's seeded liquidity: 3 bids $0.40/$0.45/$0.50 + 3 asks $0.55/$0.60/$0.65, 50 YES per rung). Right = trade panel with Buy/Sell + Yes/No toggles + amount field + estimated cost + Submit.
 
-**Action [FLOW A]:** Walk the UI cursor through: toggle Buy / Sell, toggle Yes / No, type "$5" in the amount field, watch the estimated cost + fee + slippage update live. **Do NOT click Submit** — the handler currently throws `not yet wired` and a Phantom popup will not complete a trade. Narrate the flow as "and submit would..." rather than clicking.
+**Action:** Side = Buy (default). Outcome = YES (default). Order type = Market (default). Type "10" contracts in the amount field. Watch the estimated cost ≈ $5.50 (10 × $0.55 best ask) + DR-008 fee + slippage update live. **Click Submit** → Phantom popup → approve. The `place_order` instruction broadcasts to devnet against the OrderBook PDA. The matching engine crosses 10 YES from the $0.55 ask in one tx.
 
-**Action [FLOW B if wired]:** Type $5 amount → click Submit → Phantom popup → approve. Wait ~2s for confirm. Trade summary updates.
+Wait ~2s for tx confirmation. The submitResult banner shows `Submitted! <16-char sig prefix>… (confirming)` in success-green. The order book on the left updates — the $0.55 ask drops from 50 → 40 YES. The position monitor shows 10 YES held.
+
+**Drop the bUSDC narrative here (first mention):**
+> "BellMarkets runs on bUSDC for this devnet demo — a self-controlled SPL mint with unlimited supply so we can fund judge wallets instantly. The protocol is mint-agnostic via the `update_usdc_mint` admin instruction — production deploys against Circle USDC. Tate can run `pnpm mint-demo-usdc <judge-wallet> 100` from terminal — try the demo yourselves."
 
 **Talking points (pick 2):**
-- "Phoenix v1 is the matching engine — it's an existing audited CLOB on Solana. We don't run our own matching. DR-001 in the constitution explains why."
-- "Buy YES is designed as a single atomic transaction: bundles mint_pair + a Phoenix swap of the NO half — user keeps the YES. Single wallet signature, single broadcast — POV-3 in the brain lift covers it."  *(FLOW A: "designed as"; FLOW B: "is")*
-- "Fee math is tier-based — DR-008. New users pay 2%; volume over $10K drops to 1%. Creator of the strike pays 0% (creator rebate). All shown in the trade panel as you adjust the amount."
+- "The matching engine ships in our own program — DR-020. Three-phase plan→settle→apply, escrow accounts owned by the strike's PDA, no Phoenix dependency. We pivoted from Phoenix v1 mid-build because per-market fee_recipient routing is what the protocol needs and that was a v1.5 effort vs ship-now in our own ix."
+- "Trading touches escrow accounts — not the protocol vault. The vault math (vault == pairs_outstanding × $1) is preserved through every cross/cancel/match — verified by 17 live invariant + adversarial tests against deploy_index=8."
+- "Fee math is tier-based — DR-008. New users pay 25 bps mint + 10 bps Phoenix taker (DR-018); creator of the strike pays 0% (creator rebate). All shown in the trade panel as you adjust the amount."
 
 ---
 
-### Scene 5 — Sell flow + position monitor (2:15 - 2:35)  **[FLOW A: walk UI, FLOW B: submit]**
+### Scene 5 — Sell YES Market — LIVE BROADCAST (2:15 - 2:35)  **[FLOW B: full live]**
 
-**On screen:** Same trade page. Toggle "Buy" → "Sell". Position monitor section shows current YES + NO holdings + realized PnL panel.
+**On screen:** Same trade page. Toggle "Buy" → "Sell". Position monitor still shows 10 YES from Scene 4.
 
-**Action [FLOW A]:** Toggle to Sell. Show the position monitor area. The "amount" field is now in YES/NO contracts rather than USDC.
-**Action [FLOW B]:** Toggle Sell, enter 3 YES, see estimated payout, click Submit, Phantom approve, position updates to 2 YES held.
+**Action:** Side = Sell. Outcome = YES. Order type = Market. Type "5" contracts. Estimated payout ≈ $2.50 (5 × $0.50 best bid). **Click Submit** → Phantom approve. The `place_order(side=ASK, is_market=true)` ix broadcasts; matches against the $0.50 inside bid; position monitor drops 10 → 5 YES; wallet bUSDC increases by ~$2.50.
 
 **Talking points (pick 2):**
-- "Sell is the inverse — sells your YES tokens back to the Phoenix order book. Pre-settle, you can exit any time at the market price."
-- "Realized PnL panel tracks settlement-equivalent value as the market price moves. Pure on-chain history; no off-chain bookkeeping."
+- "Sell is the inverse — taker ask crosses into the resting bid. Same matching engine, same atomic tx. Pre-settle, users can exit any time at the market price."
+- "Realized PnL panel tracks settlement-equivalent value as the market price moves. Pure on-chain history; no off-chain bookkeeping — the indexer Bram built reads `OrderMatched` events from Helius and reconstructs PnL in the UI."
 
 ---
 
-### Scene 6 — Toggle Limit (2:35 - 2:50)  **[FLOW A only: walk UI]**
+### Scene 6 — Limit order + DR-019 gating (2:35 - 2:50)  **[FLOW B: full live]**
 
-**On screen:** Order entry switches from Market to Limit. Price field appears. Order book on left shows where the order would sit if placed.
+**On screen:** Order entry. Toggle Buy YES + Limit. Price field appears, defaults to a mid-book value (e.g. $0.475).
 
-**Action [FLOW A]:** Toggle Limit, enter price $0.45, watch the book preview. Do NOT submit — limit orders are UI-shipped but the tx builder + Phoenix `getLimitOrderPacket` integration is queued for v1.5 per Cleo's branch.
-**Action [FLOW B]:** Not applicable for v1 demo; limit submit isn't wired.
+**Action 6a — Limit Buy YES rests on book:** Toggle to Limit. Set price = $0.45, size = 5. Click Submit → Phantom approve → `place_order(side=BID, price=450_000, is_market=false)` broadcasts. The order does NOT cross (it's below the $0.55 best ask + above the resting $0.45 bid). It rests on the book; the order book on left shows a new bid layer at $0.45 size 55 (50 from Bram's seed + 5 from us). Position monitor unchanged (no fill).
+
+**Action 6b — DR-019 Limit-disabled-on-NO check:** Toggle Outcome from YES → NO. The Limit/Market toggle should disable Limit (grayed out, tooltip "NO-side trades are market-only — DR-019"). Toggle Side from Buy → Sell. Sell × NO is also market-only.
+
+Narrate: "DR-019 locks NO-side trades to market-only at the protocol level. The Buy NO and Sell NO paths are atomic two-leg trades — mint_pair + sell-YES for Buy NO; buy-YES + redeem_pair for Sell NO. A limit on NO would be ambiguous about which leg the price applies to. The UI enforces it; if a user crafts the raw ix, the program rejects it."
+
+**Action 6c — Buy NO Market (atomic):** Toggle Outcome = NO + Side = Buy + Order = Market. Type "5" contracts. Estimated cost ≈ $2.75 (5 × ($1 − $0.45 best bid) = 5 × $0.55, since Buy NO mints a pair then sells the YES half at the best bid). Click Submit → Phantom approve. The atomic flow: (1) mint_pair burns $5 bUSDC + mints 5 YES + 5 NO; (2) `place_order(side=ASK, is_market=true)` sells the 5 YES at $0.45 best bid; user nets +$2.25 + 5 NO contracts. **Critical check: position monitor shows 5 NO, zero orphan YES.** If the bid book were empty, the BuyNoIocError would have reverted the whole tx atomically.
+
+**Action 6d (optional, if time) — Sell NO Market (atomic):** Toggle Outcome = NO + Side = Sell + Order = Market. Type "5" contracts (user holds 5 NO from 6c). Estimated payout ≈ buy-YES leg at best ask + redeem_pair refund. Click Submit → Phantom approve. The atomic flow: (1) `place_order(side=BID, is_market=true)` buys 5 YES at best ask; (2) `redeem_pair(5)` burns 5 YES + 5 NO + refunds 5 bUSDC. User wallet now has zero YES + zero NO + net bUSDC delta from the round-trip.
 
 **Talking points (pick 2):**
-- "Limit orders rest on Phoenix until filled or cancelled. The UI affords it today; the on-chain submit lands in the next sprint."
-- "Order book reads directly from Phoenix via subscription — no polling. Updates the moment any fill happens (when live)."
+- "Limit orders rest in the OrderBook PDA — same account-shape Aria designed under Keith's adversarial review. Telescoping escrow ensures no stranded dust on partial fills."
+- "Buy NO + Sell NO are atomic two-leg trades; the program guarantees both legs land or neither. The IOC `BuyNoIocError` is the kill-switch — if the second leg can't fill, the first leg unwinds. We adversarially tested this with an empty book + got a clean revert."
+- "DR-019 prevents UI footguns. NO-side trades are conceptually atomic — limit pricing on a two-leg atomic doesn't have one obvious meaning, so we disallowed it at the protocol level."
 
 ---
 
-### Scene 7 — Bell Pro briefing teaser (2:50 - 3:15)  **[FLOW A: switch to mockup; FLOW B: same since no Next.js page yet]**
+### Scene 7 — Bell Pro panel + Recent Fills (2:50 - 3:15)  **[FLOW B: live Next.js landing]**
 
-**On screen:** Switch to mockup tab and scroll to the Bell Pro panel section, OR click the Bell Pro slide in the carousel.
+**On screen:** Navigate back to `localhost:3000/`, scroll down past the leaderboard to the Bell Pro + Recent Fills row. Bell Pro panel on the left shows a LIVE Sonnet briefing header (`AAPL · today's briefing` + ET date) + scrollable body — Cleo's paired-sprint shipped the `/api/briefings/AAPL` route + landing-view fetch-on-mount hook. Recent Fills panel on the right shows the live tape table (static fixture today; live tape from Helius webhook ships v1.5).
 
-**Action:** Show the AI-generated market briefing template — headline + 3-paragraph briefing + suggested-strike tags + "Subscribe to Pro" CTA via Helio.
+**Action:** Scroll through the briefing body for ~3 seconds — show that it's a real AI-generated daily briefing, not a placeholder. Hover the "Upgrade · $9 / mo →" button. The CTA links to `/settings#billing` — Helio checkout integration is wired in `apps/web/app/api/billing/route.ts` + `apps/web/src/lib/billing/helio.ts`.
 
 **Talking points (pick 2):**
-- "Bell Pro is the AI-tier subscription. The classification + retrieval flow generates a daily briefing per MAG7 ticker. Production schedule (morning-cron-driven) lands in v1.5; today the generator runs operator-on-demand via `pnpm briefings:gen`."
+- "Bell Pro is the AI-tier subscription. Daily Sonnet 4.6 briefing per MAG7 ticker, generated against live Pyth Hermes spot prices + ET market-session context. The card you're looking at is reading directly from Neon — 7 briefings persisted today."
 - "Subscription is paid via Helio — Solana-native USDC checkout. No credit card. We never touch fiat."
-- "The briefing pipeline is independent of the trading pipeline — even if the AI is down, trading works normally."
+- "The briefing pipeline is independent of the trading pipeline — even if the AI is down, trading works normally. DR-014 social linking + Helio billing are off-chain off-path systems."
 
 ---
 
-### Scene 8 — Leaderboard with metric toggle (3:15 - 3:40)  **[FLOW A: mockup]**
+### Scene 8 — Leaderboard with metric toggle (3:15 - 3:40)  **[FLOW B: live Next.js landing]**
 
-**On screen:** Mockup tab Leaderboard section. Tab toggle: Profit | Streak | Win-Rate | ROI.
+**On screen:** Scroll up on `localhost:3000/` to the Leaderboard + Contests row (between the matrix and Bell Pro). Tab toggle: Profit | Streak | Win-Rate.
 
-**Action:** Click through 2-3 metric tabs to show different leaders.
+**Action:** Click through Profit → Streak → Win-Rate tabs to show different leaders. (ROI tab not shown — it's an explicit v1.5 stub.)
 
 **Talking points (pick 2):**
 - "Leaderboard tracks 4 metrics simultaneously — absolute profit, win streak, win rate, and ROI. Each surfaces a different kind of skill. Profit + streak + win-rate are live in Bram's indexer; ROI ships in v1.5 once the mint-volume capital data is indexed."
@@ -183,9 +218,9 @@ Drew's working assumption: Flow A or C. The script below is written for Flow A w
 ### Scene 9 — Close (3:40 - 4:00)
 
 **Talking points (pick 2):**
-- "Stack: Anchor on Solana devnet, Phoenix v1 CLOB, Pyth oracle, Next.js frontend, Trigger.dev cron, Neon Postgres for the leaderboard indexer."
-- "20-instruction program with 41 error variants — built across 5 devnet deploys with 5 independent Sonnet audit cycles + 14 substantive fixes shipped."
-- "Mainnet path: `pre-mainnet-readiness.md` documents the 6 gaps that remain. Today's demo is the devnet evidence."
+- "Stack: Anchor on Solana devnet, in-program CLOB (DR-020 — Keith's reference design adapted), Pyth oracle via vendored parser, Next.js frontend, Trigger.dev cron, Neon Postgres for the leaderboard indexer + briefings, Helius webhook for event indexing, Helio for fiat-free subscription billing."
+- "27-instruction program with 54 error variants — built across 8 audited devnet deploys with 7 independent Sonnet audit cycles + 17 substantive fixes shipped. The DR-020 in-program CLOB pivot landed mid-build; we pivoted from Phoenix v1 + Model D fee-recipient to a self-owned matching engine in ~24 hours."
+- "Mainnet path: `pre-mainnet-readiness.md` documents the 7 gaps that remain (including a fresh third-party audit on the new matching-engine surface). Today's demo is the devnet evidence."
 
 ---
 
@@ -198,28 +233,28 @@ Drew's working assumption: Flow A or C. The script below is written for Flow A w
 → `scripts/simulate-trading-day.mjs` runs 3 outcome modes (yes/no/invalid) with 5 invariants checked per Phase 5. 63 mocha eval tests + 100/100 Rust property tests cover the math. Sonnet-audit-3 caught a tier-scaling drift that would have broken the invariant under promo-mode fee config; fixed before this demo.
 
 ### "What's your security audit story?"
-→ `docs/architecture/pre-mainnet-readiness.md` §6 — 13-attack hostile-tester analysis. 11 defended with named test evidence. 1 weakly defended (uneconomic wash-trade for tier gaming). 1 explicit accepted gap (Sybil-mint on the leaderboard — DR-014 social linking + KYC at high-payout tiers mitigate in v2). **No independent third-party audit yet** — that's the #1 mainnet blocker.
+→ Master security model is `constitution/decisions.md` DR-017: PDA self-authority on every fund-moving account + Anchor account constraints validated before handler entry + permissionless `settle_market` + admin-as-cranker-not-redirector. The canonical "where can vault USDC go?" has a finite answer: winning user via redeem, pair-burner via redeem_pair, invalid-market refund via redeem_invalid, fee_collector via mint_pair fee. **No `withdraw_to_admin` instruction exists; no path was ever drafted.** The 13-attack hostile-tester analysis in `docs/architecture/pre-mainnet-readiness.md` §6 stress-tests that model: 11 defended with named test evidence, 1 weakly defended (uneconomic wash-trade for tier gaming — DR-009 amendment closes the Phoenix-secondary-trade fee surface at v1.5 P0), 1 explicit accepted gap (Sybil-mint on the leaderboard — DR-014 social linking + KYC at high-payout tiers mitigate in v2). **No independent third-party audit yet** — that's the #1 mainnet blocker.
 
 ### "What if Phoenix has an outage?"
-→ DR-009 explicitly accepts the dependency. Phoenix v1 is audited; our settle path doesn't depend on Phoenix (only the trading path does). If Phoenix is down, users can't trade in/out of positions on Phoenix but they CAN still mint_pair + redeem at settle. Trade-off + alternatives documented in DR-009.
+→ Trick question post-DR-020 — we don't depend on Phoenix anymore. The matching engine ships in our own program (DR-020 pivot, mid-build, Sun 2026-05-24). Reference design from Keith's adversarially-reviewed CLOB. Phoenix code stays *dormant* in the program (`verify_phoenix_market` adapter present but unused) per DR-020's additive policy — we may pivot back to Phoenix v2 if it ships with native per-market `fee_recipient`. For now, no external matching dependency. DR-009 amendment (Model D feasibility) is preserved in the constitution for the historical record; DR-020 supersedes it operationally.
 
 ### "Show me an actual on-chain transaction"
 → Two evidence levels:
 - **Program deploy** (proves devnet deployment): `4rQq81zAxwM9ME4qXdnhuMsJMHWqqwqU7A8aBqHm4urmKPkkw9PX8uupsHXifuhfMwWDNcYLeU4TGF3yCKrkGEss` — pull up Solana Explorer. This is the deploy-5 tx; proves the program lives on devnet at the cited address. **Not a trade transaction.**
 - **Lifecycle invariants** (proves trade/settle/redeem math): run `LIVE_DEMO=1 bash scripts/one-command-demo.sh` — exercises mock-mode lifecycle + the real chain-level DR-002 evidence test.
-- **A real on-chain trade tx**: only available if Flow B (Cleo's submit handlers wired) — would be the Phantom-approved tx from Scene 4.
+- **A real on-chain trade tx**: every Scene 4-6 Submit click broadcasts to devnet via `place_order` (Buy YES Market, Sell YES Market, Limit Buy YES, Buy NO atomic, Sell NO atomic). Open Solana Explorer on devnet, paste any of the tx sigs returned by the trade panel after Phantom approve — full inner-instruction view shows mint_pair + place_order (or place_order alone) executing.
 
 ### "Why no v2 features yet?"
 → DR-014 (social linking) + DR-015 (multi-metric leaderboard) + `force_redeem_invalid` + Pyth Receiver Program + multi-sig admin are all queued and specced. v1 demo is the trading-protocol + invariant evidence. v2 is the retention layer.
 
 ### "Is the live app fully wired?"
-→ Honest answer: trade-page UI is shipped, trade-submit handlers throw `not yet wired` as of Saturday evening. Cleo is actively shipping; if it's wired by Sunday morning we run Flow B (the full live Phantom-approved flow). If not, we use Flow A — visual design via mockups + on-chain evidence via terminal. **The protocol on chain is fully functional** (20 ix deployed, 76-test surface verified); the frontend wiring lags by one sprint. v1.5 closes the gap.
+→ Honest answer: as of merge `ca3c2e1` on Sun 2026-05-25, **all 4 trade paths are LIVE end-to-end** against deploy_index=8 + bUSDC + Bram's seeded books on devnet. Buy YES + Sell YES are direct taker crosses; Buy NO + Sell NO are atomic two-leg trades (mint_pair + sell-YES; buy-YES + redeem_pair) with IOC reverts guaranteeing no orphan tokens. The full v1 lifecycle (create_strike_market → init_order_book → grow_order_book → mint_pair → place_order × N → match_orders → settle_market → redeem) executes against the deployed program. Landing page sections (probability matrix, leaderboard, Recent Fills) ship with static fixture data; live-data wiring (`useAllMarkets`, `useLeaderboard`, `useFills`) lands v1.5. Bell Pro card IS live (Sonnet briefing fetched from Neon via `/api/briefings/:ticker`). **The protocol on chain is fully functional** (27 ix deployed across 8 audited devnet deploys, deploy_index=8 = deploy_index=7 + reinit_rewards_pools for the bUSDC migration; 17 live invariant + adversarial tests passing against the in-program CLOB; 7+ Sonnet audit cycles with 17+ substantive fixes).
 
 ---
 
 ## Pre-recording (Sat 5/24 night, before Sunday demo)
 
-1. **Re-evaluate flow choice** — what did Cleo land Sat night? If trade-submit wired → Flow B / C. If not → Flow A.
+1. **Flow choice locked = Flow B** (Sun deploy_index=8 smoke verdict; see header). Re-evaluate ONLY if pre-flight (1) dev server doesn't start, (2) bUSDC seeded books missing, (3) Phantom approval flow breaks. Fallback ladder: Flow B → Flow C (Buy×Yes only + narration) → Flow A (mockup HTML + terminal).
 2. **Run pre-flight checks** end-to-end. Especially the Pyth feed staleness check.
 3. **Rehearse twice** — first pass identify hiccups, second pass record.
 4. **Save best take** to `docs/demo/recording-assets/v1-demo.mp4`.
@@ -243,4 +278,8 @@ All of these are richer when pulled for a specific reviewer question rather than
 
 ## Audit lineage
 
-This script went through Sonnet-audit-6 (Day-6 round 1) which caught the original draft's over-claims on functionality. Specifically: trade-submit handlers throw `not yet wired` for every path; landing carousel + probability matrix don't exist in shipped Next.js; Bell Pro morning cron is not registered; leaderboard ROI metric is an explicit stub. The current revision restructures the script into three flows (A/B/C) with explicit honesty about what's mockup vs running app vs terminal evidence. **Re-audit before Sunday recording.**
+- **Sonnet-audit-6** (Sat 2026-05-24 round 1) caught the original draft's over-claims: trade-submit handlers throw `not yet wired` for every path; landing carousel + probability matrix don't exist in shipped Next.js; Bell Pro morning cron is not registered; leaderboard ROI metric is an explicit stub. Drew restructured the script into three flows (A/B/C) with explicit honesty about what was mockup vs running app vs terminal evidence.
+- **Smoke #3 + Flow-C lock** (Sun 2026-05-25 morning): post-merge smoke against main `91bb75d` confirmed Cleo shipped the two critical surfaces (trade Buy×Yes wiring + v8 landing). Flow C was the chosen flow as of that revision.
+- **Smoke #4 + Flow-B promotion** (Sun 2026-05-25 afternoon, this revision): post-deploy_index=8 + Bram's bUSDC re-seed against main `ca3c2e1`. Live contracts smoke = 17/17 passing (3 oracle + 14 DR-020 CLOB; the 1 prior Chai red is fixed via Aria's `22c9cdf`). All 4 trade paths confirmed live-fillable on Bram's seeded META/NVDA/AAPL strikes. **Flow B is now the chosen flow.** Bell Pro card now renders live Sonnet briefing content via Cleo's paired-sprint `/api/briefings/:ticker` route. Phoenix Q&A pivoted to DR-020 narrative (in-program CLOB; Phoenix dormant).
+
+Re-audit AGAIN if any pre-flight check fails on Sunday afternoon — devnet flakes, seeded books missing, dev-server-port surprises, Phantom approval breakage are the four known fragile points.

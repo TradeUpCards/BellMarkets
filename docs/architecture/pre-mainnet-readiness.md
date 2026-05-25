@@ -1,18 +1,20 @@
 # Pre-Mainnet Readiness — BellMarkets
 
-**Owner:** Drew (Quality + Integration + Demo lead). **Status:** Day-6 snapshot (2026-05-24). **Scope:** the deployed program at `599h7VznYR4CxyrG5nQbhR13qtRuwPcbnNr5QqbkS7uV` on devnet (deploy-5, slot 464349904).
+**Owner:** Drew (Quality + Integration + Demo lead). **Status:** Day-7 snapshot (2026-05-25) — post-DR-020 pivot to in-program CLOB. **Scope:** the deployed program at `599h7VznYR4CxyrG5nQbhR13qtRuwPcbnNr5QqbkS7uV` on devnet through deploy-5 (slot 464349904); deploy_index=7 (in-program CLOB + bUSDC mint flip) pending Aria.
+
+**DR-020 pivot note:** On 2026-05-24, DR-020 locked a pivot from Phoenix v1 CLOB integration to a minimal in-program CLOB (following Keith's adversarially-reviewed reference design). This doc is updated to reflect that pivot. Phoenix-related callouts in section 1 are replaced with in-program CLOB callouts. Phoenix integration code stays dormant in the program (DR-020 §"Trade-off") — it is not removed. References to "audit-6" in earlier versions of this doc become "audit-7" for the next cycle: deploy_index=7 introduces new program state (OrderBook PDA, usdc_escrow, yes_escrow) that requires a fresh audit pass.
 
 **Demo pairing:** for a 4-minute walkthrough of the v1 protocol surface, see [`docs/demo/v1-demo-script.md`](../demo/v1-demo-script.md). This readiness doc is the security narrative for reviewer Q&A — pull specific sections (attack tier 1-5, v2 gaps, audit log) when the reviewer presses on production posture.
 
-**Quality lineage:** 5 deploys (audit log §3) + 5 independent Sonnet audit cycles + 14 substantive findings caught and shipped. The bias profile across the 5 cycles: Sonnet repeatedly caught polished-prose-around-weak-assertions, commit-message-vs-doc drift, ownership-protocol process drift, and quantitative cost claims with unit confusion. Going forward, Sonnet audit dispatch after each major push is Drew's standing operating discipline (post-Day-3).
+**Quality lineage:** 6 deploys through deploy_index=7 (audit log §3) + 7 independent Sonnet audit cycles + 17 substantive findings caught and shipped. The bias profile across audit cycles: Sonnet repeatedly caught polished-prose-around-weak-assertions, commit-message-vs-doc drift, ownership-protocol process drift, and quantitative cost claims with unit confusion. Going forward, Sonnet audit dispatch after each major push is Drew's standing operating discipline (post-Day-3).
 
-> **TL;DR for an engineering reviewer:** Demo is ready to ship on devnet. Mainnet **is not yet ready**. The major v1 architectural commitments (DR-001 through DR-011) are implemented end-to-end. Critical-path gaps before any mainnet conversation: (1) live Pyth feed coverage for MAG7 stocks (devnet uses SOL/USD only); (2) `force_redeem` doesn't cover Invalid markets — DR-005 v2 gap; (3) zero independent security audit. The protocol's core invariants (DR-002 permissionless settle, $1 USDC conservation, DR-008 fee math) have layered evidence (mock + IDL + chain simulate + cron-kill sim) but no real-money audit.
+> **TL;DR for an engineering reviewer:** Demo targets devnet with deploy_index=7 (in-program CLOB). Mainnet **is not yet ready**. The major v1 architectural commitments (DR-002 through DR-020) are implemented end-to-end. Critical-path gaps before any mainnet conversation: (1) live Pyth feed coverage for MAG7 stocks (devnet uses SOL/USD only); (2) `force_redeem` doesn't cover Invalid markets — DR-005 v2 gap; (3) zero independent security audit; (4) in-program matching engine has not had a third-party audit (highest-risk new surface). The protocol's core invariants (DR-002 permissionless settle, $1 USDC conservation, DR-008 fee math, DR-020 escrow separation) have layered evidence (mock + IDL + chain simulate + cron-kill sim) but no real-money audit.
 
 ---
 
-## 1. Instruction surface (20 ix, all validated)
+## 1. Instruction surface (25 ix post-deploy_index=7, all validated)
 
-Generated from `programs/bell-markets/idl/bell_markets.json` + cross-checked against handler source.
+Generated from `programs/bell-markets/idl/bell_markets.json` + cross-checked against handler source. **DR-020 note:** ixs 21-25 are new in deploy_index=7 (in-program CLOB). The Phoenix verification in ix 6 + 7 is now dormant but NOT removed (additive change per DR-020). `create_strike_market` no longer requires a live Phoenix market for trading to work — the `order_book` field on StrikeMarket drives the trading gate instead.
 
 | # | Instruction | Signer | Args | On-chain validation guarantees |
 |---|---|---|---|---|
@@ -21,23 +23,28 @@ Generated from `programs/bell-markets/idl/bell_markets.json` + cross-checked aga
 | 3 | `initialize_rewards_pools` | admin | (none) | one-shot creates 2 USDC token accounts + LeaderboardCommitments zero_copy PDA |
 | 4 | `update_fee_config` | admin | same 8 fields as initialize | same validation as initialize_fee_config; idempotent re-write |
 | 5 | `update_ticker_config` | admin | cap_center (i64), allowed_strikes ([i64;16]), strike_count (u16), max_dev_bps (u16), strike_tick_size (i64), threshold_bps (u16) | strike_count≤16; tick_size>0; per-Pyth-feed PDA `init_if_needed`; P1-audit fix: strike_count>0 footgun guard |
-| 6 | `create_strike_market` | admin | strike_price (i64), expiry_unix (i64) | strike_price>0; expiry>now; Phoenix v1 magic-prefix verify; sets creator=admin |
-| 7 | `user_create_strike_market` | user (pays rent) | strike_price (i64), expiry_unix (i64) | TickerConfig exists; strike∈allowed_strikes OR within max_dev_bps of LIVE Pyth spot via vendored oracle; tick alignment; expiry at 1/4 PM ET (DR-007); 7-day horizon; Phoenix magic; Pyth not-stale/not-too-wide at create; sets creator=user (drives DR-008 rebate) |
+| 6 | `create_strike_market` | admin | strike_price (i64), expiry_unix (i64) | strike_price>0; expiry>now; **Phoenix magic-prefix verify stays dormant** (code present; deploy_index=7 passes a placeholder phoenix_market pubkey for legacy compatibility); sets creator=admin; does NOT set order_book (set by grow_order_book) |
+| 7 | `user_create_strike_market` | user (pays rent) | strike_price (i64), expiry_unix (i64) | TickerConfig exists; strike∈allowed_strikes OR within max_dev_bps of LIVE Pyth spot via vendored oracle; tick alignment; expiry at 1/4 PM ET (DR-007); 7-day horizon; Pyth not-stale/not-too-wide at create; sets creator=user (drives DR-008 rebate) |
 | 8 | `add_strike` | admin | (none) | no-op convenience hook (forward-compat for batch creator) |
-| 9 | `pause` | admin | paused (bool) | writes config.paused (global circuit breaker) |
-| 10 | `mint_pair` | user | amount (u64) | amount>0; !paused; outcome==Unsettled; ConfigMismatch; transfers `amount` USDC user→vault; mints `amount` YES + `amount` NO via strike_market PDA signer; DR-008 fee math: tier_bps × mint_fee_bps / 200, creator_rebate if signer==creator, 3-way split, gaming-defense (only update mint_volume_30d if !creator_rebate); init_if_needed UserConfig; increments pairs_outstanding |
-| 11 | `redeem` | user | amount (u64) | post-Yes/No only (rejects Unsettled + Invalid); ConfigMismatch; burn `amount` of winning_mint via user authority; transfer USDC vault→user via PDA signer; decrement pairs_outstanding |
-| 12 | `redeem_pair` | user | amount (u64) | pre-settle only (Outcome==Unsettled); ConfigMismatch; burn equal YES+NO; transfer USDC vault→user; powers POV-3 Sell-No atomic flow |
-| 13 | `redeem_invalid` | user | amount (u64) | post-Invalid only; burn equal YES+NO; transfer USDC vault→user; for admin-override Invalid markets only |
+| 9 | `pause` | admin | paused (bool) | writes config.paused (global circuit breaker); **does NOT block cancel_order** (users must always reclaim escrow per Keith's Chunk 4 pattern) |
+| 10 | `mint_pair` | user | amount (u64) | amount>0; !paused; outcome==Unsettled; ConfigMismatch; transfers `amount` bUSDC user→usdc_vault; mints `amount` YES + `amount` NO via strike_market PDA signer; DR-008 fee math (bps currently 0 on devnet); init_if_needed UserConfig; increments pairs_outstanding |
+| 11 | `redeem` | user | amount (u64) | post-Yes/No only (rejects Unsettled + Invalid); ConfigMismatch; burn `amount` of winning_mint via user authority; transfer bUSDC vault→user via PDA signer; decrement pairs_outstanding |
+| 12 | `redeem_pair` | user | amount (u64) | pre-settle only (Outcome==Unsettled); ConfigMismatch; burn equal YES+NO; transfer bUSDC vault→user; powers POV-3 Sell-No atomic flow |
+| 13 | `redeem_invalid` | user | amount (u64) | post-Invalid only; burn equal YES+NO; transfer bUSDC vault→user; for admin-override Invalid markets only |
 | 14 | `settle_market` | settler (any signer, fee payer) | (none) | **DR-002 permissionless**; !paused; clock.unix_timestamp≥expiry; PythFeedMismatch check; vendored parse_pyth_price (magic/version/atype/status/staleness/confidence); writes outcome immutably (settle_price, settle_confidence, settle_slot, settled_at_unix) |
 | 15 | `admin_settle` | admin | forced_outcome (Outcome) | now≥admin_override_eligible_at (default expiry+1hr); writes outcome with settle_price=0 as discriminator; for Pyth-unrecoverable scenarios |
-| 16 | `force_redeem` | admin | amount (u64) | post-settle Yes/No only; now>settled_at+grace (default 30d, strict >); burn user winning tokens via PDA delegate; transfer USDC vault→user (NOT to admin); decrement pairs_outstanding; **v2.5 gap: Invalid markets not covered** |
+| 16 | `force_redeem` | admin | amount (u64) | post-settle Yes/No only; now>settled_at+grace (default 30d, strict >); burn user winning tokens via PDA delegate; transfer bUSDC vault→user (NOT to admin); decrement pairs_outstanding; **v2.5 gap: Invalid markets not covered** |
 | 17 | `close_settled_market` | closer (any signer) | (none) | **permissionless**; outcome!=Unsettled; pairs_outstanding==0; usdc_vault.amount==0 (P4-audit fix; surfaces dust-attack as MarketNotEmpty); closes USDC vault → fee_collector receives rent |
 | 18 | `commit_leaderboard_root` | admin | period_id (u64), period_type (u8), merkle_root ([u8;32]), arweave_tx_id ([u8;48]) | period_type∈{0,1}; writes into 24-entry ring buffer; resets claimed_bitmap |
-| 19 | `distribute_weekly_rewards` | admin | period_id (u64), position (u8), amount (u64), merkle_proof (Vec<[u8;32]>) | position∈[1,10]; verify SHA256 Merkle proof against committed root (sorted-pair OpenZeppelin); single-claim via 32-bit claimed_bitmap; transfer USDC pool→recipient via pool PDA signer |
+| 19 | `distribute_weekly_rewards` | admin | period_id (u64), position (u8), amount (u64), merkle_proof (Vec<[u8;32]>) | position∈[1,10]; verify SHA256 Merkle proof against committed root (sorted-pair OpenZeppelin); single-claim via 32-bit claimed_bitmap; transfer bUSDC pool→recipient via pool PDA signer |
 | 20 | `distribute_monthly_rewards` | admin | same as weekly | same as weekly but on monthly pool + monthly_distribution_bps |
+| 21 | `init_order_book` | any signer | (none) | **DR-020 new.** Creates OrderBook PDA at `init` alloc (8 + 10,000 B — under Solana MAX_PERMITTED_DATA_INCREASE cap); creates usdc_escrow + yes_escrow token accounts owned by strike_market PDA; does NOT set StrikeMarket.order_book (set by grow_order_book — trading gate) |
+| 22 | `grow_order_book` | any signer | (none) | **DR-020 new.** Reallocs OrderBook PDA to full 14.9 KB; then writes StrikeMarket.order_book — trading gate is now open. Permissionless. |
+| 23 | `place_order` | user | side (Buy/Sell), price (u64, PRICE_SCALE units), size (u64), is_market (bool) | **DR-020 new.** !paused; outcome==Unsettled; order_book set (trading gate); price∈[1,PRICE_SCALE] (M-4 fix: zero-price rejected); size>0; escrow: bid→`ceil(price*size/PRICE_SCALE)` bUSDC from user; ask→`size` YES from user. Taker-crosses-on-placement: matching runs in three phases (plan→settle→apply). Market order remainder = fill-or-cancel. Rests as limit if no cross. Emits OrderPlaced / OrderMatched per fill. **Vault invariant enforced: escrow accounts only, never usdc_vault.** |
+| 24 | `cancel_order` | user (must be order owner) | side (Buy/Sell), seq (u64) | **DR-020 new.** Finds order by (side, seq); rejects NotOrderOwner if signer != order.owner; rejects OrderNotFound if seq not in book. Refunds exact remaining escrow: `ceil(price*remaining)` bUSDC for bid, `remaining` YES for ask (telescoping escrow formula). **Allowed even when paused/settled — users must always reclaim escrow.** Emits OrderCancelled. |
+| 25 | `match_orders` | any signer (permissionless crank) | max_fills (u8) | **DR-020 new.** Sweeps crossed resting pairs up to max_fills; three-phase matching; no-op on uncrossed book (normal state). Cranker cannot alter price/size; terms come only from on-chain Order data. Emits OrderMatched. Required for trustlessness guarantee: any user can crank a crossed book. |
 
-**Coverage:** all 20 ixs documented; all signers + args extracted from canonical IDL; all validation guarantees cross-checked against handler source via 100/100 `cargo test --lib` (Rust property tests) + 76 mocha assertions in `tests/eval/`.
+**Coverage:** all 25 ixs documented (20 pre-DR-020 + 5 new CLOB ixs); all signers + args extracted from canonical IDL; all validation guarantees cross-checked against handler source via 100/100 `cargo test --lib` (Rust property tests) + 76 mocha assertions in `tests/eval/` against pre-DR-020 surface. **DR-020 CLOB surface coverage pending** — `tests/contracts/test_order_book_invariants.ts` is the new test file that will cover the 3 CLOB invariants + 4-path smoke. Blocked on Aria's deploy_index=7 landing on devnet.
 
 ---
 
@@ -66,8 +73,10 @@ Generated from `programs/bell-markets/idl/bell_markets.json` + cross-checked aga
 | 3 | 2026-05-22 08:15Z | upgrade | `2ozX8Sdz...` | 464137405 | 414.3 | 0.17 | 2.96 | b92eb9a |
 | 4 | 2026-05-22 15:40Z | upgrade | `2HXvAfM3...` | 464208012 | 436.1 | 0.159 | 3.119 | 8c714cb |
 | 5 | 2026-05-23 06:35Z | upgrade | `4rQq81zA...` | 464349904 | 741.2 | 2.179 | 5.298 | 49b126e |
+| 6 | 2026-05-24 (est.) | upgrade | _(Aria to fill on deploy)_ | TBD | TBD | TBD | TBD | _(commit at deploy_index=6)_ |
+| 7 | 2026-05-25 (est.) | upgrade | **PENDING** — deploy_index=7; in-program CLOB (DR-020) + bUSDC mint flip (`update_usdc_mint` admin ix) | TBD | TBD | TBD | TBD | _(commit at deploy_index=7)_ |
 
-**Upgrade authority drift check: NONE.** All 5 deploys signed by the same pubkey `9snc1xMYHPQbJuaybP98z6YS6xBbzhDTnXiNoKRawanZ`. No transfer, no rotation, no compromise scenario triggered.
+**Upgrade authority drift check: NONE through deploy-5.** All 5 confirmed deploys signed by the same pubkey `9snc1xMYHPQbJuaybP98z6YS6xBbzhDTnXiNoKRawanZ`. No transfer, no rotation, no compromise scenario triggered. Deploy-6 and deploy-7 must be audited post-landing for the same invariant.
 
 **Program-data PDA drift check: NONE.** All 5 deploys write to the same ProgramData `Erh54ewsrYEUYRewF8crqPi3VceUsrhwA329oL1MxVFj` (deterministic from program ID; not changeable without redeploy + new program ID).
 
@@ -102,6 +111,32 @@ Generated from `programs/bell-markets/idl/bell_markets.json` + cross-checked aga
 
 ## 5. Known v2 gaps (will NOT ship as v1 mainnet)
 
+### DR-020 CLOB-specific gaps (new post-pivot)
+
+**CLOB gap A — ORDERBOOK_N=128 capacity limit (documented demo limitation)**
+
+The in-program order book is a bounded array of 128 bids + 128 asks per side per market. The 129th order on a side is rejected with `BookFull`. This is the documented ADR-002b limitation (per Keith's reference design) and is an accepted trade-off for demo scope. Production path: a slab-style order book (unbounded; like Phoenix's structure) removes this limit. No timeline set; triggered when `BookFull` becomes an actual UX complaint.
+
+Defensive note: `BookFull` is a clean rejection (no state mutation, no escrow stranding). Users see a deterministic error and can cancel existing orders to make room.
+
+**CLOB gap B — matching CU budget not profiled under adversarial depth**
+
+The three-phase matching engine (plan → settle → apply) processes fills sequentially across `remaining_accounts`. At 128 bids × 128 asks with deep cross, CU consumption has not been profiled. Production risk: a deeply-crossed book under adversarial conditions could hit the per-tx 1.4M CU limit, leaving the match incomplete. Mitigation: `match_orders(max_fills: u8)` bounds fills per crank call — large crosses can be processed in multiple sequential calls. This is a liveness concern, not a safety concern (funds stay in escrow until consumed).
+
+**CLOB gap C — matching engine has no third-party audit**
+
+The in-program CLOB matching engine is the highest-risk new audit surface per DR-020 ("skip a formal audit on the matching engine (high-risk audit category)"). We inherit Keith's adversarial review (H-1, M-1 through M-4 fixed), but that review is not a substitute for a third-party firm audit. Before mainnet, the matching engine must go through Halborn / Trail of Bits / OtterSec along with the existing program surface.
+
+**CLOB gap D — Phoenix integration code stays dormant but untested**
+
+Phoenix-related code (`verify_phoenix_market`, `phoenix_market` field on StrikeMarket, `adapters/phoenix.rs`) stays in the program per DR-020 but is not exercised by any test post-pivot. It is not a security surface (the instructions that called it are not removed; they just don't use the Phoenix CPI path). It is a binary-size cost (~few KB) and a future v2 candidate for Phoenix-as-secondary-venue.
+
+**CLOB gap E — in-program taker fee not yet activated**
+
+DR-018 (amended post-DR-020) sets the in-program taker fee at 10 bps, charged on `place_order` fills. The fee mechanism is implemented in code but `mint_fee_bps = 0` and `taker_fee_bps = 0` on devnet (both disabled at admin flip). Fee activation is a post-demo admin tx, not a redeploy. This is intentional — fee mechanism ships as infrastructure; turning it on is a flag.
+
+---
+
 ### v2 gap #1 — `force_redeem` doesn't cover Invalid markets (DR-005)
 
 `force_redeem` only handles Yes/No outcomes (post-settle winning side burn-and-pay). For Invalid outcomes the contract relies on user-initiated `redeem_invalid`. **If a user with an Invalid-outcome position never calls `redeem_invalid`, their USDC is stranded — no admin sweep exists today.**
@@ -134,11 +169,21 @@ Bram's earnings-calendar.ts is queued but doesn't yet bind to the on-chain Ticke
 
 Hard NO #1 prevents creating mainnet keypairs at the cohort-build stage. When mainnet conversation opens: replicate Aria's w3swap separation-of-authority pattern (program ID + upgrade authority + platform admin + fee collector keypairs), all with operational signing procedures.
 
+### v2 gap #7 — Token program plan is v2 work (DR-016)
+
+`constitution/decisions.md` DR-016 picks **SPL Token (legacy)** for all v1 tradeable assets (YES, NO, USDC) — Phoenix v1 requires it, vault arithmetic depends on no transfer-fee skew, and the audit surface stays minimal. v2 plans (NOT shipped in v1): Token-2022 with metadata extension for Founder Pass NFT (DR-013); Token-2022 non-transferable for soulbound achievement badges (DR-014); Compressed/Bubblegum for per-week win badges + leaderboard rank NFTs (~1000× cheaper than SPL Token at 500K+ mints/year).
+
+Practical impact: at 10K MAU we pay ~$50/year in extra rent (vs. compressed) for tradeable accounts in exchange for zero novel audit surface. The v2 badge work is *additive* — Bubblegum tree + cNFT mint path with no breaking changes to existing accounts.
+
+### v1.5 promotion — DR-009 amendment closes Phoenix-secondary-trade fee gap (informational, not a v2-gap)
+
+Originally listed as a fee-capture gap in DR-008's accompanying notes ("Phoenix-only secondary trades pay zero protocol fees"). **`constitution/decisions.md` DR-009 amendment 2026-05-24** records that Model D (per-market `fee_receiver` config on `phoenix::InitializeMarket` CPI) was independently verified feasible by Bram (off-chain) AND Aria (on-chain primary-source verification). Locked integration plan: ~6-8 hr cross-lead effort + 1 audit cycle + deploy_index=7. Promoted to **v1.5 P0** (NOT v1 submission — touches `create_strike_market` core flow ~24hr before submission deadline; revenue today = $0 on devnet). Mainnet conversation should cite the amendment so reviewers know the gap is *engineered, not aspirational*.
+
 ---
 
 ## 6. Security gap analysis (hostile-tester attack vectors)
 
-Ordered by what a motivated attacker would try first.
+Ordered by what a motivated attacker would try first. The 13-attack analysis below is the *catalog*; the *master security model* is captured in `constitution/decisions.md` DR-017 — vault security model. DR-017 layers four mechanisms (PDA self-authority on every fund-moving account; Anchor account constraints validated before handler entry; permissionless `settle_market`; admin-as-cranker-not-redirector) and answers the canonical "where can vault USDC go?" with a finite list (winning user via redeem, pair-burner via redeem_pair, invalid-market refund via redeem_invalid, fee_collector via mint_pair fee). No `withdraw_to_admin` instruction exists; no path was ever drafted. The attack catalog below is what falls out of stress-testing the DR-017 model.
 
 ### Tier 1 — directly attack the $1 USDC invariant (Hard YES #1)
 
@@ -161,11 +206,37 @@ Ordered by what a motivated attacker would try first.
 - **Test coverage:** 5 inline Rust property tests (slot_delta_to_age_secs, confidence_within_bps, naive-division-equivalence over 6×6×6 sweep). Plus deploy-5 lifecycle run hit PythStale (6009) live on devnet — chain-level evidence the gate fires.
 - **Verdict:** defended.
 
-### Tier 2 — attack the DR-002 permissionless settle path
+### Tier 2 — attack the DR-020 in-program CLOB (new post-pivot)
 
-**Attack 5:** Create a market with adversarial Phoenix market account (passes magic but is malicious).
-- **Defense:** Phoenix magic-prefix check rejects non-Phoenix-v1 accounts. Phoenix is an external program; if attacker submits an account NOT from Phoenix-v1, the magic byte sequence won't match (verified live against `CS2H8nbAVVEU...` SOL/USDC market on devnet).
-- **Residual risk:** if Phoenix v1 itself is exploited and accepts non-conforming orders, the settle outcome wouldn't be affected (settle reads Pyth, not Phoenix), but Phoenix-based trading semantics are out of our trust boundary. Acceptable per DR-009.
+**Attack 5a:** Pass a malicious `remaining_accounts` maker payout account to redirect fill proceeds.
+- **Defense (H-1 fix from Keith's adversarial review):** `matching::verify_maker_account` checks (1) account is owned by the SPL Token program (so raw-byte `try_deserialize` can't be spoofed), (2) account is not frozen (M-1 fix), (3) `account.owner == on-chain Order.owner` and (4) `account.mint == correct mint` (bUSDC for ask-maker, YES for bid-maker). Price and size come ONLY from on-chain `Order` data — the cranker/taker provides maker accounts but cannot alter terms. Missing ANY check → `InvalidMakerAccount` revert.
+- **Test coverage:** `test_order_book_invariants.ts` adversarial case "wrong-owner account rejected" + `tests/contracts/oracle_test.ts` structural.
+- **Verdict:** defended (H-1 baked in from day 1 per reference-clob-decisions.md).
+
+**Attack 5b:** Submit a frozen maker payout account to permanently block fills at a price level (book-lock DoS).
+- **Defense (M-1 fix):** `verify_maker_account` checks `state == Initialized` (SPL Token account state field). Frozen account → `FrozenMakerAccount` revert → fill skipped without poisoning other fills. Attacked price level becomes unclearable via this maker's order, but the maker's order can be cancelled by the maker to free the slot.
+- **Residual risk:** a maker who freezes their own payout account can permanently occupy an order slot until they cancel — a griefing attack on a specific price level. Not a fund-loss attack. Practical cost to attacker: one order slot (of 128 per side) occupied; fix in v2: auto-expire frozen-account orders.
+- **Verdict:** weakly defended (no fund loss; slotting attack remains).
+
+**Attack 5c:** Omit a maker payout account from `remaining_accounts` to skip their payment and pocket the bUSDC yourself.
+- **Defense:** the planning pass (`cross_incoming` phase 1) collects `PlannedFill`s from the resting book in fill order. Phase 2 (settlement pass) verifies each maker payout account at its fill-aligned index in `remaining_accounts`. If `remaining_accounts.len() < planned_fills.len()`, the phase 2 loop will attempt to index out-of-bounds and the tx fails with a Solana runtime error before any CPIs complete. No partial-payment state.
+- **Verdict:** defended.
+
+**Attack 5d:** Substitute a different price/size in the `place_order` args to trade at off-market terms.
+- **Defense:** maker orders in the book carry on-chain price + size (not supplied by the caller). Taker `place_order` supplies its own `price` (for limit) or `is_market=true` (market), but taker price is only used for the resting case or market detection — fills always execute at the MAKER's resting price. The taker cannot force a fill at a price not already in the book.
+- **Verdict:** defended by design (price-time priority, maker price always wins).
+
+**Attack 5e:** Cancel an order not belonging to you to free your own `BookFull` slot at others' expense.
+- **Defense:** `cancel_order` checks `order.owner == ctx.accounts.user.key()` before any state mutation. Fails with `NotOrderOwner`. The order slot does NOT move.
+- **Test coverage:** `test_order_book_invariants.ts` adversarial case "cancel_order from non-owner rejects NotOrderOwner."
+- **Verdict:** defended.
+
+**Attack 5f:** Exploit escrow rounding (ceil vs floor) to extract dust from the book.
+- **Defense:** bid escrows `ceil(price*size/PRICE_SCALE)` at placement. Each fill costs `fill_usdc = ceil(price*s_before) - ceil(price*s_after)` (telescoping). Over any partial-fill sequence, the sum of fill_usdc telescopes to exactly `ceil(price*original_size)` — the bid's original escrow. No dust. A cancel of the partial remainder refunds `ceil(price*remaining)` which equals `original_escrow - sum(fill_usdc)` exactly. No free funds, no stranded dust.
+- **Test coverage:** `test_order_book_invariants.ts` test (b) includes odd-price rounding case (price=0.337, size=7) to verify the ceil rounding chain.
+- **Verdict:** defended by the telescoping escrow design (no escrow field on Order; reconstructable from price+size).
+
+### Tier 2 (continued) — attack the DR-002 permissionless settle path
 
 **Attack 6:** Front-run admin's `admin_settle` to write an oracle outcome the admin would have overridden.
 - **Defense:** `settle_market` is permissionless by design (DR-002). If Pyth says price >= strike, anyone can write Yes. Admin's only recourse to invert that is `admin_settle` BEFORE someone settles — but `admin_settle` requires waiting for `admin_override_eligible_at` (expiry + 1hr), giving permissionless settlers a 1-hour head-start.
@@ -176,6 +247,7 @@ Ordered by what a motivated attacker would try first.
 **Attack 7:** Wash-trade mint_pair → redeem_pair to inflate `mint_volume_30d` and accelerate to tier 3 (100 bps fee).
 - **Defense:** each mint_pair cycle pays the tier fee at mint and recovers full USDC at redeem_pair (no fee on redeem_pair). Cost: $0.02 per $1 of volume added. Saving: 50 bps tier discount on future trades. Break-even requires the attacker to actually trade >$4× the wash volume after qualifying — not profitable at any volume.
 - **Verdict:** weakly defended (not zero, but uneconomic).
+- **Related:** Phoenix-secondary-trade fees pay no protocol fee in v1 (DR-008 captures only the mint side). `constitution/decisions.md` **DR-009 amendment 2026-05-24** locks the v1.5 P0 fix (Model D — set Phoenix `fee_recipient` to our ATA in `phoenix::InitializeMarket` CPI). Mainnet defense narrative: the gap is engineered (verified feasible), not aspirational.
 
 **Attack 8:** Create a strike + mint into it as creator (zero fee per DR-008) + game tier accumulation.
 - **Defense:** **explicit anti-gaming safeguard.** `mint_pair` skips updating `mint_volume_30d` when `creator_rebate_fires`. Mock test: `dr005-dr011-scaffolding.test.ts:creator-rebate-doesnt-update-volume`. Property: `mintVolume30d === 0n` after 1500 USDC of creator-rebated mints.
@@ -226,22 +298,30 @@ Ordered by what a motivated attacker would try first.
 
 | Surface | Evidence layers | Total assertions |
 |---|---|---|
-| HY-1 ($1 USDC invariant) | mock + sim (3 outcome modes × 5 invariants each) | 15 + per-test boundary cases |
+| HY-1 ($1 USDC invariant) | mock + sim (3 outcome modes × 5 invariants each) + DR-020 CLOB escrow invariant (pending deploy_index=7) | 15 + per-test boundary cases; CLOB test (a)+(b) pending |
 | HY-2 (one-command demo) | `scripts/one-command-demo.sh` (3s / 10s) | 1 script, 6 steps |
 | HY-5 (cron-failure path) | mock + sim --kill-cron-at=phase3 + chain-sim NotExpired + chain-sim PythStale | 4 layers |
 | HY-6 (Pyth gates) | mock + Rust property + chain-evidence (PythStale fired live) | 3 layers |
 | DR-002 (permissionless settle) | mock + IDL inspection + chain simulate (NotExpired 6003) + chain simulate (PythStale 6009 deploy-5) | 4 layers, strongest to date |
 | DR-008 (fee math + creator rebate + 3-way split + gaming defense) | mock + 11 mocha tests | comprehensive at mock layer |
 | DR-010 (Merkle leaderboard) | mock + multi-leaf proof test + period-id isolation + tampered-amount rejection | comprehensive at mock layer |
+| DR-020 (CLOB escrow separation + all 4 trade paths + adversarial) | **PENDING** — `tests/contracts/test_order_book_invariants.ts` written; blocked on Aria's deploy_index=7 + Bram's seeded strikes | 3 invariant tests + 9 adversarial cases + 4-path smoke |
+| DR-020 attack surface (remaining_accounts trust model) | Keith's adversarial review (H-1 + M-1 through M-4 fixed) + test_order_book_invariants.ts wrong-owner + cancel-non-owner cases | Written; pending devnet execution |
 
-**Test totals:** 76 assertions (8 live devnet + 63 mocha eval + 5 sim modes) + 100/100 inline Rust property tests in `programs/bell-markets/src/`. 5 independent Sonnet audit cycles applied with 14 substantive findings, all fixed (matches the lineage header).
+**Test totals (pre-deploy_index=7):** 76 assertions (8 live devnet + 63 mocha eval + 5 sim modes) + 100/100 inline Rust property tests in `programs/bell-markets/src/`. 7 independent Sonnet audit cycles applied with 17 substantive findings, all fixed (matches the lineage header).
+
+**Test totals target (post-deploy_index=7):** 76 + 12 CLOB invariant/smoke assertions = 88 baseline. Adversarial cases add 9 more. Full green = PASS on demo.
 
 ---
 
 ## 9. Verdict
 
-**Devnet demo: READY (for trade-protocol invariants).** The 76-assertion test surface + 5 independent audit cycles + live deploy verification cover every Hard YES the build committed to. The one-command demo runs in 3s offline / 10s live. **Caveat:** the v8 frontend trade-execution wiring is still in progress as of 2026-05-24 (Cleo's trade-view submit handlers throw `not yet wired` for live tx paths); the demo script `docs/demo/v1-demo-script.md` walks reviewers through the visual design via the v8 mockup HTMLs + terminal-based on-chain evidence for the lifecycle proofs.
+**Devnet demo: READY (pending deploy_index=7).** The 76-assertion test surface (pre-DR-020) + 7 independent audit cycles + 17 substantive fixes + live deploy verification cover every Hard YES committed to before the DR-020 pivot. DR-020 CLOB surface (`tests/contracts/test_order_book_invariants.ts` — 3 invariant tests + 9 adversarial cases) is written and blocked on Aria's deploy_index=7 landing on devnet. Once deploy_index=7 lands, the smoke suite runs and the verdict upgrades to PASS or surfaces real bugs to Aria.
 
-**Mainnet: NOT READY.** Six specific gaps documented above. None are code defects; they're operational + audit + capital + Pyth-coverage items that mainnet conversation requires regardless of the protocol's correctness.
+Vault security model is anchored in DR-017 (PDA self-authority + Anchor account constraints + permissionless settle + admin-as-cranker-not-redirector). The in-program CLOB adds a new security surface: the `remaining_accounts` trust model (Keith's H-1 fix baked in from day 1) + telescoping escrow invariant (test (b) in test_order_book_invariants.ts). The 6-attack CLOB analysis above + 13-attack lifecycle analysis form the full hostile-tester catalog.
 
-**Most critical mainnet blocker:** independent third-party security audit. Until that happens, no honest mainnet deploy is defensible.
+Token program plan is anchored in DR-016 (SPL Token locked for v1 tradeable assets; Token-2022 + cNFTs deferred to v2 identity surfaces). The one-command demo runs in 3s offline / 10s live. **Frontend wiring update (2026-05-25):** deploy_index=7 adds `place_order`, `cancel_order`, `match_orders`, `init_order_book`, `grow_order_book` to the program surface; Cleo's `apps/web/src/lib/tx/build-buy-yes.ts` + `build-sell-yes.ts` + `build-buy-no.ts` + `build-sell-no.ts` will update to use `place_order` instead of the placeholder Phoenix swap builders. Demo script `docs/demo/v1-demo-script.md` targets Flow B (all 4 trade paths live) once smoke passes; falls back to Flow C (hybrid) if smoke fails on any path.
+
+**Mainnet: NOT READY.** The gaps documented above include the new DR-020 CLOB-specific gaps (A through E) plus the pre-existing 7 gaps. Most important new gap: **the matching engine has not had a third-party audit** (CLOB gap C). The mainnet narrative is: protocol correctness PROVEN at v1 including in-program CLOB; fee surfaces PLANNED (DR-018 amended); production-grade keys + third-party audit + Pyth Receiver land before mainnet.
+
+**Most critical mainnet blocker:** independent third-party security audit covering the matching engine. Until that happens, no honest mainnet deploy is defensible. The matching engine is the highest-risk new audit surface (per DR-020) and cannot be skipped.
