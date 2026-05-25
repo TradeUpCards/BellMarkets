@@ -36,17 +36,10 @@ import {
   isBellProActive,
 } from "@/hooks/use-bell-pro-subscription";
 import { LeftRail, TickerAccordion } from "@/components/v8/left-rail";
-
-// ── Demo strike overrides (Bram's Path B seed on devnet) ───────────────────
-const DEMO_LIVE_STRIKE: Record<string, number> = {
-  META: 610,
-  NVDA: 215,
-  AAPL: 309,
-};
-
-function navStrike(sym: string, fallback: number): number {
-  return DEMO_LIVE_STRIKE[sym] ?? fallback;
-}
+import {
+  DEFAULT_TRADE_ROUTE,
+  navStrike,
+} from "@/lib/demo-strikes";
 
 const BELL_PRO_DEFAULT_TICKER = "AAPL";
 
@@ -259,7 +252,7 @@ const SLIDES: CarouselSlide[] = [
     eyebrow: { icon: "●", text: "49 markets live" },
     title: { lead: "Binary outcome ", accent: "contracts", trail: " on Solana" },
     body: "YES/NO on daily MAG7 stock closes. $1 bUSDC max payout per contract. Settles at 4 PM ET via Pyth oracle. Non-custodial. In-program CLOB.",
-    ctaPrimary: { label: "Launch Terminal →", href: "/trade/META/610" },
+    ctaPrimary: { label: "Launch Terminal →", href: DEFAULT_TRADE_ROUTE },
     ctaSecondary: { label: "How it works" },
     stat: {
       num: "49",

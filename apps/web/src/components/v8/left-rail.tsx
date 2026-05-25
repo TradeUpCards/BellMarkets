@@ -15,12 +15,10 @@
 import type { CSSProperties } from "react";
 import Link from "next/link";
 
-// ── Demo strike overrides (Bram's Path B seed on devnet) ──────────────────
-const DEMO_LIVE_STRIKE: Record<string, number> = {
-  META: 610,
-  NVDA: 215,
-  AAPL: 309,
-};
+// Canonical demo-strike map — single source of truth across LeftRail,
+// landing matrix, trade-page strike pills, and header nav. See
+// `apps/web/src/lib/demo-strikes.ts`.
+import { DEMO_LIVE_STRIKE } from "@/lib/demo-strikes";
 
 interface RailStrike {
   px: number;

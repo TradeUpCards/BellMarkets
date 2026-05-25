@@ -26,6 +26,7 @@ import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey, Transaction } from "@solana/web3.js";
 
 import { LeftRail } from "@/components/v8/left-rail";
+import { liveStrikesForTicker } from "@/lib/demo-strikes";
 import { useUserConfig } from "@/hooks/use-user-config";
 import { useBellProSubscription } from "@/hooks/use-bell-pro-subscription";
 import { useMarketConfig } from "@/hooks/use-market-config";
@@ -52,7 +53,11 @@ type Outcome = "yes" | "no";
 type OrderType = "market" | "limit";
 type Unit = "usdc" | "contracts";
 
-const STRIKES = [620, 640, 660, 680, 700, 720, 740];
+// Fallback strike range — used when the active ticker isn't one of Bram's
+// seeded demo tickers. For seeded tickers (META/NVDA/AAPL) the picker is
+// per-ticker via `liveStrikesForTicker()` so every pill click lands on a
+// real on-chain market.
+const FALLBACK_STRIKES = [620, 640, 660, 680, 700, 720, 740];
 const STRIKE_PROBS: Record<number, number> = {
   620: 92,
   640: 84,
@@ -81,6 +86,11 @@ function fmtUsdSigned(n: number, decimals = 2): string {
 export function TradeView({ ticker, strike }: TradeViewParams) {
   const tickerUpper = ticker.toUpperCase();
   const strikeNum = Number(strike);
+  // Per-ticker strike list: live strikes (Bram's seed) when the ticker is
+  // demo-live, otherwise the mockup range. Drives the strike-pill picker +
+  // dropdown — every click lands on a real on-chain market for seeded
+  // tickers; mockup ticker clicks still surface the disable banner.
+  const STRIKES = liveStrikesForTicker(tickerUpper) ?? FALLBACK_STRIKES;
 
   // ─── State machine ────────────────────────────────────────────────────
   const [side, setSide] = useState<Side>("buy");
@@ -644,7 +654,12 @@ export function TradeView({ ticker, strike }: TradeViewParams) {
         <main>
           <div className="trade-grid">
             <div className="left-col">
-              <ChartCard ticker={tickerUpper} strike={strikeNum} />
+              <ChartCard
+                ticker={tickerUpper}
+                strike={strikeNum}
+                yesAsk={liveYesAsk}
+                yesBid={liveYesBid}
+              />
 
               <div className="info-grid-2">
                 <PositionCard pos={position.yes} outcome="yes" />
@@ -1111,22 +1126,63 @@ export function TradeView({ ticker, strike }: TradeViewParams) {
 // page-specific variant is the "Filter matrix" section, which the trade
 // page omits via the default `showFilters=false`.)
 
-function ChartCard({ ticker, strike }: { ticker: string; strike: number }) {
+interface ChartCardProps {
+  ticker: string;
+  strike: number;
+  /** Best YES ask from the live order book (dollars). */
+  yesAsk?: number;
+  /** Best YES bid from the live order book (dollars). */
+  yesBid?: number;
+}
+
+function ChartCard({ ticker, strike, yesAsk, yesBid }: ChartCardProps) {
+  // Live-derived YES last/mid price + spread. Falls back to the mockup
+  // $0.520 only when the order book is empty / pre-init — paired with the
+  // disable matrix that will block submits in that state anyway.
+  const FALLBACK_PRICE = 0.52;
+  const last =
+    yesAsk !== undefined && yesBid !== undefined
+      ? (yesAsk + yesBid) / 2
+      : yesAsk ?? yesBid ?? FALLBACK_PRICE;
+  // Delta vs the strike's $0.50 fair-coin midpoint — honest approximation
+  // since we don't yet store an "open" price. Will be replaced by a real
+  // open/close once the indexer surfaces price history.
+  const REFERENCE_PRICE = 0.5;
+  const deltaAbs = last - REFERENCE_PRICE;
+  const deltaPct = (deltaAbs / REFERENCE_PRICE) * 100;
+  const deltaUp = deltaAbs >= 0;
+  const spreadAbs =
+    yesAsk !== undefined && yesBid !== undefined ? yesAsk - yesBid : undefined;
+  const spreadPct =
+    spreadAbs !== undefined && yesBid && yesBid > 0
+      ? (spreadAbs / yesBid) * 100
+      : undefined;
+  const bestBA =
+    yesBid !== undefined && yesAsk !== undefined
+      ? `${yesBid.toFixed(3)}/${yesAsk.toFixed(3)}`
+      : "—";
   return (
     <div className="chart-card">
       <div className="chart-h compact">
         <div className="chart-headline">
-          <div className="chart-price mono">$0.520</div>
-          <span className="chart-delta up mono">+$0.04 · +8.3%</span>
+          <div className="chart-price mono">${last.toFixed(3)}</div>
+          <span className={`chart-delta ${deltaUp ? "up" : "down"} mono`}>
+            {deltaUp ? "+" : "−"}${Math.abs(deltaAbs).toFixed(3)} ·{" "}
+            {deltaUp ? "+" : "−"}
+            {Math.abs(deltaPct).toFixed(1)}%
+          </span>
         </div>
-        <div className="chart-quick-stats">
+        <div className="chart-quick-stats" data-mock>
+          {/* O/H/L/VWAP still mock-fixture until Bram's indexer surfaces
+              price history. Spread + B/A are live-derived from the order
+              book when available; fall back to "—" when book is empty. */}
           {[
             ["O", "0.480"],
             ["H", "0.545"],
             ["L", "0.460"],
             ["VWAP", "0.504"],
-            ["Spread", "7.7%"],
-            ["B/A", "0.500/0.540"],
+            ["Spread", spreadPct !== undefined ? `${spreadPct.toFixed(1)}%` : "—"],
+            ["B/A", bestBA],
           ].map(([k, v]) => (
             <div key={k as string}>
               <span className="lbl">{k}</span>

@@ -21,6 +21,8 @@
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
+
+import { DEFAULT_TRADE_ROUTE } from "@/lib/demo-strikes";
 // Custom <UserMenu/> replaces the wallet-adapter default WalletMultiButton
 // dropdown. Surfaces wallet pubkey + linked socials + Bell Pro tier +
 // settings/disconnect in one cohesive dropdown (fanalytics pattern).
@@ -41,7 +43,7 @@ export interface SiteChromeProps {
 
 const NAV: Array<{ key: ActiveNav; href: string; label: string }> = [
   { key: "markets", href: "/", label: "Markets" },
-  { key: "trade", href: "/trade/META/680", label: "Trade" },
+  { key: "trade", href: DEFAULT_TRADE_ROUTE, label: "Trade" },
   { key: "positions", href: "/portfolio", label: "Positions" },
   { key: "orders", href: "/portfolio?tab=orders", label: "Orders" },
   { key: "history", href: "/history", label: "History" },
@@ -155,7 +157,7 @@ export function MobileBottomTabs({ active }: { active: ActiveNav }) {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12h18M3 6h18M3 18h18" /></svg>
         Markets
       </Link>
-      <Link href="/trade/META/680" className={`bottom-tab${active === "trade" ? " active" : ""}`} aria-current={active === "trade" ? "page" : undefined}>
+      <Link href={DEFAULT_TRADE_ROUTE} className={`bottom-tab${active === "trade" ? " active" : ""}`} aria-current={active === "trade" ? "page" : undefined}>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 17l6-6 4 4 8-8" /><path d="M17 7h4v4" /></svg>
         Trade
       </Link>
