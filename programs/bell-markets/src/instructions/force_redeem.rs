@@ -11,25 +11,36 @@
 //! `Burn` requires the source token account's owner OR a delegate to sign.
 //! force_redeem signs with `strike_market` PDA as the burn authority.
 //! This succeeds ONLY IF the user has previously called SPL Token `Approve`
-//! granting `strike_market` PDA as a delegate of `user_winning_token`.
-//!
-//! For users who haven't opted in: the SPL Token CPI returns
-//! `OwnerMismatch` and the entire `force_redeem` tx reverts gracefully —
-//! no partial state mutation. Cleo's "Enable force-redeem eligibility"
-//! UI flow (Cleo-domain) wires the user-signed `Approve(strike_market_pda,
-//! u64::MAX)` for both YES and NO mints, so future force_redeems against
-//! THIS user succeed.
+//! granting `strike_market` PDA as a delegate of `user_yes` / `user_no`
+//! (whichever side is being burned). For users who haven't opted in: the
+//! SPL Token CPI returns `OwnerMismatch` and the entire `force_redeem` tx
+//! reverts gracefully — no partial state mutation. Cleo's "Enable
+//! force-redeem eligibility" UI flow (Cleo-domain) wires the user-signed
+//! `Approve(strike_market_pda, u64::MAX)` for both YES and NO mints, so
+//! future force_redeems against THIS user succeed.
 //!
 //! Per cory_questions_1_answers.md, this is a v2/v2.5 ix — the MVP demo does
 //! not require force_redeem. The mechanism ships INFRASTRUCTURE so the
 //! grace_secs default (30 days) is met before any market would even be
 //! eligible. Admin runs it after real-world unredeemed balances accumulate.
+//!
+//! ## DR-017 Fix 1 — structural mint-substitution defense (deploy_index=7+)
+//!
+//! Mirrors `redeem`: Accounts struct PDA-binds both `yes_mint` and `no_mint`
+//! plus `user_yes` / `user_no` token accounts (statically bound to the PDA
+//! mints via `token::mint`, with owner-check constraints against the
+//! UncheckedAccount `user` field since admin — not user — signs the tx).
+//! Handler picks the burn side via the shared `redeem::select_winning_side`
+//! helper. See `redeem.rs` module docs for the full attack-class-eliminated
+//! analysis.
 
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Burn, Mint, Token, TokenAccount, Transfer};
 use crate::state::*;
 use crate::errors::BellMarketsError;
-use crate::instructions::redeem::validate_winning_mint;
+use crate::instructions::redeem::{
+    select_winning_side, WinningSide, YES_MINT_SEED, NO_MINT_SEED,
+};
 
 /// Returns true iff the grace window has elapsed: `now > settled_at + grace_secs`.
 ///
@@ -71,18 +82,44 @@ pub struct ForceRedeem<'info> {
     )]
     pub strike_market: Box<Account<'info, StrikeMarket>>,
 
-    /// CHECK: user wallet pubkey — bound by user_winning_token.owner == user.key().
+    /// CHECK: user wallet pubkey — bound by `user_yes.owner` / `user_no.owner`
+    /// / `user_usdc.owner == user.key()` constraints below.
     pub user: UncheckedAccount<'info>,
 
-    #[account(mut)]
-    pub winning_mint: Box<Account<'info, Mint>>,
-
+    /// DR-017 Fix 1 — PDA-seed-constrained. Caller (admin) cannot substitute.
     #[account(
         mut,
-        token::mint = winning_mint,
-        constraint = user_winning_token.owner == user.key() @ BellMarketsError::ConfigMismatch,
+        seeds = [YES_MINT_SEED, strike_market.key().as_ref()],
+        bump = strike_market.yes_mint_bump,
     )]
-    pub user_winning_token: Box<Account<'info, TokenAccount>>,
+    pub yes_mint: Box<Account<'info, Mint>>,
+
+    /// DR-017 Fix 1 — PDA-seed-constrained. Caller (admin) cannot substitute.
+    #[account(
+        mut,
+        seeds = [NO_MINT_SEED, strike_market.key().as_ref()],
+        bump = strike_market.no_mint_bump,
+    )]
+    pub no_mint: Box<Account<'info, Mint>>,
+
+    /// User's YES-token ATA. Statically bound to `yes_mint` via `token::mint`;
+    /// owner-checked against the UncheckedAccount `user` (admin signs the tx,
+    /// not user, so `token::authority` is not appropriate).
+    #[account(
+        mut,
+        token::mint = yes_mint,
+        constraint = user_yes.owner == user.key() @ BellMarketsError::ConfigMismatch,
+    )]
+    pub user_yes: Box<Account<'info, TokenAccount>>,
+
+    /// User's NO-token ATA. Statically bound to `no_mint`; symmetric to
+    /// `user_yes`.
+    #[account(
+        mut,
+        token::mint = no_mint,
+        constraint = user_no.owner == user.key() @ BellMarketsError::ConfigMismatch,
+    )]
+    pub user_no: Box<Account<'info, TokenAccount>>,
 
     #[account(
         mut,
@@ -121,11 +158,11 @@ pub fn handler(ctx: Context<ForceRedeem>, amount: u64) -> Result<()> {
         BellMarketsError::ForceRedeemGraceActive
     );
 
-    // Verify winning_mint matches outcome — DRY with redeem.rs. Same helper
-    // means same audit surface: a regression there would also break
-    // force_redeem.
+    // DR-017 Fix 1 — same shared helper as `redeem.rs`. DRY with redeem
+    // means same audit surface: a regression in `select_winning_side` would
+    // also break force_redeem.
     //
-    // TODO(v2.5): `validate_winning_mint` rejects Invalid outcomes by design.
+    // TODO(v2.5): `select_winning_side` rejects Invalid outcomes by design.
     // No admin force-sweep path for Invalid markets — users who abandon
     // Invalid positions cannot be swept by admin via this ix. The fix is a
     // dedicated `force_redeem_invalid` ix (burns equal YES + NO via delegate
@@ -133,12 +170,17 @@ pub fn handler(ctx: Context<ForceRedeem>, amount: u64) -> Result<()> {
     // but with admin signer + strike_market PDA as burn delegate). Not
     // blocking MVP since Invalid markets are admin-override-only (rare).
     // `force_redeem_rejects_invalid_outcome` test below pins the gap.
-    validate_winning_mint(
-        ctx.accounts.strike_market.outcome,
-        ctx.accounts.strike_market.yes_mint,
-        ctx.accounts.strike_market.no_mint,
-        ctx.accounts.winning_mint.key(),
-    )?;
+    let outcome = ctx.accounts.strike_market.outcome;
+    let (winning_mint_info, user_winning_token_info) = match select_winning_side(outcome)? {
+        WinningSide::Yes => (
+            ctx.accounts.yes_mint.to_account_info(),
+            ctx.accounts.user_yes.to_account_info(),
+        ),
+        WinningSide::No => (
+            ctx.accounts.no_mint.to_account_info(),
+            ctx.accounts.user_no.to_account_info(),
+        ),
+    };
 
     // Signer seeds: strike_market PDA acts as both the burn delegate (via
     // user's prior Approve) AND the vault transfer authority. The Burn CPI
@@ -162,8 +204,8 @@ pub fn handler(ctx: Context<ForceRedeem>, amount: u64) -> Result<()> {
         CpiContext::new_with_signer(
             ctx.accounts.token_program.to_account_info(),
             Burn {
-                mint: ctx.accounts.winning_mint.to_account_info(),
-                from: ctx.accounts.user_winning_token.to_account_info(),
+                mint: winning_mint_info,
+                from: user_winning_token_info,
                 authority: ctx.accounts.strike_market.to_account_info(),
             },
             signer_seeds,
@@ -258,24 +300,20 @@ mod tests {
     /// `force_redeem_invalid` ix (v2.5 — see TODO in handler), `force_redeem`
     /// MUST refuse Invalid outcomes outright. Test pins the documented gap.
     ///
-    /// Composes with `validate_winning_mint` from `redeem.rs` — that helper
-    /// rejects Invalid + Unsettled by design; force_redeem inherits the
-    /// rejection via the shared helper. Coverage here = the `force_redeem`
-    /// flow specifically (in addition to the `redeem_wrong_mint_substitution`
-    /// coverage at the helper layer).
+    /// DR-017 Fix 1: composes with `select_winning_side` from `redeem.rs` —
+    /// that helper rejects Invalid + Unsettled by design; force_redeem
+    /// inherits the rejection via the shared helper. Coverage here = the
+    /// `force_redeem` flow specifically (in addition to the broader
+    /// `redeem_outcome_rejects_invalid_and_unsettled` coverage at the
+    /// helper layer).
     #[test]
     fn force_redeem_rejects_invalid_outcome() {
-        let yes_mint = Pubkey::new_unique();
-        let no_mint = Pubkey::new_unique();
-        // Even when supplying the right pubkey (yes_mint), Invalid is rejected.
         assert!(
-            validate_winning_mint(Outcome::Invalid, yes_mint, no_mint, yes_mint).is_err(),
-            "Invalid outcome rejection is force_redeem's documented v2.5 gap — \
-             test pins the rejection so a future relaxation requires explicit \
-             design discussion"
-        );
-        assert!(
-            validate_winning_mint(Outcome::Invalid, yes_mint, no_mint, no_mint).is_err()
+            select_winning_side(Outcome::Invalid).is_err(),
+            "force_redeem rejects Invalid via shared select_winning_side. \
+             v2.5 force_redeem_invalid is the documented follow-up; this test \
+             pins the rejection so a future relaxation requires explicit \
+             design discussion."
         );
     }
 }
