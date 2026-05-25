@@ -2147,35 +2147,41 @@
     .connect-btn { padding: 8px 12px; font-size: 12px; min-height: 38px; }
     .connect-btn span:last-child { max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-    /* Compact market header — keep only ticker + price + change + switch */
-    .market-header { padding: 10px 14px; }
-    .market-header-top { margin-bottom: 8px; }
-    .market-id { gap: 10px; }
-    .market-id-mark { display: none; }
-    .market-id-title { font-size: 18px; }
-    .market-id-sub { font-size: 10px; gap: 6px; }
-    .market-id-sub .chip:not(.live) { display: none; }
-    .market-id-sub > span:not(.chip) { display: none; }
-    /* Market controls — compact horizontal scroll so ticker switching stays
-       above the fold per Cory feedback */
-    .market-header-top { flex-direction: column; align-items: stretch; gap: 8px; }
-    .market-controls {
-      display: flex;
-      width: 100%;
-      overflow-x: auto;
-      gap: 6px;
-      padding-bottom: 2px;
+    /* Compact market header (Cory 2026-05-25: "move market selector up on
+       same line as stock hero"). Single horizontal row = ticker title +
+       strike dropdown inline. Saves ~40px vs prior two-row layout so the
+       chart + submit button move up. */
+    .market-header { padding: 8px 12px; }
+    .market-header-top {
+      margin-bottom: 0;
+      flex-direction: row;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: nowrap;
     }
-    .market-controls::-webkit-scrollbar { height: 0; }
-    .market-controls .ctrl-btn { flex-shrink: 0; padding: 6px 10px; font-size: 11px; min-height: 36px; }
+    .market-id { gap: 8px; flex: 1 1 auto; min-width: 0; }
+    .market-id-mark { display: none; }
+    .market-id-title { font-size: 16px; line-height: 1.2; }
+    .market-id-sub { display: none; }
+    /* Market controls hidden — strike dropdown carries market navigation */
+    .market-controls { display: none; }
     /* Stats grid: hide on mobile — info is in chart card */
     .market-stats { display: none; }
 
-    /* Strike pills inline — hide on mobile; strike dropdown shows instead */
+    /* Strike pills inline — hide on mobile; strike dropdown sits on the
+       SAME LINE as the ticker title now */
     .strike-pills-inline { display: none; }
-    .strike-dropdown { display: block; width: 100%; margin-top: 6px; }
-    /* Pro header card stacks below market-id on mobile; goes full-width */
-    .market-header-top { flex-wrap: wrap; }
+    .strike-dropdown {
+      display: block;
+      width: auto;
+      flex: 0 0 auto;
+      min-width: 130px;
+      max-width: 180px;
+      margin-top: 0;
+      padding: 6px 8px;
+      font-size: 12px;
+    }
+    /* Pro header card — full-width on its own row below the title */
     .pro-header-card { width: 100%; flex: 1 1 100%; padding: 8px 10px; margin-top: 6px; }
     .pro-header-card .pro-rail-sub { -webkit-line-clamp: 1; }
     /* Old separate strike-row no longer exists, but keep CSS in case any HTML still references */
@@ -2215,36 +2221,55 @@
     .trades-card { order: 6; }
     .left-col > .info-card:not(.chart-card) { order: 7; }
 
-    /* Compact chart on mobile — reduce 440 → 200 to save 240px */
-    .chart-viz { height: 200px; }
+    /* Compact chart on mobile — 200 → 140 to elevate the submit button per
+       Cory 2026-05-25 ("Buy/Sell button HAS TO BE ABOVE THE FOLD"). */
+    .chart-viz { height: 140px; }
     .chart-card { border-radius: 0; border-left: none; border-right: none; }
-    /* Chart bar on mobile: keep price + delta + timespans; hide stats + icons + watch (deeper view via tap) */
-    .chart-h { padding: 6px 12px; gap: 8px; }
-    .chart-price { font-size: 22px; }
+    /* Chart bar on mobile: keep price + delta + timespans; hide stats + icons + watch */
+    .chart-h { padding: 4px 10px; gap: 6px; }
+    .chart-price { font-size: 20px; }
     .chart-delta { font-size: 11px; }
     .chart-quick-stats { display: none; }
     .chart-icons { display: none; }
     .chart-watch-btn { display: none; }
     .chart-tabs .chart-tab { padding: 4px 6px; font-size: 9px; }
 
-    /* Compact trade card */
+    /* Compact trade card — Buy/Sell + Market/Limit tabs slightly smaller
+       per Cory feedback but still ≥44pt touch targets. yn-tab 56→48; the
+       order-type row trimmed. Slippage block collapses by default
+       (details > summary) so the submit button sits closer to the fold. */
     .trade-card { border-radius: 0; border-left: none; border-right: none; }
-    .yes-no-toggle { padding: 10px 10px 0; }
-    .yn-tab { padding: 10px; min-height: 56px; }
-    .yn-tab .price { font-size: 18px; }
+    .yes-no-toggle { padding: 8px 8px 0; }
+    .yn-tab { padding: 8px 10px; min-height: 48px; }
+    .yn-tab .lbl { font-size: 10px; }
+    .yn-tab .price { font-size: 16px; }
     .yn-tab .sub { font-size: 8px; }
-    .trade-form { padding: 10px; }
-    .order-type-row { margin-bottom: 10px; }
-    .quick-amount { min-height: 38px; font-size: 11px; }
-    .input-wrap input { font-size: 16px; padding: 8px 0; }
+    .trade-tabs { padding: 6px 8px 0; }
+    .trade-tab { padding: 8px 10px; min-height: 44px; font-size: 12px; }
+    .trade-form { padding: 8px 10px; }
+    .order-type-row { margin-bottom: 8px; }
+    .order-type-btn { padding: 8px 10px; min-height: 44px; font-size: 12px; }
+    .quick-amount { min-height: 36px; padding: 6px 8px; font-size: 11px; }
+    .unit-toggle .unit-btn { padding: 6px 8px; min-height: 32px; font-size: 11px; }
+    .input-wrap input { font-size: 16px; padding: 6px 0; }
+    .input-wrap .suffix { font-size: 11px; }
+    .field-label { font-size: 10px; margin-bottom: 4px; }
     /* Compress trade-summary on mobile — keep critical rows only above fold */
-    .trade-summary { padding: 10px; margin: 8px 0; font-size: 11px; }
+    .trade-summary { padding: 8px; margin: 6px 0; font-size: 11px; }
+    .trade-summary-toggle { padding: 8px 10px; font-size: 11px; }
     .summary-row.hide-mobile { display: none; }
-    /* Slippage compressed */
-    .slip-row { padding: 8px; margin: 8px 0; }
-    .slip-head { font-size: 9px; }
-    .slip-ticks { font-size: 8px; }
-    .submit-btn { padding: 14px; font-size: 13px; min-height: 56px; }
+    /* Slippage block hidden by default on mobile (Cory 2026-05-25: submit
+       button MUST be above the fold). 0.5% default applies; users who
+       need to tune drop to landscape/desktop or open the trade-summary
+       details to see the slip preview. ~70px reclaimed for the submit. */
+    .slip-row { display: none; }
+    /* Trade summary collapsed by default on mobile (details > summary
+       handles the toggle natively). Saves another ~30-60px depending
+       on how many summary rows the user opens. */
+    .trade-summary-wrap > summary { padding: 6px 10px; font-size: 11px; }
+    /* Submit — keep large + tappable but trim padding so it ends higher */
+    .submit-btn { padding: 12px; font-size: 13px; min-height: 52px; }
+    .submit-btn .sb-detail { font-size: 10px; }
 
     /* Open orders peek — compact, only 2 rows max above fold (extras scroll) */
     .open-orders-card { border-radius: 0; border-left: none; border-right: none; }

@@ -1658,9 +1658,27 @@
     /* Adjust sticky left-rail top offset since header is now ~58px (was 66px) */
     .left-rail { top: 58px; max-height: calc(100vh - 58px); }
 
-    main { padding: 12px; }
+    main {
+      padding: 12px;
+      /* MOBILE STACKING — Markets above the fold (Cory 2026-05-25).
+         Flatten <main> into a flex column so we can reorder children. */
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    /* PROBABILITY MATRIX = the headline surface on mobile, render first */
+    .matrix-card { order: 1; }
+    .ticker-marquee { order: 2; }
+    .hero-grid { order: 3; }
+    .row-2col { order: 4; }
+    .how-section { order: 5; }
 
-    /* CAROUSEL stacks 1-up + smaller */
+    /* TODAY'S SESSION block hidden on mobile (Cory feedback: condense/hide).
+       Marquee + matrix carry the live-state signal; session stats are
+       reachable via the future Markets full-page view. */
+    .session-block { display: none; }
+
+    /* CAROUSEL stacks 1-up + smaller — but now BELOW the matrix on mobile */
     .carousel-slide { padding: 18px 16px; flex-direction: column; gap: 12px; min-height: auto; }
     .slide-stat { flex: 0 0 auto; width: 100%; padding: 12px; }
     .slide-stat-num { font-size: 28px; }
@@ -1668,33 +1686,42 @@
     .slide-body p { font-size: 12px !important; margin-bottom: 10px !important; }
     .slide-actions .btn-primary, .slide-actions .btn-secondary { padding: 10px 16px; font-size: 11px; }
 
-    /* HERO-GRID stacks carousel above session block */
-    .hero-grid { gap: 12px; }
-    .session-block { padding: 14px 16px; }
+    /* HERO-GRID — session block hidden, so carousel becomes full-width */
+    .hero-grid { gap: 12px; grid-template-columns: 1fr; }
 
-    /* MATRIX — compress aggressively to fit narrow viewports.
-       Hide non-essential columns (Spot, Vol, Action) — focus on ticker + strikes.
-       Tap ticker name to open trade page. */
-    .matrix-h { padding: 10px 14px; flex-direction: column; align-items: stretch; gap: 8px; }
-    .matrix-h h3 { font-size: 13px; }
-    .matrix-h-controls { flex-wrap: wrap; gap: 6px; }
+    /* MATRIX — compress aggressively to fit narrow viewports (Cory 2026-05-25:
+       "matrix view is too busy/crowded on mobile"). Hide outer strikes (-9%,
+       +9%) + non-essential cols (Spot, Vol, Action) — focus on the 5 most
+       actionable strikes (-6, -3, ATM, +3, +6). Row click → ATM strike. */
+    .matrix-h { padding: 8px 12px; flex-direction: column; align-items: stretch; gap: 6px; }
+    .matrix-h h3 { font-size: 12px; }
+    .matrix-h h3 .badge { display: none; }
+    .matrix-h-controls { flex-wrap: wrap; gap: 4px; }
     .matrix-controls { flex-wrap: wrap; }
-    /* Hide Spot (col 2), Vol 24h (col 10), Action (col 11) on mobile */
+    .matrix-controls .matrix-control { padding: 4px 7px; font-size: 9px; }
+    .matrix-view-toggle .mv-btn { width: 26px; height: 26px; }
+    /* Hide Spot (col 2), outer -9% (col 3) + outer +9% (col 9), Vol (col 10),
+       Action (col 11). Keep ticker + 5 strike cells (-6/-3/ATM/+3/+6). */
     .matrix-thead > div:nth-child(2),
     .matrix-row > div:nth-child(2),
+    .matrix-thead > div:nth-child(3),
+    .matrix-row > div:nth-child(3),
+    .matrix-thead > div:nth-child(9),
+    .matrix-row > div:nth-child(9),
     .matrix-thead > div:nth-child(10),
     .matrix-row > div:nth-child(10),
     .matrix-thead > div:nth-child(11),
     .matrix-row > div:nth-child(11) { display: none; }
     .matrix-thead, .matrix-row {
-      grid-template-columns: 64px repeat(7, 1fr);
+      grid-template-columns: 56px repeat(5, 1fr);
     }
+    .matrix-thead > div { font-size: 9px; padding: 4px 2px; }
     .matrix-card { overflow-x: hidden; }
     .matrix-grid { min-width: 0; }
-    .matrix-row > div { padding: 8px 4px; }
+    .matrix-row > div { padding: 8px 3px; }
     .prob-cell .strike { font-size: 8px; }
-    .prob-cell .prob { font-size: 11px; }
-    .matrix-ticker { font-size: 11px; gap: 4px; }
+    .prob-cell .prob { font-size: 12px; font-weight: 600; }
+    .matrix-ticker { font-size: 11px; gap: 4px; font-weight: 600; }
     .matrix-ticker-mark { width: 18px; height: 18px; font-size: 9px; }
 
     /* ROW-2COL stacks at <=1024px already; tighten gap at small screens */
@@ -1724,13 +1751,14 @@
     .hotkey-bar { display: none; }
   }
   @media (max-width: 480px) {
-    /* Tighten further on very small screens (iPhone SE etc.) */
+    /* Tighten further on very small screens (iPhone SE etc.).
+       Stays at 5 strike cols (-6/-3/ATM/+3/+6) per the 768px breakpoint. */
     .matrix-thead, .matrix-row {
-      grid-template-columns: 54px repeat(7, 1fr);
+      grid-template-columns: 48px repeat(5, 1fr);
     }
     .matrix-row > div { padding: 6px 2px; }
     .prob-cell .strike { font-size: 7px; }
-    .prob-cell .prob { font-size: 10px; }
+    .prob-cell .prob { font-size: 11px; }
     .matrix-ticker { font-size: 10px; }
     .matrix-ticker-mark { width: 16px; height: 16px; font-size: 8px; }
     .slide-title { font-size: 16px !important; }
