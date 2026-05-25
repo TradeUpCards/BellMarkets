@@ -40,8 +40,6 @@ export interface BuildBuyNoParams {
   treasury: PublicKey;
   /** Pair count to mint = also the base lots sold on Phoenix. */
   amount: bigint;
-  /** Slippage floor on the Phoenix sell-Yes leg. */
-  minQuoteLotsToFill?: number;
 }
 
 export interface BuildBuyNoResult {
@@ -78,6 +76,15 @@ export interface BuildBuyNoResult {
  * swap (8 accounts) — fits within the 1232-byte legacy-tx cap. If it ever
  * overflows post-deploy, the ATA creates can be moved into a separate
  * one-time setup tx per user per market.
+ *
+ * DR-019 IOC partial-fill defense (`.project/stories/ioc-partial-fill-stranding.md`):
+ * the Phoenix swap ix below hardcodes `minBaseLotsToFill = Number(amount)`. A
+ * Phoenix IOC swap is allowed to return `Ok` with zero fills if no bids exist;
+ * without this constraint the atomic tx would land with `mint_pair` succeeded
+ * but no YES sold, stranding the user with YES + NO + the sunk mint fee. The
+ * minimum-fill demand makes the swap revert on insufficient liquidity, which
+ * Solana atomicity then propagates back through `mint_pair`. This is NOT a
+ * caller responsibility — the builder enforces the invariant structurally.
  */
 export async function buildBuyNoTx(
   params: BuildBuyNoParams,
@@ -90,7 +97,6 @@ export async function buildBuyNoTx(
     usdcMint,
     treasury,
     amount,
-    minQuoteLotsToFill,
   } = params;
 
   const [config] = deriveMarketConfigPda();
@@ -174,13 +180,16 @@ export async function buildBuyNoTx(
     },
   );
 
+  // DR-019: hardcode `minBaseLotsToFill = Number(amount)` so the IOC swap
+  // reverts if the YES bid book can't absorb the full sell. Optional caller
+  // override would reintroduce the partial-fill stranding bug — see docstring.
   const sellYesIx = buildPhoenixSwapIx({
     market: phoenixMarket,
     trader,
     side: PhoenixSide.Ask,
     numBaseLots: Number(amount),
     numQuoteLots: 0,
-    minQuoteLotsToFill,
+    minBaseLotsToFill: Number(amount),
   });
 
   const tx = new Transaction();

@@ -68,6 +68,14 @@ export interface BuildSellNoResult {
  * quote-lot ceiling, we abort the whole tx atomically if liquidity can't
  * support it — better UX than a half-completed flow.
  *
+ * DR-019 IOC partial-fill defense (`.project/stories/ioc-partial-fill-stranding.md`):
+ * the buy-YES leg below hardcodes `minBaseLotsToFill = Number(amount)`. A
+ * Phoenix IOC swap is allowed to return `Ok` with zero fills if no asks
+ * exist; without this constraint the user would pay USDC, receive less than
+ * `amount` YES, and the subsequent `redeem_pair(amount)` would fail. The
+ * minimum-fill demand makes the swap revert atomically. This is enforced by
+ * the builder, not by callers.
+ *
  * Tx-size note: same budget concerns as `buildBuyNoTx` apply (ATA creates +
  * 2 main ixes ≈ ~900 b under the 1232 cap). Documented escape hatch: split
  * ATA creates into a one-time setup tx per user per market.

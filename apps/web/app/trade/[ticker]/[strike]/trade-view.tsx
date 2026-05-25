@@ -24,13 +24,22 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey, Transaction } from "@solana/web3.js";
+import { MarketState } from "@ellipsis-labs/phoenix-sdk";
 
 import { useUserConfig } from "@/hooks/use-user-config";
 import { useBellProSubscription } from "@/hooks/use-bell-pro-subscription";
 import { useMarketConfig } from "@/hooks/use-market-config";
 import { useAllMarkets } from "@/hooks/use-all-markets";
+import { useOrderBook } from "@/hooks/use-order-book";
+import { usePosition } from "@/hooks/use-position";
 import { useBellMarketsProgram } from "@/lib/solana/anchor";
+import { outcomeTag } from "@/lib/solana/types";
 import { buildMintPairTx } from "@/lib/tx/build-mint-pair";
+import { buildBuyYesTx } from "@/lib/tx/build-buy-yes";
+import { buildSellYesTx } from "@/lib/tx/build-sell-yes";
+import { buildBuyNoTx } from "@/lib/tx/build-buy-no";
+import { buildSellNoTx } from "@/lib/tx/build-sell-no";
+import { buildRedeemPairTx } from "@/lib/tx/build-redeem-pair";
 
 export interface TradeViewParams {
   ticker: string;
@@ -107,28 +116,186 @@ export function TradeView({ ticker, strike }: TradeViewParams) {
     );
   }, [allMarkets, strikeNum]);
 
-  // STATIC FIXTURE — wire to usePosition(wallet, liveMarket.pda) once cost-basis tracking lands.
-  // Today the on-chain side only stores current balances; cost basis comes from an off-chain
-  // tx history index (Bram's indexer scope).
-  const position = useMemo(
-    () => ({
-      yes: { contracts: 5, avgEntry: 0.62, costBasis: 3.10 },
-      no: { contracts: 0, avgEntry: 0, costBasis: 0 },
-    }),
-    [],
+  // Live position from the user's YES + NO ATAs for this strike. Cost basis
+  // still needs the off-chain tx-history index (Bram's scope) — until then we
+  // surface contracts only, with cost basis = 0 so the UI doesn't lie.
+  const livePosition = usePosition(
+    wallet.publicKey ?? null,
+    liveMarket?.pda ?? null,
   );
 
+  // USDC tokens (6 decimals) per pair. mint_pair takes USDC micros = pair count × 1e6.
+  // YES/NO tokens are also 6 decimals → balance / 1e6 = contract count.
+  const TOKEN_SCALE = 1_000_000n;
+
+  const yesContracts = livePosition.data
+    ? Number(livePosition.data.yesBalance / TOKEN_SCALE)
+    : 0;
+  const noContracts = livePosition.data
+    ? Number(livePosition.data.noBalance / TOKEN_SCALE)
+    : 0;
+
+  // Matched-pair / directional decomposition per Hard YES #8 §6.1 + the
+  // architecture conversation. `matched_pairs` is the count of YES+NO that
+  // can be redeemed atomically via redeem_pair (each pair = $1 USDC back).
+  // `directional_*` is the side the user is net-long after netting the pair.
+  const matchedPairs = Math.min(yesContracts, noContracts);
+  const directionalYes = Math.max(0, yesContracts - noContracts);
+  const directionalNo = Math.max(0, noContracts - yesContracts);
+
+  // Position card / sell-side gating reads the directional side only — a
+  // matched pair is not a sellable directional position, it's recoverable
+  // via Redeem Pair instead.
+  const position = useMemo(
+    () => ({
+      yes: { contracts: directionalYes, avgEntry: 0, costBasis: 0 },
+      no: { contracts: directionalNo, avgEntry: 0, costBasis: 0 },
+    }),
+    [directionalYes, directionalNo],
+  );
+
+  // Phoenix order book — drives the pre-flight check matrix (empty / thin
+  // book → action disabled). null pubkey → null snapshot.
+  const phoenixPubkey = liveMarket?.data.phoenixMarket ?? null;
+  const { data: bookSnapshot } = useOrderBook(phoenixPubkey, 10);
+  const orderBook = bookSnapshot?.book ?? null;
+  const yesAsks = orderBook?.asks ?? [];
+  const yesBids = orderBook?.bids ?? [];
+
+  // Settled / paused → all trade actions disabled. `outcomeTag` returns
+  // "unsettled" when the market is still live.
+  const marketSettled = liveMarket
+    ? outcomeTag(liveMarket.data.outcome) !== "unsettled"
+    : false;
+  const marketPaused = marketConfig?.paused === true;
+
+  // DR-019 guard: NO-side trades are market-only. If the user toggles to NO
+  // while sitting on Limit, snap back to Market. The Limit toggle itself is
+  // gated below (disabled + tooltip) — this useEffect handles the case where
+  // the user changes outcome AFTER picking Limit.
+  useEffect(() => {
+    if (outcome === "no" && orderType === "limit") {
+      setOrderType("market");
+    }
+  }, [outcome, orderType]);
+
   // ─── Derived ────────────────────────────────────────────────────────────
-  const opp: Outcome = outcome === "yes" ? "no" : "yes";
   const pos = position[outcome];
 
-  const ask = outcome === "yes" ? PRICE_YES_ASK : PRICE_NO_ASK;
-  const bid = outcome === "yes" ? PRICE_YES_BID : PRICE_NO_BID;
+  // Prefer live Phoenix mid + ladder prices when available; fall back to the
+  // mockup constants only for static visual rendering when the book is empty
+  // (the disable matrix below grays out the action so the user never sees
+  // these as a real price quote).
+  const livePriceYesAsk = yesAsks[0]?.price;
+  const livePriceYesBid = yesBids[0]?.price;
+  const livePriceNoAsk =
+    livePriceYesBid !== undefined ? 1 - livePriceYesBid : undefined;
+  const livePriceNoBid =
+    livePriceYesAsk !== undefined ? 1 - livePriceYesAsk : undefined;
+
+  const ask =
+    outcome === "yes"
+      ? livePriceYesAsk ?? PRICE_YES_ASK
+      : livePriceNoAsk ?? PRICE_NO_ASK;
+  const bid =
+    outcome === "yes"
+      ? livePriceYesBid ?? PRICE_YES_BID
+      : livePriceNoBid ?? PRICE_NO_BID;
   const feeBps = userConfigDerived.projectedFeeBps || FEE_BPS_DEFAULT;
   const feeRatio = feeBps / 10_000;
   const usdcAvail = USDC_AVAIL_FALLBACK; // TODO: useTokenBalance(usdcAta)
 
   const sellEmpty = side === "sell" && pos.contracts === 0;
+
+  // ─── Pre-flight check matrix (P4) ───────────────────────────────────────
+  // Computes a single "why this action is disabled" reason per (side, outcome,
+  // orderType) combination. Each entry mirrors the architecture-conversation
+  // table; null = action is allowed. Buy YES Market is always allowed because
+  // we fall back to mint_pair when the Phoenix YES ask book is empty.
+  const phoenixUninitialized =
+    !phoenixPubkey || bookSnapshot?.uninitialized === true;
+
+  const disableReason: string | null = useMemo(() => {
+    if (marketSettled) return "Market settled — use Redeem for winnings.";
+    if (marketPaused) return "Market paused by admin.";
+    if (!liveMarket)
+      return `No on-chain StrikeMarket for ${tickerUpper} @ $${strikeNum}.`;
+
+    // DR-019: Limit on NO is structurally disabled (force-flipped to Market
+    // by the useEffect above; this guard catches any race where state hasn't
+    // updated yet).
+    if (outcome === "no" && orderType === "limit") {
+      return "Limit Buy/Sell NO coming in v1.5 — use Market for now.";
+    }
+
+    // Position-exclusivity (Hard YES #8 §6.1): you can't buy YES while net-
+    // long NO, or vice versa. Matched pairs don't trigger this — only the
+    // directional component does.
+    if (side === "buy" && outcome === "yes" && directionalNo > 0) {
+      return `You hold ${directionalNo} directional NO — close those (Sell NO) before buying YES.`;
+    }
+    if (side === "buy" && outcome === "no" && directionalYes > 0) {
+      return `You hold ${directionalYes} directional YES — close those (Sell YES) before buying NO.`;
+    }
+
+    if (side === "buy" && outcome === "yes") {
+      // Buy YES Market falls back to mint_pair when no asks — always allowed.
+      if (orderType === "limit" && phoenixUninitialized) {
+        return "Phoenix CLOB not yet bound to this strike — Limit orders unavailable.";
+      }
+      return null;
+    }
+
+    if (side === "sell" && outcome === "yes") {
+      if (directionalYes === 0) return "You hold no YES contracts to sell.";
+      if (orderType === "market" && yesBids.length === 0) {
+        return "No YES bids — wait for a buyer or place a Limit Sell.";
+      }
+      if (orderType === "limit" && phoenixUninitialized) {
+        return "Phoenix CLOB not yet bound to this strike — Limit orders unavailable.";
+      }
+      return null;
+    }
+
+    if (side === "buy" && outcome === "no") {
+      // Buy NO Market = atomic mint_pair + sell-YES. Needs YES bids to
+      // absorb the sell-YES leg.
+      if (phoenixUninitialized) {
+        return "Phoenix CLOB not yet bound — atomic Buy NO unavailable.";
+      }
+      if (yesBids.length === 0) {
+        return "Empty YES bid book — Buy NO would revert (no liquidity to sell the YES leg into).";
+      }
+      return null;
+    }
+
+    if (side === "sell" && outcome === "no") {
+      if (directionalNo === 0) return "You hold no NO contracts to sell.";
+      if (phoenixUninitialized) {
+        return "Phoenix CLOB not yet bound — atomic Sell NO unavailable.";
+      }
+      if (yesAsks.length === 0) {
+        return "Empty YES ask book — Sell NO would revert (no liquidity to buy the YES leg from).";
+      }
+      return null;
+    }
+
+    return null;
+  }, [
+    marketSettled,
+    marketPaused,
+    liveMarket,
+    tickerUpper,
+    strikeNum,
+    outcome,
+    orderType,
+    side,
+    directionalYes,
+    directionalNo,
+    yesAsks.length,
+    yesBids.length,
+    phoenixUninitialized,
+  ]);
 
   // BUY compute
   const buy = useMemo(() => {
@@ -211,6 +378,28 @@ export function TradeView({ ticker, strike }: TradeViewParams) {
   const [submitting, setSubmitting] = useState(false);
   const [submitResult, setSubmitResult] = useState<{ ok: boolean; msg: string } | null>(null);
 
+  // Load a Phoenix MarketState on-demand for the Phoenix-leg builders.
+  // Lifted to a closure rather than a hook because we only need it inside
+  // the submit handlers — keeps the render loop cheap.
+  const loadPhoenixMarketState = async (): Promise<MarketState> => {
+    if (!phoenixPubkey) {
+      throw new Error("Phoenix market not bound on this StrikeMarket.");
+    }
+    const info = await connection.getAccountInfo(phoenixPubkey, "confirmed");
+    if (!info) {
+      throw new Error("Phoenix market account not found on devnet.");
+    }
+    return MarketState.load({ address: phoenixPubkey, buffer: info.data });
+  };
+
+  const broadcast = async (tx: Transaction): Promise<string> => {
+    if (!wallet.publicKey) throw new Error("wallet disconnected");
+    const { blockhash } = await connection.getLatestBlockhash("confirmed");
+    tx.recentBlockhash = blockhash;
+    tx.feePayer = wallet.publicKey;
+    return wallet.sendTransaction(tx, connection, { skipPreflight: false });
+  };
+
   const handleSubmit = async () => {
     setSubmitResult(null);
     if (!wallet.publicKey || !wallet.signTransaction) {
@@ -221,25 +410,6 @@ export function TradeView({ ticker, strike }: TradeViewParams) {
       setSubmitResult({ ok: false, msg: "Anchor program loading — wait a beat." });
       return;
     }
-    if (sellEmpty) {
-      setSubmitResult({ ok: false, msg: "No contracts to sell." });
-      return;
-    }
-
-    // v1 demo enables Buy×Yes via mint_pair. The atomic Buy×No / Sell×Yes
-    // / Sell×No flows require a loaded Phoenix MarketState — Phoenix is not
-    // yet bound to BellMarkets strikes on devnet (mint-mismatch flag, Day-3
-    // handoff). Surface a clear "Phoenix CLOB pending" message rather than
-    // pretend to submit.
-    if (!(side === "buy" && outcome === "yes")) {
-      setSubmitResult({
-        ok: false,
-        msg:
-          "Phoenix CLOB binding pending — Buy YES via mint_pair is the live demo path. The other three actions ship in v1.1.",
-      });
-      return;
-    }
-
     if (!marketConfig) {
       setSubmitResult({ ok: false, msg: "Market config loading — wait a beat." });
       return;
@@ -251,24 +421,101 @@ export function TradeView({ ticker, strike }: TradeViewParams) {
       });
       return;
     }
+    if (disableReason) {
+      setSubmitResult({ ok: false, msg: disableReason });
+      return;
+    }
 
     setSubmitting(true);
     try {
-      const contractAmount = BigInt(Math.max(1, buy.contracts));
-      const built = await buildMintPairTx({
-        program,
-        user: wallet.publicKey,
-        marketPda: liveMarket.pda,
-        usdcMint: marketConfig.usdcMint,
-        treasury: marketConfig.treasury,
-        amount: contractAmount * 1_000_000n, // mint_pair takes USDC micros = pair count
-      });
-      const { blockhash } = await connection.getLatestBlockhash("confirmed");
-      built.tx.recentBlockhash = blockhash;
-      built.tx.feePayer = wallet.publicKey;
-      const sig = await wallet.sendTransaction(built.tx, connection, {
-        skipPreflight: false,
-      });
+      const trader = wallet.publicKey;
+      const marketPda = liveMarket.pda;
+      const usdcMint = marketConfig.usdcMint;
+      const treasury = marketConfig.treasury;
+
+      let tx: Transaction;
+
+      if (side === "buy" && outcome === "yes") {
+        // Buy YES: prefer Phoenix taker (cheaper, ladder-priced) when asks
+        // exist; fall back to mint_pair (always works, prices at $1/pair) when
+        // the YES ask book is empty. mint_pair is the load-bearing v1 path.
+        if (orderType === "market" && yesAsks.length > 0 && !phoenixUninitialized) {
+          const phoenixMarket = await loadPhoenixMarketState();
+          const numQuoteLots = Math.max(1, Math.floor(buy.total * 1_000_000));
+          tx = buildBuyYesTx({
+            phoenixMarket,
+            trader,
+            numQuoteLots,
+            minBaseLotsToFill: Math.max(1, Math.floor(buy.contracts * 0.95)),
+          });
+        } else {
+          const contractAmount = BigInt(Math.max(1, buy.contracts));
+          const built = await buildMintPairTx({
+            program,
+            user: trader,
+            marketPda,
+            usdcMint,
+            treasury,
+            amount: contractAmount * 1_000_000n,
+          });
+          tx = built.tx;
+        }
+      } else if (side === "sell" && outcome === "yes") {
+        // Sell YES: single-ix Phoenix swap (Ask side). User burns YES, receives
+        // USDC. Limit support adds a priceInTicks — Phoenix limit posting is
+        // forthcoming; for now Market only.
+        const phoenixMarket = await loadPhoenixMarketState();
+        const numBaseLots = Math.max(1, sell.sellCount);
+        tx = buildSellYesTx({
+          phoenixMarket,
+          trader,
+          numBaseLots,
+          // Floor for minQuoteLots: 95% of book price × lots. Keeps the user
+          // from being slipped past the slip-tolerance bar.
+          minQuoteLotsToFill: Math.max(
+            1,
+            Math.floor(sell.gross * 1_000_000 * 0.95),
+          ),
+        });
+      } else if (side === "buy" && outcome === "no") {
+        // Atomic Buy NO: mint_pair + Phoenix sell-YES in one tx. DR-019 IOC
+        // defense built into the builder.
+        const phoenixMarket = await loadPhoenixMarketState();
+        const contractAmount = BigInt(Math.max(1, buy.contracts));
+        const built = await buildBuyNoTx({
+          program,
+          trader,
+          marketPda,
+          phoenixMarket,
+          usdcMint,
+          treasury,
+          amount: contractAmount,
+        });
+        tx = built.tx;
+      } else {
+        // Atomic Sell NO: Phoenix buy-YES + redeem_pair in one tx. DR-019 IOC
+        // defense built into the builder.
+        const phoenixMarket = await loadPhoenixMarketState();
+        const contractAmount = BigInt(Math.max(1, sell.sellCount));
+        // maxQuoteLotsToSpend = 105% of book price × lots (5% slip ceiling on
+        // the buy-YES leg). Phoenix reverts if it would spend more than this.
+        const maxQuoteLotsToSpend = Math.max(
+          1,
+          Math.floor(Number(contractAmount) * ask * 1_000_000 * 1.05),
+        );
+        const built = await buildSellNoTx({
+          program,
+          trader,
+          marketPda,
+          phoenixMarket,
+          usdcMint,
+          amount: contractAmount,
+          maxQuoteLotsToSpend,
+        });
+        tx = built.tx;
+      }
+
+      const sig = await broadcast(tx);
       setSubmitResult({
         ok: true,
         msg: `Submitted! ${sig.slice(0, 16)}… (confirming)`,
@@ -280,6 +527,39 @@ export function TradeView({ ticker, strike }: TradeViewParams) {
       });
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  // ─── Redeem Pair (P5) ───────────────────────────────────────────────────
+  const [redeemingPair, setRedeemingPair] = useState(false);
+  const handleRedeemPair = async () => {
+    setSubmitResult(null);
+    if (!wallet.publicKey || !wallet.signTransaction) {
+      setSubmitResult({ ok: false, msg: "Connect a wallet to redeem." });
+      return;
+    }
+    if (!program || !marketConfig || !liveMarket || matchedPairs === 0) return;
+    setRedeemingPair(true);
+    try {
+      const built = await buildRedeemPairTx({
+        program,
+        trader: wallet.publicKey,
+        marketPda: liveMarket.pda,
+        usdcMint: marketConfig.usdcMint,
+        amount: BigInt(matchedPairs) * TOKEN_SCALE,
+      });
+      const sig = await broadcast(built.tx);
+      setSubmitResult({
+        ok: true,
+        msg: `Redeemed ${matchedPairs} pair${matchedPairs === 1 ? "" : "s"} — ${sig.slice(0, 16)}…`,
+      });
+    } catch (err) {
+      setSubmitResult({
+        ok: false,
+        msg: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setRedeemingPair(false);
     }
   };
 
@@ -373,6 +653,45 @@ export function TradeView({ ticker, strike }: TradeViewParams) {
             </div>
 
             <aside className="right-col">
+              {matchedPairs > 0 && (
+                <div
+                  className="stranded-pair-banner"
+                  data-matched-pairs={matchedPairs}
+                  style={{
+                    padding: 12,
+                    marginBottom: 12,
+                    border: "1px solid var(--bell-amber, #f59e0b)",
+                    background: "rgba(245, 158, 11, 0.08)",
+                    borderRadius: 6,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
+                  }}
+                >
+                  <div style={{ fontSize: 13, lineHeight: 1.5 }}>
+                    <strong>Matched pair{matchedPairs === 1 ? "" : "s"} detected.</strong>{" "}
+                    You hold {matchedPairs} matched YES+NO pair
+                    {matchedPairs === 1 ? "" : "s"} for this strike — click
+                    Redeem Pair to recover ${matchedPairs.toFixed(2)} USDC, or
+                    trade your directional position normally.
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleRedeemPair}
+                    disabled={redeemingPair || !program || !marketConfig}
+                    className="submit-btn primary-cta"
+                    style={{
+                      alignSelf: "flex-start",
+                      padding: "6px 14px",
+                      fontSize: 13,
+                    }}
+                  >
+                    {redeemingPair
+                      ? "Redeeming…"
+                      : `Redeem ${matchedPairs} Pair${matchedPairs === 1 ? "" : "s"} → $${matchedPairs.toFixed(2)}`}
+                  </button>
+                </div>
+              )}
               <div
                 className="trade-card"
                 data-side={side}
@@ -426,10 +745,22 @@ export function TradeView({ ticker, strike }: TradeViewParams) {
                     >
                       Market
                     </button>
+                    {/* DR-019: Limit Buy/Sell NO disabled — see constitution/decisions.md */}
                     <button
                       className={`order-type-btn${orderType === "limit" ? " active" : ""}`}
-                      onClick={() => setOrderType("limit")}
+                      onClick={() => outcome === "yes" && setOrderType("limit")}
                       type="button"
+                      disabled={outcome === "no"}
+                      title={
+                        outcome === "no"
+                          ? "Limit Buy/Sell NO coming in v1.5 — use Market for now."
+                          : undefined
+                      }
+                      style={
+                        outcome === "no"
+                          ? { opacity: 0.4, cursor: "not-allowed" }
+                          : undefined
+                      }
                     >
                       Limit
                     </button>
@@ -649,14 +980,29 @@ export function TradeView({ ticker, strike }: TradeViewParams) {
 
                       <button
                         className={`submit-btn primary-cta ${outcome === "yes" ? "yes" : "no"}`}
-                        disabled={!!fundsWarning || submitting}
+                        disabled={
+                          !!fundsWarning ||
+                          !!disableReason ||
+                          submitting
+                        }
                         onClick={handleSubmit}
                         type="button"
+                        title={disableReason ?? undefined}
                       >
                         <span className="sb-action">{sbAction}</span>
                         <span className={`sb-outcome ${outcome}`}>{outcome.toUpperCase()}</span>
                         <span className="sb-detail">{sbDetail}</span>
                       </button>
+                      {disableReason && (
+                        <div
+                          className="funds-warning"
+                          style={{ marginTop: 8 }}
+                          data-disable-reason
+                        >
+                          <span aria-hidden="true">⚠</span>
+                          <span>{disableReason}</span>
+                        </div>
+                      )}
 
                       {submitResult && (
                         <div
