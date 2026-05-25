@@ -69,7 +69,7 @@ export function TopStatusBar({ settleCountdown = "02:13:47" }: { settleCountdown
   return (
     <div className="top-status">
       <div><span className="pulse" /><span className="label">CONN</span><span className="val green">DEVNET</span></div>
-      <div><span className="label">PYTH</span><span className="val green">FRESH</span></div>
+      <div><span className="label">PYTH</span><span className="val green">FRESH·12s</span></div>
       <div><span className="label">PROG</span><span className="val">599h7V…kS7uV</span></div>
       <div><span className="label">CFG</span><span className="val">6CYzWh…ev9gQ</span></div>
       <div><span className="label">SETTLE</span><span className="val amber">{settleCountdown}</span></div>
