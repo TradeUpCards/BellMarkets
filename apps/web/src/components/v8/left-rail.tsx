@@ -131,6 +131,91 @@ const RAIL_POSITIONS = [
   { market: "AAPL.230.YES", side: "8 contracts · entry $0.42", pnl: "+$2.80", down: false },
 ];
 
+/**
+ * Stand-alone ticker accordion — same markup the left rail uses, but
+ * extractable so the landing page can render it inline as the primary
+ * market navigator on mobile (where the rail is hidden by CSS).
+ *
+ * The wrapping `<details className="rail-section">` keeps the section
+ * header + collapse affordance consistent with the rail. Pass
+ * `defaultOpen={false}` if you want the section collapsed by default
+ * (e.g., when stacking multiple sections on a small viewport).
+ */
+export interface TickerAccordionProps {
+  activeTicker?: string;
+  defaultOpen?: boolean;
+  /** Override the section title — defaults to "All tickers". */
+  title?: string;
+}
+
+export function TickerAccordion({
+  activeTicker,
+  defaultOpen = true,
+  title = "All tickers",
+}: TickerAccordionProps) {
+  return (
+    <details className="rail-section" id="rail-tickers" open={defaultOpen}>
+      <summary className="rail-section-h">
+        <span className="rail-section-title">
+          {title} <span className="count">{RAIL_TICKERS.length}</span>
+        </span>
+        <span className="rail-chevron" aria-hidden="true">▾</span>
+      </summary>
+      <div className="rail-section-body">
+        <div className="rail-ticker-list">
+          {RAIL_TICKERS.map((t) => {
+            const isActive =
+              !!activeTicker && t.sym === activeTicker.toUpperCase();
+            return (
+              <details
+                key={t.sym}
+                className={`ticker-accordion${isActive ? " active" : ""}`}
+                open={isActive}
+              >
+                <summary className="ticker-accordion-head">
+                  <span className="rail-ticker-mark">{t.mark}</span>
+                  <span className="ticker-sym-block">
+                    <span className="rail-ticker-sym">{t.sym}</span>
+                    <span className="rail-ticker-spot">{t.spot}</span>
+                  </span>
+                  <span className="ticker-meta-block">
+                    <span
+                      className={`rail-ticker-chg ${t.chgUp ? "up" : "down"}`}
+                    >
+                      {t.chg}
+                    </span>
+                    <span className="rail-ticker-vol">{t.vol}</span>
+                  </span>
+                  <span className="ticker-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <div className="ticker-strikes">
+                  {t.strikes.map((s) => {
+                    const isDemoTicker = DEMO_LIVE_STRIKE[t.sym] !== undefined;
+                    const routeStrike =
+                      isDemoTicker && s.kind === "atm"
+                        ? DEMO_LIVE_STRIKE[t.sym]
+                        : s.px;
+                    return (
+                      <Link
+                        key={s.px}
+                        className={`ticker-strike ${s.kind}`}
+                        href={`/trade/${t.sym}/${routeStrike}`}
+                      >
+                        <span className="px">{s.label}</span>
+                        <span className="prob">{s.prob}%</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </details>
+            );
+          })}
+        </div>
+      </div>
+    </details>
+  );
+}
+
 export interface LeftRailProps {
   /** Highlight a specific ticker as the active one (e.g., the page's ticker on /trade). */
   activeTicker?: string;
@@ -190,65 +275,7 @@ export function LeftRail({
         </details>
       )}
 
-      <details className="rail-section" id="rail-tickers" open>
-        <summary className="rail-section-h">
-          <span className="rail-section-title">
-            All tickers <span className="count">7</span>
-          </span>
-          <span className="rail-chevron" aria-hidden="true">▾</span>
-        </summary>
-        <div className="rail-section-body">
-          <div className="rail-ticker-list">
-            {RAIL_TICKERS.map((t) => {
-              const isActive =
-                !!activeTicker && t.sym === activeTicker.toUpperCase();
-              return (
-                <details
-                  key={t.sym}
-                  className={`ticker-accordion${isActive ? " active" : ""}`}
-                  open={isActive}
-                >
-                  <summary className="ticker-accordion-head">
-                    <span className="rail-ticker-mark">{t.mark}</span>
-                    <span className="ticker-sym-block">
-                      <span className="rail-ticker-sym">{t.sym}</span>
-                      <span className="rail-ticker-spot">{t.spot}</span>
-                    </span>
-                    <span className="ticker-meta-block">
-                      <span
-                        className={`rail-ticker-chg ${t.chgUp ? "up" : "down"}`}
-                      >
-                        {t.chg}
-                      </span>
-                      <span className="rail-ticker-vol">{t.vol}</span>
-                    </span>
-                    <span className="ticker-chevron" aria-hidden="true">▾</span>
-                  </summary>
-                  <div className="ticker-strikes">
-                    {t.strikes.map((s) => {
-                      const isDemoTicker = DEMO_LIVE_STRIKE[t.sym] !== undefined;
-                      const routeStrike =
-                        isDemoTicker && s.kind === "atm"
-                          ? DEMO_LIVE_STRIKE[t.sym]
-                          : s.px;
-                      return (
-                        <Link
-                          key={s.px}
-                          className={`ticker-strike ${s.kind}`}
-                          href={`/trade/${t.sym}/${routeStrike}`}
-                        >
-                          <span className="px">{s.label}</span>
-                          <span className="prob">{s.prob}%</span>
-                        </Link>
-                      );
-                    })}
-                  </div>
-                </details>
-              );
-            })}
-          </div>
-        </div>
-      </details>
+      <TickerAccordion activeTicker={activeTicker} />
 
       <div className="rail-section">
         <div className="rail-section-h">

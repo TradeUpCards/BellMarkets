@@ -505,6 +505,12 @@
   /* ========== MAIN ========== */
   main { padding: 16px; overflow-x: hidden; }
 
+  /* Mobile-only ticker card — hidden on desktop. Becomes the primary
+     market navigator below 768px where the left rail collapses; matches
+     the rail's accordion markup so the desktop + mobile UX stay
+     consistent. See @media (max-width: 768px) for the mobile rules. */
+  .mobile-ticker-card { display: none; }
+
   /* ========== TICKER STRIP (above everything) ========== */
   .ticker-strip {
     background: var(--panel);
@@ -1666,12 +1672,49 @@
       flex-direction: column;
       gap: 12px;
     }
-    /* PROBABILITY MATRIX = the headline surface on mobile, render first */
-    .matrix-card { order: 1; }
+    /* MOBILE: ticker accordion is the primary market navigator (replaces
+       the 7×7 matrix, which is too crowded on small viewports per Cory
+       2026-05-25 "we should default to the ticker list we use in the
+       left bar"). Show the mobile-ticker-card; hide the matrix-card. */
+    .mobile-ticker-card { order: 1; display: block; }
+    .matrix-card { display: none; }
     .ticker-marquee { order: 2; }
     .hero-grid { order: 3; }
     .row-2col { order: 4; }
     .how-section { order: 5; }
+
+    /* Mobile ticker card frame — match the matrix-card visual treatment
+       so the landing-page hierarchy stays consistent. The inner
+       <TickerAccordion> renders the standard rail-section markup. */
+    .mobile-ticker-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .mobile-ticker-card .rail-section { border: none; padding: 0; }
+    .mobile-ticker-card .rail-section-h { padding: 12px 14px; }
+    .mobile-ticker-card .rail-section-title {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: none;
+      letter-spacing: 0;
+      color: var(--text);
+    }
+    .mobile-ticker-card .rail-section-body { padding: 0 8px 8px; }
+    /* Ticker rows in the mobile card — bigger tap targets than the rail */
+    .mobile-ticker-card .ticker-accordion-head {
+      padding: 12px 10px;
+      min-height: 56px;
+    }
+    .mobile-ticker-card .ticker-strikes {
+      padding: 4px 10px 10px;
+      gap: 6px;
+    }
+    .mobile-ticker-card .ticker-strike {
+      min-height: 44px;
+      padding: 8px 10px;
+    }
 
     /* TODAY'S SESSION block hidden on mobile (Cory feedback: condense/hide).
        Marquee + matrix carry the live-state signal; session stats are
