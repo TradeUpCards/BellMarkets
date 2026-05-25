@@ -103,6 +103,180 @@
       ]
     },
     {
+      "name": "cancel_order",
+      "discriminator": [
+        95,
+        129,
+        237,
+        240,
+        8,
+        49,
+        223,
+        132
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "strike_market"
+        },
+        {
+          "name": "order_book",
+          "docs": [
+            "Zero-copy AccountLoader — §4.11 stack safety. Back-ref + bump",
+            "checked in handler."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  100,
+                  101,
+                  114,
+                  95,
+                  98,
+                  111,
+                  111,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "strike_market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "yes_mint",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  121,
+                  101,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "strike_market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "usdc_mint",
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "user_yes",
+          "writable": true
+        },
+        {
+          "name": "user_usdc",
+          "writable": true
+        },
+        {
+          "name": "usdc_escrow",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  100,
+                  99,
+                  95,
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "strike_market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "yes_escrow",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  121,
+                  101,
+                  115,
+                  95,
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "strike_market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "side",
+          "type": "u8"
+        },
+        {
+          "name": "seq",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "close_settled_market",
       "discriminator": [
         223,
@@ -809,14 +983,71 @@
           "writable": true
         },
         {
-          "name": "user"
+          "name": "user",
+          "docs": [
+            "/ `user_usdc.owner == user.key()` constraints below."
+          ]
         },
         {
-          "name": "winning_mint",
+          "name": "yes_mint",
+          "docs": [
+            "DR-017 Fix 1 — PDA-seed-constrained. Caller (admin) cannot substitute."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  121,
+                  101,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "strike_market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "no_mint",
+          "docs": [
+            "DR-017 Fix 1 — PDA-seed-constrained. Caller (admin) cannot substitute."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  110,
+                  111
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "strike_market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_yes",
+          "docs": [
+            "User's YES-token ATA. Statically bound to `yes_mint` via `token::mint`;",
+            "owner-checked against the UncheckedAccount `user` (admin signs the tx,",
+            "not user, so `token::authority` is not appropriate)."
+          ],
           "writable": true
         },
         {
-          "name": "user_winning_token",
+          "name": "user_no",
+          "docs": [
+            "User's NO-token ATA. Statically bound to `no_mint`; symmetric to",
+            "`user_yes`."
+          ],
           "writable": true
         },
         {
@@ -866,6 +1097,271 @@
           "type": "u64"
         }
       ]
+    },
+    {
+      "name": "grow_order_book",
+      "discriminator": [
+        233,
+        31,
+        8,
+        169,
+        183,
+        56,
+        77,
+        99
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "strike_market",
+          "writable": true
+        },
+        {
+          "name": "order_book",
+          "docs": [
+            "by reading the back-ref bytes at offset 8..40 (market field) and",
+            "comparing to strike_market.key(). Typed `Account<OrderBook>` can't be",
+            "used here because the account starts under-sized."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  100,
+                  101,
+                  114,
+                  95,
+                  98,
+                  111,
+                  111,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "strike_market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "init_order_book",
+      "discriminator": [
+        225,
+        19,
+        88,
+        90,
+        233,
+        246,
+        140,
+        84
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "strike_market",
+          "writable": true
+        },
+        {
+          "name": "order_book",
+          "docs": [
+            "at smaller-than-OrderBook::LEN size. Anchor's `init` constraint can't",
+            "be used here because it would require typed deserialization at the",
+            "smaller allocation, which the borsh layout doesn't permit. The PDA",
+            "derivation is verified by Anchor via `seeds + bump`; ownership +",
+            "discriminator are written manually below."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  100,
+                  101,
+                  114,
+                  95,
+                  98,
+                  111,
+                  111,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "strike_market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "usdc_mint",
+          "docs": [
+            "USDC mint — also bound on `MarketConfig.usdc_mint` via `has_one` above."
+          ],
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "yes_mint",
+          "docs": [
+            "YES mint — PDA-bound to the strike. Used as the mint for the",
+            "`yes_escrow` token account."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  121,
+                  101,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "strike_market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "usdc_escrow",
+          "docs": [
+            "Per-market USDC escrow for resting bid orders. Authority = strike_market",
+            "PDA (reused per DR-020 — no separate mint_authority PDA, matches our",
+            "existing usdc_vault pattern). Init via Anchor's standard token::init",
+            "path; small enough to fit in one ix."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  100,
+                  99,
+                  95,
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "strike_market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "yes_escrow",
+          "docs": [
+            "Per-market YES escrow for resting ask orders. Authority = strike_market",
+            "PDA."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  121,
+                  101,
+                  115,
+                  95,
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "strike_market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "rent",
+          "address": "SysvarRent111111111111111111111111111111111"
+        }
+      ],
+      "args": []
     },
     {
       "name": "initialize_config",
@@ -1214,6 +1710,168 @@
       "args": []
     },
     {
+      "name": "match_orders",
+      "discriminator": [
+        17,
+        1,
+        201,
+        93,
+        7,
+        51,
+        251,
+        134
+      ],
+      "accounts": [
+        {
+          "name": "cranker",
+          "docs": [
+            "Cranker (anyone). Pays gas. No special role."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "strike_market"
+        },
+        {
+          "name": "order_book",
+          "docs": [
+            "Zero-copy AccountLoader — §4.11 stack safety. Back-ref checked in handler."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  100,
+                  101,
+                  114,
+                  95,
+                  98,
+                  111,
+                  111,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "strike_market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "yes_mint",
+          "docs": [
+            "DR-020 M-2: PDA-seed-constrained."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  121,
+                  101,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "strike_market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "usdc_mint",
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "usdc_escrow",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  100,
+                  99,
+                  95,
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "strike_market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "yes_escrow",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  121,
+                  101,
+                  115,
+                  95,
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "strike_market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "mint_pair",
       "discriminator": [
         19,
@@ -1512,6 +2170,199 @@
       ]
     },
     {
+      "name": "place_order",
+      "discriminator": [
+        51,
+        194,
+        155,
+        175,
+        109,
+        130,
+        96,
+        106
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "strike_market",
+          "writable": true
+        },
+        {
+          "name": "order_book",
+          "docs": [
+            "Zero-copy AccountLoader — required for §4.11 stack safety. The",
+            "~16 KB OrderBook is mapped, not deserialized onto the BPF stack.",
+            "`order_book.market` back-ref is verified in the handler (constraints",
+            "can't directly read zero_copy fields without `.load()`)."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  100,
+                  101,
+                  114,
+                  95,
+                  98,
+                  111,
+                  111,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "strike_market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "yes_mint",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  121,
+                  101,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "strike_market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "usdc_mint",
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "user_yes",
+          "docs": [
+            "Caller's YES ATA. Used as the SOURCE for ask escrow (sell YES) AND",
+            "the DESTINATION for bid fills (buy YES received from ask makers).",
+            "Always required even for pure-rest bid (a crossing bid receives YES)."
+          ],
+          "writable": true
+        },
+        {
+          "name": "user_usdc",
+          "docs": [
+            "Caller's USDC ATA. SOURCE for bid escrow; DESTINATION for ask fills."
+          ],
+          "writable": true
+        },
+        {
+          "name": "usdc_escrow",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  100,
+                  99,
+                  95,
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "strike_market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "yes_escrow",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  121,
+                  101,
+                  115,
+                  95,
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "strike_market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "side",
+          "type": "u8"
+        },
+        {
+          "name": "price",
+          "type": "u64"
+        },
+        {
+          "name": "size",
+          "type": "u64"
+        },
+        {
+          "name": "is_market",
+          "type": "bool"
+        }
+      ]
+    },
+    {
       "name": "redeem",
       "discriminator": [
         184,
@@ -1552,16 +2403,69 @@
           "writable": true
         },
         {
-          "name": "winning_mint",
+          "name": "yes_mint",
           "docs": [
-            "The mint corresponding to the user's winning side. The handler",
-            "enforces `winning_mint == strike_market.yes_mint` (if outcome == Yes)",
-            "or `== strike_market.no_mint` (if outcome == No)."
+            "DR-017 Fix 1 — PDA-seed-constrained. Caller cannot substitute. Bound",
+            "to the canonical per-market YES mint via `[b\"yes\", strike_market.key()]`",
+            "+ stored bump."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  121,
+                  101,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "strike_market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "no_mint",
+          "docs": [
+            "DR-017 Fix 1 — PDA-seed-constrained. Bound to the canonical per-market",
+            "NO mint via `[b\"no\", strike_market.key()]` + stored bump."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  110,
+                  111
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "strike_market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_yes",
+          "docs": [
+            "User's YES-token ATA. Statically bound to `yes_mint` above; if",
+            "outcome == No the handler does not touch this account but it is",
+            "still passed in (Anchor's static analyzer needs the full account",
+            "list for verification)."
           ],
           "writable": true
         },
         {
-          "name": "user_winning_token",
+          "name": "user_no",
+          "docs": [
+            "User's NO-token ATA. Statically bound to `no_mint`; symmetric to",
+            "`user_yes` — unused when outcome == Yes."
+          ],
           "writable": true
         },
         {
@@ -1871,6 +2775,131 @@
       ]
     },
     {
+      "name": "reinit_rewards_pools",
+      "discriminator": [
+        112,
+        26,
+        54,
+        56,
+        4,
+        26,
+        240,
+        115
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "usdc_mint",
+          "docs": [
+            "Current `MarketConfig.usdc_mint` (verified via `has_one = usdc_mint`).",
+            "Reused as the binding mint for the re-initialized pool accounts."
+          ],
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "weekly_pool",
+          "docs": [
+            "SPL TokenAccount bound to the OLD usdc_mint. Handler verifies via",
+            "raw byte read that:",
+            "(1) account is owned by SPL Token program (`spl_token::ID`)",
+            "(2) account is a valid TokenAccount (data.len() == 165)",
+            "(3) TokenAccount.amount == 0 (PoolNotEmpty defense)",
+            "(4) TokenAccount.owner == this account's own pubkey (self-authority,",
+            "matches `initialize_rewards_pools` pattern; WrongPoolAuthority",
+            "defense)",
+            "Then closes + recreates + reinits at the same PDA bound to",
+            "`config.usdc_mint`."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  119,
+                  101,
+                  101,
+                  107,
+                  108,
+                  121,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "monthly_pool",
+          "docs": [
+            "weekly_pool."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  111,
+                  110,
+                  116,
+                  104,
+                  108,
+                  121,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "rent",
+          "address": "SysvarRent111111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "settle_market",
       "discriminator": [
         193,
@@ -2136,6 +3165,51 @@
       ]
     },
     {
+      "name": "update_usdc_mint",
+      "discriminator": [
+        131,
+        156,
+        29,
+        130,
+        237,
+        52,
+        110,
+        164
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "new_mint",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
       "name": "user_create_strike_market",
       "discriminator": [
         134,
@@ -2377,6 +3451,19 @@
         82,
         128,
         24
+      ]
+    },
+    {
+      "name": "OrderBook",
+      "discriminator": [
+        55,
+        230,
+        125,
+        218,
+        149,
+        39,
+        65,
+        248
       ]
     },
     {
@@ -2624,6 +3711,86 @@
       "code": 6040,
       "name": "PythNegativePrice",
       "msg": "Pyth price is negative; refusing to bind a negative spot for strike validation."
+    },
+    {
+      "code": 6041,
+      "name": "BookFull",
+      "msg": "Order book is full at capacity ORDERBOOK_N=128 per side; reject new resting order."
+    },
+    {
+      "code": 6042,
+      "name": "NotOrderOwner",
+      "msg": "Order owner mismatch; only the order's owner may cancel it."
+    },
+    {
+      "code": 6043,
+      "name": "OrderNotFound",
+      "msg": "Order with the supplied (side, seq) not found on the book."
+    },
+    {
+      "code": 6044,
+      "name": "PriceOutOfRange",
+      "msg": "Order price must be in [1, PRICE_SCALE] (DR-020 M-4: zero price rejected to prevent free-Yes griefing)."
+    },
+    {
+      "code": 6045,
+      "name": "ZeroOrderSize",
+      "msg": "Order size must be > 0."
+    },
+    {
+      "code": 6046,
+      "name": "InvalidSide",
+      "msg": "Side discriminator must be SIDE_BID (0) or SIDE_ASK (1)."
+    },
+    {
+      "code": 6047,
+      "name": "ClobMakerNotSplOwned",
+      "msg": "Maker payout account not owned by the SPL Token program (DR-020 H-1: prevents book-lock DoS via spoofed account)."
+    },
+    {
+      "code": 6048,
+      "name": "ClobMakerNotWritable",
+      "msg": "Maker payout account not writable (defense-in-depth: a read-only account would block the SPL Token transfer CPI)."
+    },
+    {
+      "code": 6049,
+      "name": "ClobMakerFrozen",
+      "msg": "Maker payout token account is frozen (DR-020 M-1: rejects frozen-account matching DoS)."
+    },
+    {
+      "code": 6050,
+      "name": "ClobMakerOwnerMismatch",
+      "msg": "Maker payout account owner does not match the on-chain order's owner pubkey."
+    },
+    {
+      "code": 6051,
+      "name": "ClobMakerMintMismatch",
+      "msg": "Maker payout account mint does not match the expected mint (USDC for ask payouts; YES for bid payouts)."
+    },
+    {
+      "code": 6052,
+      "name": "ClobRemainingAccountsMismatch",
+      "msg": "remaining_accounts shape mismatch: expected one maker payout account per planned fill, in fill order."
+    },
+    {
+      "code": 6053,
+      "name": "OrderBookNotInitialized",
+      "msg": "Order book is not initialized for this strike_market (init_order_book + grow_order_book must run first)."
+    },
+    {
+      "code": 6054,
+      "name": "OrderBookMarketMismatch",
+      "msg": "Order book back-reference does not match the supplied strike_market account."
+    },
+    {
+      "code": 6055,
+      "name": "PoolNotEmpty",
+      "msg": "Reward pool has non-zero balance; drain to admin before reinit (admin manual SPL transfer)."
+    },
+    {
+      "code": 6056,
+      "name": "WrongPoolAuthority",
+      "msg": "Reward pool authority does not match its own pubkey (self-authority pattern from initialize_rewards_pools)."
     }
   ],
   "types": [
@@ -2908,6 +4075,183 @@
       }
     },
     {
+      "name": "Order",
+      "docs": [
+        "One resting order. `#[zero_copy]` + `#[repr(C)]` for stack-safety —",
+        "avoids the §4.11 BPF stack overflow that a borsh-deserialized",
+        "`[Order; 128]` would trigger inside Anchor's `try_accounts`.",
+        "",
+        "Size = 64 bytes (with 7-byte explicit pad to make `[Order; N]` Pod-safe).",
+        "Time priority comes from `seq` (monotonic from `OrderBook.next_seq` at",
+        "place time).",
+        "",
+        "**No `escrow_amount` field** — escrow is computed at every point from",
+        "`price` + `size` via `matching::bid_cost_ceil` and `matching::fill_usdc`.",
+        "The telescoping property means escrow drains to exactly 0 on full fill",
+        "with no dust. See `matching::fill_usdc` doc."
+      ],
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "price",
+            "type": "u64"
+          },
+          {
+            "name": "size",
+            "type": "u64"
+          },
+          {
+            "name": "seq",
+            "type": "u64"
+          },
+          {
+            "name": "side",
+            "type": "u8"
+          },
+          {
+            "name": "_pad",
+            "type": {
+              "array": [
+                "u8",
+                7
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "OrderBook",
+      "docs": [
+        "Per-market on-chain order book. PDA seed = `[ORDER_BOOK_SEED, strike_market]`.",
+        "`#[account(zero_copy)]` + `#[repr(C)]` + `AccountLoader` — the 14.7 KB",
+        "account never enters the BPF stack (§4.11). Field order is largest-first",
+        "to keep natural alignment without implicit padding (bytemuck::Pod",
+        "requirement).",
+        "",
+        "**Layout (no implicit padding):**",
+        "",
+        "| Offset | Field | Size | Align |",
+        "|---|---|---|---|",
+        "| 0 | discriminator (Anchor) | 8 | 1 |",
+        "| 8 | market | 32 | 1 |",
+        "| 40 | next_seq | 8 | 8 |",
+        "| 48 | bids[128] | 8192 | 8 |",
+        "| 8240 | asks[128] | 8192 | 8 |",
+        "| 16432 | bids_len | 2 | 2 |",
+        "| 16434 | asks_len | 2 | 2 |",
+        "| 16436 | bump | 1 | 1 |",
+        "| 16437 | _reserved[11] | 11 | 1 |",
+        "| 16448 | end (size-aligned to 8) | — | — |",
+        "",
+        "**Two-instruction creation** (Keith's spec): `init_order_book` allocates",
+        "`ORDER_BOOK_INIT_ALLOC` payload (10,000 + 8 disc = 10,008 bytes), under",
+        "the `MAX_PERMITTED_DATA_INCREASE` cap. `grow_order_book` reallocs the",
+        "remaining ~6,440 bytes (10_008 → 16_448) — also under the cap.",
+        "",
+        "Pre-grow, `AccountLoader::load()` fails because the buffer is smaller",
+        "than the type — natural trading gate. Post-grow, `load()` / `load_mut()`",
+        "succeed and trading is open.",
+        "",
+        "**Garbage bytes in unused tail slots** (Solana doesn't zero realloc'd",
+        "bytes per Keith's L-5) are never observed: all reads gate on",
+        "`bids_len` / `asks_len` (zero at init time, bumped only by genuine",
+        "`place_order` writes)."
+      ],
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market",
+            "docs": [
+              "Back-reference to the StrikeMarket this book serves."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "next_seq",
+            "docs": [
+              "Monotonic counter for time priority."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "bids",
+            "docs": [
+              "Sorted price-desc, then seq-asc. `bids[0]` = best (highest price)."
+            ],
+            "type": {
+              "array": [
+                {
+                  "defined": {
+                    "name": "Order"
+                  }
+                },
+                128
+              ]
+            }
+          },
+          {
+            "name": "asks",
+            "docs": [
+              "Sorted price-asc, then seq-asc. `asks[0]` = best (lowest price)."
+            ],
+            "type": {
+              "array": [
+                {
+                  "defined": {
+                    "name": "Order"
+                  }
+                },
+                128
+              ]
+            }
+          },
+          {
+            "name": "bids_len",
+            "docs": [
+              "Number of valid (non-garbage) Orders at the head of `bids`.",
+              "`bids[..bids_len]` is the active set."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "asks_len",
+            "docs": [
+              "Same for asks."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "_reserved",
+            "type": {
+              "array": [
+                "u8",
+                11
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "Outcome",
       "type": {
         "kind": "enum",
@@ -3017,13 +4361,18 @@
             "type": "u64"
           },
           {
-            "name": "_reserved",
-            "type": {
-              "array": [
-                "u8",
-                24
-              ]
-            }
+            "name": "order_book",
+            "docs": [
+              "DR-020 in-program CLOB trading gate (Keith's spec §4.3 `Market.order_book`).",
+              "Set by `grow_order_book` to the per-market `OrderBook` PDA address.",
+              "`Pubkey::default()` until `grow_order_book` runs — every trading ix",
+              "requires `strike_market.order_book == order_book.key()` to reject",
+              "trading on a strike whose book isn't fully allocated. Backward-compat",
+              "note: the 7 legacy META markets (deploy_index=6, ~333-byte schema)",
+              "won't deserialize against the new ~349-byte schema — acceptable per",
+              "Cory's \"devnet only, nothing in use\" green-light on this dispatch."
+            ],
+            "type": "pubkey"
           }
         ]
       }

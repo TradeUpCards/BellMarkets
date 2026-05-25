@@ -124,4 +124,56 @@ pub enum BellMarketsError {
 
     #[msg("Pyth price is negative; refusing to bind a negative spot for strike validation.")]
     PythNegativePrice,
+
+    // ─── DR-020 — In-program CLOB errors ────────────────────────────────────
+
+    #[msg("Order book is full at capacity ORDERBOOK_N=128 per side; reject new resting order.")]
+    BookFull,
+
+    #[msg("Order owner mismatch; only the order's owner may cancel it.")]
+    NotOrderOwner,
+
+    #[msg("Order with the supplied (side, seq) not found on the book.")]
+    OrderNotFound,
+
+    #[msg("Order price must be in [1, PRICE_SCALE] (DR-020 M-4: zero price rejected to prevent free-Yes griefing).")]
+    PriceOutOfRange,
+
+    #[msg("Order size must be > 0.")]
+    ZeroOrderSize,
+
+    #[msg("Side discriminator must be SIDE_BID (0) or SIDE_ASK (1).")]
+    InvalidSide,
+
+    #[msg("Maker payout account not owned by the SPL Token program (DR-020 H-1: prevents book-lock DoS via spoofed account).")]
+    ClobMakerNotSplOwned,
+
+    #[msg("Maker payout account not writable (defense-in-depth: a read-only account would block the SPL Token transfer CPI).")]
+    ClobMakerNotWritable,
+
+    #[msg("Maker payout token account is frozen (DR-020 M-1: rejects frozen-account matching DoS).")]
+    ClobMakerFrozen,
+
+    #[msg("Maker payout account owner does not match the on-chain order's owner pubkey.")]
+    ClobMakerOwnerMismatch,
+
+    #[msg("Maker payout account mint does not match the expected mint (USDC for ask payouts; YES for bid payouts).")]
+    ClobMakerMintMismatch,
+
+    #[msg("remaining_accounts shape mismatch: expected one maker payout account per planned fill, in fill order.")]
+    ClobRemainingAccountsMismatch,
+
+    #[msg("Order book is not initialized for this strike_market (init_order_book + grow_order_book must run first).")]
+    OrderBookNotInitialized,
+
+    #[msg("Order book back-reference does not match the supplied strike_market account.")]
+    OrderBookMarketMismatch,
+
+    // ─── deploy_index=8 — reinit_rewards_pools errors ───────────────────────
+
+    #[msg("Reward pool has non-zero balance; drain to admin before reinit (admin manual SPL transfer).")]
+    PoolNotEmpty,
+
+    #[msg("Reward pool authority does not match its own pubkey (self-authority pattern from initialize_rewards_pools).")]
+    WrongPoolAuthority,
 }

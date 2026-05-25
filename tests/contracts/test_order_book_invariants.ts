@@ -661,7 +661,10 @@ describe("DR-020 Order Book Invariants (in-program CLOB)", () => {
       // For market orders, we use is_market=true and price can be 0.
       // But our mock enforces M-4: zero-price limit check. Market orders pass through.
       // If the mock rejected market orders with price=0, use price=1n instead.
-      expect(buyNoResult.filled, "Buy NO: Sell YES step should fill into resting bid").to.be.gt(0n);
+      // Chai .gt(0n) doesn't support BigInt; assert the exact expected fill
+      // (2 YES = 2_000_000 base units) — stronger than ">0" and matches the
+      // pattern used at line ~683 for the symmetric Sell NO step.
+      expect(buyNoResult.filled, "Buy NO: Sell YES step should fill 2 YES into resting bid").to.equal(2n * ONE_USDC);
       await assertVaultInvariant("after Buy NO step 2: sell YES into bid book");
 
       // ── Trade path 4: Sell NO (atomic: place_order Buy YES + redeem_pair) ─

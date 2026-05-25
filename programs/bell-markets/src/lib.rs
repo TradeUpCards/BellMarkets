@@ -22,6 +22,7 @@ pub mod oracle;
 pub mod adapters;
 pub mod instructions;
 pub mod merkle;
+pub mod matching;
 
 use instructions::*;
 use state::{Outcome, MAX_ALLOWED_STRIKES, ARWEAVE_TX_ID_LEN};
@@ -229,5 +230,43 @@ pub mod bell_markets {
 
     pub fn close_settled_market(ctx: Context<CloseSettledMarket>) -> Result<()> {
         instructions::close_settled_market::handler(ctx)
+    }
+
+    // ─── DR-020 — In-program CLOB instructions ──────────────────────────
+
+    pub fn init_order_book(ctx: Context<InitOrderBook>) -> Result<()> {
+        instructions::init_order_book::handler(ctx)
+    }
+
+    pub fn grow_order_book(ctx: Context<GrowOrderBook>) -> Result<()> {
+        instructions::grow_order_book::handler(ctx)
+    }
+
+    pub fn place_order<'info>(
+        ctx: Context<'_, '_, '_, 'info, PlaceOrder<'info>>,
+        side: u8,
+        price: u64,
+        size: u64,
+        is_market: bool,
+    ) -> Result<()> {
+        instructions::place_order::handler(ctx, side, price, size, is_market)
+    }
+
+    pub fn cancel_order(ctx: Context<CancelOrder>, side: u8, seq: u64) -> Result<()> {
+        instructions::cancel_order::handler(ctx, side, seq)
+    }
+
+    pub fn match_orders<'info>(
+        ctx: Context<'_, '_, '_, 'info, MatchOrders<'info>>,
+    ) -> Result<()> {
+        instructions::match_orders::handler(ctx)
+    }
+
+    pub fn update_usdc_mint(ctx: Context<UpdateUsdcMint>, new_mint: Pubkey) -> Result<()> {
+        instructions::update_usdc_mint::handler(ctx, new_mint)
+    }
+
+    pub fn reinit_rewards_pools(ctx: Context<ReinitRewardsPools>) -> Result<()> {
+        instructions::reinit_rewards_pools::handler(ctx)
     }
 }
