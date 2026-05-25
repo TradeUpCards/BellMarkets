@@ -35,7 +35,7 @@ import {
   useBellProSubscription,
   isBellProActive,
 } from "@/hooks/use-bell-pro-subscription";
-import { LeftRail } from "@/components/v8/left-rail";
+import { LeftRail, TickerAccordion } from "@/components/v8/left-rail";
 
 // ── Demo strike overrides (Bram's Path B seed on devnet) ───────────────────
 const DEMO_LIVE_STRIKE: Record<string, number> = {
@@ -512,7 +512,16 @@ export function LandingView() {
           </div>
         </div>
 
-        {/* PROBABILITY MATRIX */}
+        {/* MOBILE-ONLY ticker list — replaces the matrix below on small
+            viewports per Cory feedback ("default to the ticker list we
+            use in the left bar on desktop for easier market selection
+            on landing page"). CSS hides this above 768px (the rail is
+            visible) and hides the matrix-card below 768px. */}
+        <div className="mobile-ticker-card" data-mobile-only>
+          <TickerAccordion title="Pick a market" />
+        </div>
+
+        {/* PROBABILITY MATRIX — desktop primary surface; hidden on mobile */}
         <div className="matrix-card" id="matrix" data-view={matrixView}>
           <div className="matrix-h">
             <h3>
