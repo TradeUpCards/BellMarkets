@@ -2775,6 +2775,131 @@
       ]
     },
     {
+      "name": "reinit_rewards_pools",
+      "discriminator": [
+        112,
+        26,
+        54,
+        56,
+        4,
+        26,
+        240,
+        115
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "usdc_mint",
+          "docs": [
+            "Current `MarketConfig.usdc_mint` (verified via `has_one = usdc_mint`).",
+            "Reused as the binding mint for the re-initialized pool accounts."
+          ],
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "weekly_pool",
+          "docs": [
+            "SPL TokenAccount bound to the OLD usdc_mint. Handler verifies via",
+            "raw byte read that:",
+            "(1) account is owned by SPL Token program (`spl_token::ID`)",
+            "(2) account is a valid TokenAccount (data.len() == 165)",
+            "(3) TokenAccount.amount == 0 (PoolNotEmpty defense)",
+            "(4) TokenAccount.owner == this account's own pubkey (self-authority,",
+            "matches `initialize_rewards_pools` pattern; WrongPoolAuthority",
+            "defense)",
+            "Then closes + recreates + reinits at the same PDA bound to",
+            "`config.usdc_mint`."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  119,
+                  101,
+                  101,
+                  107,
+                  108,
+                  121,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "monthly_pool",
+          "docs": [
+            "weekly_pool."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  111,
+                  110,
+                  116,
+                  104,
+                  108,
+                  121,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "rent",
+          "address": "SysvarRent111111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "settle_market",
       "discriminator": [
         193,
@@ -3624,33 +3749,48 @@
     },
     {
       "code": 6048,
+      "name": "ClobMakerNotWritable",
+      "msg": "Maker payout account not writable (defense-in-depth: a read-only account would block the SPL Token transfer CPI)."
+    },
+    {
+      "code": 6049,
       "name": "ClobMakerFrozen",
       "msg": "Maker payout token account is frozen (DR-020 M-1: rejects frozen-account matching DoS)."
     },
     {
-      "code": 6049,
+      "code": 6050,
       "name": "ClobMakerOwnerMismatch",
       "msg": "Maker payout account owner does not match the on-chain order's owner pubkey."
     },
     {
-      "code": 6050,
+      "code": 6051,
       "name": "ClobMakerMintMismatch",
       "msg": "Maker payout account mint does not match the expected mint (USDC for ask payouts; YES for bid payouts)."
     },
     {
-      "code": 6051,
+      "code": 6052,
       "name": "ClobRemainingAccountsMismatch",
       "msg": "remaining_accounts shape mismatch: expected one maker payout account per planned fill, in fill order."
     },
     {
-      "code": 6052,
+      "code": 6053,
       "name": "OrderBookNotInitialized",
       "msg": "Order book is not initialized for this strike_market (init_order_book + grow_order_book must run first)."
     },
     {
-      "code": 6053,
+      "code": 6054,
       "name": "OrderBookMarketMismatch",
       "msg": "Order book back-reference does not match the supplied strike_market account."
+    },
+    {
+      "code": 6055,
+      "name": "PoolNotEmpty",
+      "msg": "Reward pool has non-zero balance; drain to admin before reinit (admin manual SPL transfer)."
+    },
+    {
+      "code": 6056,
+      "name": "WrongPoolAuthority",
+      "msg": "Reward pool authority does not match its own pubkey (self-authority pattern from initialize_rewards_pools)."
     }
   ],
   "types": [
