@@ -16,6 +16,27 @@
 //! become trade-inert after the USDC mint flip — their vaults hold Circle
 //! USDC, config will say bUSDC. Acceptable per the pivot scope." Devnet
 //! only; no real funds at risk.
+//!
+//! ## CAUTION — resting bid stranding on old-mint strikes
+//!
+//! Audit-LOW finding (Sonnet defense-in-depth audit on `acf2602`): any
+//! resting BIDS on old-mint StrikeMarkets become un-cancellable after this
+//! flip. `cancel_order`'s Accounts struct includes
+//! `usdc_escrow: token::mint = usdc_mint` — after the flip, `usdc_mint` is
+//! the new mint but the old strike's escrow account carries the old mint, so
+//! Anchor's `token::mint` constraint fails before the handler runs. Users
+//! with resting bids on affected strikes cannot reclaim their USDC escrow
+//! unless the admin temporarily flips usdc_mint back.
+//!
+//! **Pre-flip checklist for admin:** (1) confirm no resting bids exist on
+//! any strike whose `usdc_vault.mint` equals the OLD mint, OR (2) document
+//! the admin-flip-back recovery procedure so affected users know they can
+//! be made whole by request.
+//!
+//! Devnet posture (deploy_index=7 era): the legacy 7 META markets had no
+//! resting bids (Phoenix-style trading was never live against them), so the
+//! 2026-05-25 Circle → bUSDC flip was safe in practice. Future flips must
+//! re-check this invariant.
 
 use anchor_lang::prelude::*;
 use crate::errors::BellMarketsError;

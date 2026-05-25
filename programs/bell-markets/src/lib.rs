@@ -265,4 +265,8 @@ pub mod bell_markets {
     pub fn update_usdc_mint(ctx: Context<UpdateUsdcMint>, new_mint: Pubkey) -> Result<()> {
         instructions::update_usdc_mint::handler(ctx, new_mint)
     }
+
+    pub fn reinit_rewards_pools(ctx: Context<ReinitRewardsPools>) -> Result<()> {
+        instructions::reinit_rewards_pools::handler(ctx)
+    }
 }

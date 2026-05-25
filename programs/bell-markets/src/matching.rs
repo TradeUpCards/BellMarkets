@@ -219,9 +219,13 @@ pub fn verify_maker_account(
         account_info.owner == &spl_token::ID,
         BellMarketsError::ClobMakerNotSplOwned
     );
+    // Audit-NIT fix (Sonnet defense-in-depth audit on `acf2602`): use the
+    // semantically-correct ClobMakerNotWritable error variant here. Previously
+    // emitted ClobMakerNotSplOwned for both checks, which misdiagnosed the
+    // failure on client-side. No security impact (both fire fail-closed).
     require!(
         account_info.is_writable,
-        BellMarketsError::ClobMakerNotSplOwned
+        BellMarketsError::ClobMakerNotWritable
     );
     let data = account_info.try_borrow_data()?;
     // SPL TokenAccount layout: mint(32) owner(32) amount(8) delegate(36)
