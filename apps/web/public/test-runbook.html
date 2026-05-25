@@ -1,0 +1,580 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>BellMarkets — Demo Testing Runbook</title>
+<style>
+  :root {
+    --bg: #0a0d14;
+    --panel: #0f141e;
+    --panel-2: #141b27;
+    --border: rgba(255,255,255,0.08);
+    --text: #e6e9ef;
+    --text-dim: #9aa3b2;
+    --text-mute: #6b7280;
+    --accent: #22d3ee;
+    --green: #10b981;
+    --green-soft: rgba(16,185,129,0.15);
+    --red: #ef4444;
+    --red-soft: rgba(239,68,68,0.15);
+    --amber: #f59e0b;
+    --amber-soft: rgba(245,158,11,0.15);
+    --violet: #8b5cf6;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 15px; line-height: 1.6; margin: 0; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 40px 24px 80px; }
+  h1 { font-size: 32px; font-weight: 700; margin: 0 0 8px; letter-spacing: -0.02em; }
+  .subtitle { color: var(--text-dim); font-size: 16px; margin: 0 0 32px; }
+  h2 { font-size: 22px; font-weight: 600; margin: 40px 0 14px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 17px; font-weight: 600; margin: 24px 0 10px; }
+  code { background: var(--panel-2); padding: 1px 6px; border-radius: 3px; color: #c2cad6; font-family: var(--mono); font-size: 0.92em; }
+  .mono { font-family: var(--mono); }
+
+  .step {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 18px 22px;
+    margin: 14px 0;
+    position: relative;
+  }
+  .step.critical { border-left: 4px solid var(--red); }
+  .step.warn     { border-left: 4px solid var(--amber); }
+  .step.green    { border-left: 4px solid var(--green); }
+  .step.info     { border-left: 4px solid var(--accent); }
+  .step h4 {
+    margin: 0 0 8px;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .step .badge {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 2px 7px;
+    border-radius: 3px;
+    background: var(--panel-2);
+    color: var(--text-dim);
+  }
+  .step .badge.critical { background: var(--red-soft); color: var(--red); }
+  .step .badge.warn     { background: var(--amber-soft); color: var(--amber); }
+  .step .badge.green    { background: var(--green-soft); color: var(--green); }
+  .step .badge.info     { background: rgba(34,211,238,0.15); color: var(--accent); }
+
+  .step .label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-mute);
+    margin: 10px 0 4px;
+  }
+  .step p { margin: 4px 0 8px; }
+  .step ul { margin: 4px 0 8px; padding-left: 22px; }
+  .step li { margin: 3px 0; }
+  .step .check {
+    background: var(--panel-2);
+    padding: 8px 12px;
+    border-radius: 4px;
+    margin-top: 8px;
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--text);
+  }
+  .step .fail {
+    background: rgba(239,68,68,0.08);
+    border: 1px solid rgba(239,68,68,0.25);
+    padding: 8px 12px;
+    border-radius: 4px;
+    margin-top: 8px;
+    font-size: 13.5px;
+    color: #fca5a5;
+  }
+  .step .pass {
+    background: rgba(16,185,129,0.08);
+    border: 1px solid rgba(16,185,129,0.25);
+    padding: 8px 12px;
+    border-radius: 4px;
+    margin-top: 8px;
+    font-size: 13.5px;
+    color: #6ee7b7;
+  }
+
+  .checkbox {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 1.5px solid var(--text-dim);
+    border-radius: 3px;
+    vertical-align: middle;
+    margin-right: 8px;
+    cursor: pointer;
+  }
+
+  .toc {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 20px;
+    margin: 24px 0;
+  }
+  .toc h3 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-mute); }
+  .toc ol { margin: 0; padding-left: 22px; }
+  .toc li { margin: 3px 0; }
+  .toc a { color: var(--accent); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; background: var(--panel); border-radius: 6px; overflow: hidden; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 14px; vertical-align: top; }
+  th { background: var(--panel-2); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-dim); }
+  tr:last-child td { border-bottom: none; }
+
+  .summary-banner {
+    background: linear-gradient(180deg, rgba(16,185,129,0.08) 0%, transparent 100%);
+    border: 1px solid var(--green);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 16px 0 32px;
+  }
+  .summary-banner h3 { margin: 0 0 6px; color: var(--green); font-size: 14px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .summary-banner p { margin: 4px 0; font-size: 14.5px; }
+
+  hr { border: none; border-top: 1px solid var(--border); margin: 36px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>BellMarkets — Demo Testing Runbook</h1>
+<p class="subtitle">Step-by-step checklist for verifying demo functionality before the Mon 2026-05-25 7pm ET submission. Run this end-to-end at least once. Flag any FAIL items immediately.</p>
+
+<div class="summary-banner">
+  <h3>Pre-Conditions (must be true before starting)</h3>
+  <p>✓ Main branch at <code class="mono">562d8e5</code> or later (post-merge of all 4 leads)</p>
+  <p>✓ deploy_index=8 LIVE on devnet (27 ixs)</p>
+  <p>✓ MarketConfig.usdc_mint = bUSDC (<code class="mono">5vq2oahK...</code>)</p>
+  <p>✓ Reward pools (weekly + monthly) migrated to bUSDC</p>
+  <p>✓ Demo strikes seeded: META @ 610, NVDA @ 215, AAPL @ 309 — each with bids + asks</p>
+</div>
+
+<div class="toc">
+  <h3>Sections</h3>
+  <ol>
+    <li><a href="#prep">Pre-flight setup (5 min)</a></li>
+    <li><a href="#landing">Landing page checks</a></li>
+    <li><a href="#trade-page">Trade page checks (per strike)</a></li>
+    <li><a href="#buy-yes">Trade path 1: Buy YES</a></li>
+    <li><a href="#sell-yes">Trade path 2: Sell YES</a></li>
+    <li><a href="#buy-no">Trade path 3: Buy NO (atomic)</a></li>
+    <li><a href="#sell-no">Trade path 4: Sell NO (atomic)</a></li>
+    <li><a href="#redeem-pair">Redeem Pair (matched portion recovery)</a></li>
+    <li><a href="#disable-matrix">UI disable matrix verification</a></li>
+    <li><a href="#adversarial">Adversarial / IOC defense verification</a></li>
+    <li><a href="#settle">Settle + redeem (post-settle)</a></li>
+    <li><a href="#admin">Admin dashboard (if shipped)</a></li>
+    <li><a href="#final">Final demo readiness checklist</a></li>
+  </ol>
+</div>
+
+<hr/>
+
+<h2 id="prep">1. Pre-flight setup (~5 min)</h2>
+
+<div class="step info">
+  <h4><span class="checkbox"></span>Step 1.1 — Pull main + start dev server <span class="badge info">SETUP</span></h4>
+  <div class="check">
+    cd C:/Dev/GauntletAI/BellMarkets<br/>
+    git checkout main &amp;&amp; git pull origin main<br/>
+    pnpm install<br/>
+    pnpm --filter web dev
+  </div>
+  <div class="label">Verify</div>
+  <p>Dev server starts on <code>localhost:3000</code> (or 3010 if 3000 is in use). No build errors.</p>
+  <div class="fail">If <code>.next/trace</code> EPERM on Windows: kill any stale Next processes (Task Manager → end <code>node.exe</code>) and retry. Documented flake.</div>
+</div>
+
+<div class="step info">
+  <h4><span class="checkbox"></span>Step 1.2 — Fund a test wallet with bUSDC <span class="badge info">SETUP</span></h4>
+  <p>You need a wallet to test trades. If you don't have one with bUSDC:</p>
+  <div class="check">
+    pnpm --filter @bell-markets/automation mint-demo-usdc &lt;YOUR_WALLET_PUBKEY&gt; 1000
+  </div>
+  <p>Mints 1000 bUSDC to your wallet's bUSDC ATA. Verify balance in Phantom or via:</p>
+  <div class="check">
+    wsl spl-token balance --owner &lt;YOUR_WALLET_PUBKEY&gt; 5vq2oahKFnnjStK1Ctqwdxdt44rtKuKHmPga9iZKtBZp --url devnet
+  </div>
+  <div class="pass">PASS: 1000.000000 bUSDC visible in Phantom wallet token list</div>
+</div>
+
+<div class="step warn">
+  <h4><span class="checkbox"></span>Step 1.3 — Connect wallet to devnet <span class="badge warn">CRITICAL</span></h4>
+  <p>In Phantom: Settings → Developer Settings → toggle <strong>Testnet Mode</strong> ON, select <strong>Devnet</strong>. This is the #1 cause of "tx fails with no obvious error" — wrong cluster.</p>
+  <div class="pass">PASS: Phantom shows "DEVNET" badge at the top of the wallet UI</div>
+</div>
+
+<hr/>
+
+<h2 id="landing">2. Landing page checks</h2>
+
+<div class="step">
+  <h4><span class="checkbox"></span>Step 2.1 — Open <code>localhost:3000/</code> in browser</h4>
+  <div class="label">Verify</div>
+  <ul>
+    <li>Page loads without errors (no red banners, no 500)</li>
+    <li>Top status bar shows live ET clock (ticking once per second)</li>
+    <li>Brand "BellMarkets" + nav (Markets / Portfolio / History / Trade / Settings)</li>
+    <li>Hero section with "Open trade panel →" CTA</li>
+    <li>Probability matrix renders with 7 MAG7 tickers × 7-9 strike columns</li>
+    <li>Leaderboard half-section (Weekly/Monthly + Profit/Streak/WinRate tabs)</li>
+    <li>Contests half-section with at least 1 contest card</li>
+    <li>Bell Pro half-section showing LIVE Sonnet briefing (not the static placeholder)</li>
+    <li>Recent Fills tape (may be empty if no recent trades)</li>
+  </ul>
+  <div class="fail">FAIL #1: Bell Pro card shows static "Daily briefing coming soon" text → Bram's <code>/api/briefings/AAPL</code> route not responding. Check terminal.</div>
+  <div class="fail">FAIL #2: Probability matrix empty → useAllMarkets() returning nothing; on-chain markets not visible. Check network tab.</div>
+</div>
+
+<div class="step">
+  <h4><span class="checkbox"></span>Step 2.2 — Hero CTA routes to live strike</h4>
+  <p>Click "Open trade panel →" in the hero. Should navigate to <code>/trade/META/610</code>.</p>
+  <div class="pass">PASS: URL changes to /trade/META/610 + trade page loads with OrderBook showing 3 bids + 3 asks (NOT "Order book not yet bound")</div>
+  <div class="fail">FAIL: navigation goes to /trade/META/680 → Cleo's CTA still hardcoded to old strike; should be 610 per <code>3bc901e</code> commit. Re-pull main.</div>
+</div>
+
+<div class="step">
+  <h4><span class="checkbox"></span>Step 2.3 — Matrix click routes to seeded strikes</h4>
+  <p>Click on a META, NVDA, or AAPL row in the probability matrix. Should navigate to one of the seeded strikes (610 / 215 / 309 respectively).</p>
+  <p>Click on a non-seeded ticker (MSFT, GOOGL, AMZN, TSLA): should navigate but show "No on-chain StrikeMarket" disable banner cleanly (honest UX — not a bug).</p>
+</div>
+
+<hr/>
+
+<h2 id="trade-page">3. Trade page checks (META @ 610 — primary demo strike)</h2>
+
+<div class="step">
+  <h4><span class="checkbox"></span>Step 3.1 — Open <code>/trade/META/610</code> + connect wallet</h4>
+  <p>Click "Connect Wallet" → Phantom popup → approve.</p>
+  <div class="label">Verify after connect</div>
+  <ul>
+    <li>Wallet pubkey appears in nav (truncated like "F4Bk...3xC9")</li>
+    <li>Position card shows YES: 0 / NO: 0 / Matched: 0 (assuming first time on this strike)</li>
+    <li>Fund warning shows your bUSDC balance correctly (e.g. "Available: 1000 bUSDC")</li>
+  </ul>
+</div>
+
+<div class="step">
+  <h4><span class="checkbox"></span>Step 3.2 — Order book renders LIVE data</h4>
+  <p>OrderBookCard should show the seeded depth (per Bram's seed-demo-liquidity):</p>
+  <table>
+    <thead><tr><th>Side</th><th>Price</th><th>Size</th></tr></thead>
+    <tbody>
+      <tr><td>Ask</td><td class="mono">$0.65</td><td>50</td></tr>
+      <tr><td>Ask</td><td class="mono">$0.60</td><td>50</td></tr>
+      <tr><td>Ask</td><td class="mono">$0.55</td><td>50</td></tr>
+      <tr><td colspan="3" style="color:var(--text-mute);text-align:center;">— spread $0.05 —</td></tr>
+      <tr><td>Bid</td><td class="mono">$0.50</td><td>50</td></tr>
+      <tr><td>Bid</td><td class="mono">$0.45</td><td>50</td></tr>
+      <tr><td>Bid</td><td class="mono">$0.40</td><td>50</td></tr>
+    </tbody>
+  </table>
+  <p>Toggle YES / NO / BOTH view buttons:</p>
+  <ul>
+    <li><strong>YES view</strong> — shows YES asks + bids as above</li>
+    <li><strong>NO view</strong> — should show INVERTED (price = $1 − YES price). NO asks $0.50/$0.45/$0.40; NO bids $0.45/$0.40/$0.35. Sizes mirror.</li>
+    <li><strong>BOTH view</strong> — two columns side-by-side</li>
+  </ul>
+  <div class="fail">FAIL #1: book shows hardcoded mock data ($0.555/$0.550/etc., never matches seeded book) → Cleo's P6 OrderBookCard live-render didn't ship. Pull main.</div>
+  <div class="fail">FAIL #2: book empty / "Order book not yet bound" → wrong strike, or Bram's seed-demo-liquidity didn't run. Check coordination/demo-strikes.md.</div>
+</div>
+
+<hr/>
+
+<h2 id="buy-yes">4. Trade path 1: Buy YES (Market)</h2>
+
+<div class="step green">
+  <h4><span class="checkbox"></span>Step 4.1 — Buy YES Market, 10 contracts <span class="badge green">CORE DEMO</span></h4>
+  <div class="label">Setup</div>
+  <ul>
+    <li>Action toggle: Buy</li>
+    <li>Outcome toggle: YES</li>
+    <li>Order type: Market (default)</li>
+    <li>Amount: 10 contracts</li>
+  </ul>
+  <div class="label">Expected cost</div>
+  <p>10 × best ask ($0.55) = $5.50 bUSDC (or includes some slippage if depth allows). Verify "Cost" displays correctly + slippage tolerance is sane.</p>
+  <div class="label">Submit</div>
+  <p>Click "Buy YES" → Phantom popup → approve.</p>
+  <div class="pass">PASS: tx submitted, signature appears in submit-result banner (e.g. "✓ Buy YES submitted: 3CTqj...vLEu"). Position card updates: YES: 10 / NO: 0. bUSDC balance drops by ~$5.50.</div>
+  <div class="fail">FAIL #1: tx fails with "ConstraintTokenMint" or error 2014 → reward pools not migrated to bUSDC. Re-run reinit-rewards-pools.</div>
+  <div class="fail">FAIL #2: tx fails with "BookFull" → impossible at this depth; check IDL match.</div>
+  <div class="fail">FAIL #3: "Submit" button is disabled → check tooltip; likely thin-book or insufficient bUSDC. Verify balance + book depth.</div>
+</div>
+
+<div class="step">
+  <h4><span class="checkbox"></span>Step 4.2 — Buy YES Limit @ $0.50, 5 contracts (rests on book)</h4>
+  <p>Toggle to Limit, set price to $0.50 (below current best ask $0.55 → won't cross). Submit.</p>
+  <div class="pass">PASS: tx succeeds; bUSDC deducted ($2.50 to escrow); OrderBook now shows your 5-contract bid at $0.50 added to the existing 50 (total 55 at $0.50, or appears as separate row depending on aggregation).</div>
+</div>
+
+<div class="step">
+  <h4><span class="checkbox"></span>Step 4.3 — Cancel the resting bid</h4>
+  <p>If Open Orders card is visible: click cancel on the $0.50 bid you just placed.</p>
+  <div class="pass">PASS: tx succeeds; bUSDC refunded ($2.50 back); OrderBook bid count reverts.</div>
+  <p style="color:var(--text-mute);font-size:13px;">If no Open Orders card in trade-view: cancel via /portfolio if it exists, or skip (Cleo's v1.5 polish item).</p>
+</div>
+
+<hr/>
+
+<h2 id="sell-yes">5. Trade path 2: Sell YES (Market)</h2>
+
+<div class="step green">
+  <h4><span class="checkbox"></span>Step 5.1 — Sell YES Market, 10 contracts (closes Step 4.1 position) <span class="badge green">CORE DEMO</span></h4>
+  <div class="label">Setup</div>
+  <ul>
+    <li>Action: Sell</li>
+    <li>Outcome: YES</li>
+    <li>Order type: Market</li>
+    <li>Amount: 10</li>
+  </ul>
+  <div class="label">Expected proceeds</div>
+  <p>10 × best bid ($0.50) = $5.00 bUSDC. Realized PnL = $5.00 − $5.50 (entry cost) = −$0.50.</p>
+  <div class="pass">PASS: tx succeeds; YES balance back to 0; bUSDC up ~$5.00. PnL displayed honestly.</div>
+</div>
+
+<hr/>
+
+<h2 id="buy-no">6. Trade path 3: Buy NO (atomic mint_pair + sell-YES)</h2>
+
+<div class="step green">
+  <h4><span class="checkbox"></span>Step 6.1 — Buy NO Market, 10 contracts <span class="badge green">CORE DEMO + ATOMIC</span></h4>
+  <div class="label">Setup</div>
+  <ul>
+    <li>Action: Buy</li>
+    <li>Outcome: NO</li>
+    <li>Order type: Market (Limit should be DISABLED with tooltip "Limit Buy NO coming in v1.5")</li>
+    <li>Amount: 10</li>
+  </ul>
+  <div class="label">What happens on-chain</div>
+  <ul>
+    <li><code>mint_pair(10)</code> — pays 10 × $1 bUSDC + 2% fee to vault, gets 10 YES + 10 NO</li>
+    <li>Phoenix-style atomic Sell-YES → sells 10 YES at best bid ($0.50) → receives $5</li>
+    <li>Net: spent ~$10.20 (mint + fee) − $5.00 (YES sale) = ~$5.20 for 10 NO</li>
+  </ul>
+  <div class="pass">PASS: tx succeeds with ONE signature, ONE Phantom popup. Position: YES: 0 / NO: 10. bUSDC down ~$5.20. The atomic sequencing means user never sees an intermediate "YES: 10" state.</div>
+  <div class="fail">FAIL #1: tx fails with BuyNoIocError → bid book too thin OR IOC defense fired (book can't absorb 10 contracts at acceptable slippage). Try smaller amount (3 contracts).</div>
+  <div class="fail">FAIL #2: tx succeeds but user ends with YES: 10 AND NO: 10 → IOC defense BYPASSED. This is a Cleo build-buy-no.ts regression. STOP THE DEMO and flag to Cleo immediately.</div>
+</div>
+
+<hr/>
+
+<h2 id="sell-no">7. Trade path 4: Sell NO (atomic buy-YES + redeem_pair)</h2>
+
+<div class="step green">
+  <h4><span class="checkbox"></span>Step 7.1 — Sell NO Market, 10 contracts (closes Step 6.1 position) <span class="badge green">CORE DEMO + ATOMIC</span></h4>
+  <div class="label">Setup</div>
+  <ul>
+    <li>Action: Sell</li>
+    <li>Outcome: NO</li>
+    <li>Order type: Market (Limit should be DISABLED)</li>
+    <li>Amount: 10</li>
+  </ul>
+  <div class="label">What happens on-chain</div>
+  <ul>
+    <li>Phoenix-style atomic Buy-YES → buys 10 YES at best ask ($0.55) → spends $5.50</li>
+    <li><code>redeem_pair(10)</code> — burns 10 YES + 10 NO, vault releases $10 bUSDC</li>
+    <li>Net: received $10.00 − $5.50 (YES buy) = $4.50 net proceeds for selling 10 NO</li>
+  </ul>
+  <div class="pass">PASS: tx succeeds with ONE signature. Position: YES: 0 / NO: 0. bUSDC up ~$4.50 (or however the seeded book ends up pricing the buy-YES leg).</div>
+</div>
+
+<hr/>
+
+<h2 id="redeem-pair">8. Redeem Pair (matched portion recovery)</h2>
+
+<div class="step">
+  <h4><span class="checkbox"></span>Step 8.1 — Get into a matched-pair state</h4>
+  <p>Manually call mint_pair via Bram's script or do a Buy NO Market and then BEFORE the resting state, click Sell NO at less than full size. End result: user holds e.g. 5 YES + 5 NO (matched pair) + possibly some directional position.</p>
+  <p>Easier path: just call <code>pnpm mint_pair</code> via CLI to get 10 YES + 10 NO into your wallet.</p>
+</div>
+
+<div class="step">
+  <h4><span class="checkbox"></span>Step 8.2 — Redeem Pair banner + CTA appears</h4>
+  <p>When matched_pairs > 0, the trade-view should show:</p>
+  <ul>
+    <li>Amber banner above the trade card with explanation</li>
+    <li>"Redeem N Pair(s) → $N bUSDC" button</li>
+  </ul>
+  <div class="pass">PASS: banner visible, button shows correct amounts. Click → Phantom popup → approve → bUSDC up by $N, YES + NO both drop by N.</div>
+</div>
+
+<hr/>
+
+<h2 id="disable-matrix">9. UI disable matrix verification</h2>
+
+<div class="step warn">
+  <h4><span class="checkbox"></span>Step 9.1 — Limit toggle disabled on Buy NO + Sell NO <span class="badge warn">DR-019</span></h4>
+  <p>Set Action = Buy, Outcome = NO. Try to toggle Limit.</p>
+  <div class="pass">PASS: Limit toggle is grayed out / disabled. Tooltip shows "Limit Buy/Sell NO coming in v1.5". Same for Sell NO.</div>
+  <div class="fail">FAIL: Limit toggle clickable on NO paths → DR-019 lock violated. Flag to Cleo.</div>
+</div>
+
+<div class="step warn">
+  <h4><span class="checkbox"></span>Step 9.2 — Position-exclusivity (Hard YES #8)</h4>
+  <p>While holding directional YES (e.g. after Step 4.1), try Buy NO. Should be disabled with tooltip "Close your YES position first."</p>
+  <p>Symmetric: while holding directional NO, try Buy YES → disabled.</p>
+</div>
+
+<div class="step warn">
+  <h4><span class="checkbox"></span>Step 9.3 — Pre-flight thin-book checks</h4>
+  <p>Use a non-seeded ticker like MSFT (no strikes have order books bound). The Buy YES / Sell YES / Buy NO / Sell NO buttons should ALL be disabled with appropriate tooltips ("Order book not yet bound" or similar).</p>
+</div>
+
+<hr/>
+
+<h2 id="adversarial">10. Adversarial / IOC defense verification</h2>
+
+<div class="step critical">
+  <h4><span class="checkbox"></span>Step 10.1 — Buy NO with insufficient bid depth <span class="badge critical">IOC DEFENSE</span></h4>
+  <p>Try Buy NO with amount = 1000 (way more than the 150 total bid depth). The IOC defense at the builder layer should throw BEFORE submitting the tx.</p>
+  <div class="pass">PASS: in-band banner says "Cannot fill 1000 — only 150 available on bid book." NO Phantom popup. NO tx broadcast. No fee taken. No stranded pair.</div>
+  <div class="fail">FAIL: tx submitted and user ends with mint fee paid + orphan YES+NO → IOC defense bypassed. STOP DEMO, flag to Cleo.</div>
+</div>
+
+<div class="step critical">
+  <h4><span class="checkbox"></span>Step 10.2 — Buy NO on a strike with EMPTY bid book (if available)</h4>
+  <p>If you can find a strike with order_book bound but no bids: try Buy NO 1 contract.</p>
+  <div class="pass">PASS: IOC defense throws "0 available on bid book"; no tx broadcasts.</div>
+</div>
+
+<hr/>
+
+<h2 id="settle">11. Settle + redeem (post-settle)</h2>
+
+<div class="step info">
+  <h4><span class="checkbox"></span>Step 11.1 — Settle a strike (requires post-expiry OR admin override)</h4>
+  <p>The demo strikes are seeded with expiry 2026-05-27 — NOT yet expired today (2026-05-25). To demo settle:</p>
+  <ul>
+    <li><strong>Option A — Skip live settle</strong> in the demo. Narrate the flow + show on-chain settle txs from prior Day-4 / Day-5 META markets that have already settled.</li>
+    <li><strong>Option B — Use admin_settle</strong> via the admin dashboard (if Cleo ships P5) or via CLI: <code>pnpm admin-settle --strike &lt;PUBKEY&gt; --outcome Yes</code>. NOTE: <code>admin_settle</code> is gated by <code>admin_override_eligible_at</code> — default 30 days post-expiry per DR-008. May not be callable yet on the seeded strikes.</li>
+    <li><strong>Option C — Create a fresh strike with near-future expiry</strong> via <code>user_create_strike_market</code> set to expire ~5 min from now. Trade against it. Then settle after expiry.</li>
+  </ul>
+  <p>Option A is safest for demo. Options B/C require setup time.</p>
+</div>
+
+<div class="step">
+  <h4><span class="checkbox"></span>Step 11.2 — Once settled, click Redeem on winning side</h4>
+  <p>Per market, after settle, the winning side's "Redeem" button should activate. Click → burns winning tokens → vault releases $1 per token.</p>
+</div>
+
+<hr/>
+
+<h2 id="admin">12. Admin dashboard (if Cleo ships in parallel)</h2>
+
+<div class="step info">
+  <h4><span class="checkbox"></span>Step 12.1 — Navigate to <code>/admin</code></h4>
+  <p>If wallet is NOT the admin pubkey: should show "Not authorized" page cleanly.</p>
+  <p>If wallet IS the admin (<code>7b17F2woUy9hgHcRjuLckBVAtNnKAJBRD769URvLprp5</code>): should render the admin sections.</p>
+</div>
+
+<div class="step info">
+  <h4><span class="checkbox"></span>Step 12.2 — Verify MarketConfig + FeeConfig displays</h4>
+  <p>Read-only cards showing live config state. Verify usdc_mint shows bUSDC pubkey, paused = false.</p>
+</div>
+
+<div class="step warn">
+  <h4><span class="checkbox"></span>Step 12.3 — Test Pause/Unpause toggle (CAREFUL — affects live demo)</h4>
+  <p>Click PAUSE → Phantom popup → approve → config.paused becomes true. Verify trade-view now shows "Trading paused" banner + all buttons disabled.</p>
+  <p>Click UNPAUSE → restores trading.</p>
+  <div class="fail">⚠️ DO NOT leave the protocol paused between demo prep and demo time. Always unpause after testing.</div>
+</div>
+
+<hr/>
+
+<h2 id="final">13. Final demo readiness checklist</h2>
+
+<div class="step green">
+  <h4>Pre-recording checklist <span class="badge green">FINAL</span></h4>
+  <ul>
+    <li><span class="checkbox"></span> All 4 trade paths verified live (Buy YES, Sell YES, Buy NO, Sell NO)</li>
+    <li><span class="checkbox"></span> Order book renders LIVE data (not mock fixtures)</li>
+    <li><span class="checkbox"></span> Redeem Pair flow verified (banner appears + CTA works)</li>
+    <li><span class="checkbox"></span> IOC defense verified (Buy NO with insufficient depth throws, no tx broadcast)</li>
+    <li><span class="checkbox"></span> DR-019 verified (Limit toggle disabled on Buy NO + Sell NO)</li>
+    <li><span class="checkbox"></span> Position-exclusivity verified (Hard YES #8)</li>
+    <li><span class="checkbox"></span> Bell Pro card renders live Sonnet briefing</li>
+    <li><span class="checkbox"></span> Landing matrix CTAs route to seeded strikes (610/215/309)</li>
+    <li><span class="checkbox"></span> Wallet funded with bUSDC (≥100 for buffer)</li>
+    <li><span class="checkbox"></span> Phantom on devnet</li>
+    <li><span class="checkbox"></span> Dev server running cleanly (no console errors)</li>
+    <li><span class="checkbox"></span> Demo script (docs/demo/v1-demo-script.md) reviewed; flow B narrative locked</li>
+    <li><span class="checkbox"></span> Screenshots captured of each working path (for backup)</li>
+    <li><span class="checkbox"></span> Protocol is UNPAUSED before going live</li>
+    <li><span class="checkbox"></span> Backup plan if anything breaks: Flow C narrative + mockup screenshots</li>
+  </ul>
+</div>
+
+<hr/>
+
+<h2>Triage: what to do if something fails mid-test</h2>
+
+<table>
+  <thead><tr><th>Symptom</th><th>Likely cause</th><th>Fix path</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Trade tx fails with error 2014 (ConstraintTokenMint)</td>
+      <td>Reward pools not migrated to bUSDC</td>
+      <td>Re-run <code>pnpm reinit-rewards-pools</code></td>
+    </tr>
+    <tr>
+      <td>OrderBook empty / "not yet bound"</td>
+      <td>Wrong strike OR seed-demo-liquidity didn't run</td>
+      <td>Use META @ 610 / NVDA @ 215 / AAPL @ 309; verify via <code>coordination/demo-strikes.md</code></td>
+    </tr>
+    <tr>
+      <td>OrderBook shows mock data (not seeded depth)</td>
+      <td>Cleo's P6 live-render didn't deploy</td>
+      <td><code>git pull origin main</code>; restart dev server</td>
+    </tr>
+    <tr>
+      <td>Phantom popup never appears</td>
+      <td>Wallet not connected OR wrong cluster</td>
+      <td>Reconnect; verify Phantom is on devnet</td>
+    </tr>
+    <tr>
+      <td>Bell Pro card static placeholder</td>
+      <td>Bram's <code>/api/briefings/AAPL</code> route not responding</td>
+      <td>Check dev server console; verify Neon DB connection in <code>apps/web/.env.local</code></td>
+    </tr>
+    <tr>
+      <td>Buy NO atomic ends with both tokens + fee paid</td>
+      <td>IOC defense bypassed — CRITICAL BUG</td>
+      <td>STOP DEMO. Flag to Cleo immediately. Use Flow C fallback.</td>
+    </tr>
+    <tr>
+      <td>Submit button always disabled</td>
+      <td>Pre-flight check (thin book / no balance / position exclusivity)</td>
+      <td>Read the tooltip; address the named condition</td>
+    </tr>
+    <tr>
+      <td>tx fails silently / no error in UI</td>
+      <td>Network issue OR signing issue</td>
+      <td>Check browser console + Phantom logs; check Solana Explorer for the tx sig</td>
+    </tr>
+  </tbody>
+</table>
+
+<hr/>
+
+<p style="text-align:center;color:var(--text-mute);font-size:12px;margin-top:48px;">
+  Built for the BellMarkets v1 demo (Mon 2026-05-25 7pm ET). Generated by Tate. Cross-reference <code>docs/demo/v1-demo-script.md</code> (Flow B) for the demo-day narrative.
+</p>
+
+</div>
+</body>
+</html>
