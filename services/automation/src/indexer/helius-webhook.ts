@@ -262,9 +262,21 @@ function pickStringOrNumber(
 
 import { createHash } from "node:crypto";
 
-/** All 20 ix names from Aria's deploy-5 IDL. Keep in lockstep with
- *  programs/bell-markets/src/lib.rs `#[program] mod` declarations. */
+/** All Bell Markets ix names. Keep in lockstep with
+ *  programs/bell-markets/src/lib.rs `#[program] mod` declarations.
+ *
+ *  Through deploy_index=6: 20 ixs (initialize_config through close_settled_market).
+ *  Adds in deploy_index=7 per DR-020 (in-program CLOB pivot):
+ *    - init_order_book, grow_order_book — two-instruction creation (Solana realloc cap)
+ *    - place_order, cancel_order — user trade entry points
+ *    - match_orders — permissionless crank for crossed-but-unmatched pairs
+ *    - update_usdc_mint — admin ix to flip from Circle USDC → bUSDC demo mint
+ *
+ *  Discriminators are auto-computed via sha256("global:<name>")[..8] at module
+ *  load; no manual base58 wrangling needed when ixs are added or renamed.
+ */
 export const BELL_MARKETS_IX_NAMES = [
+  // deploy_index ≤ 6
   "initialize_config",
   "create_strike_market",
   "add_strike",
@@ -285,6 +297,13 @@ export const BELL_MARKETS_IX_NAMES = [
   "distribute_monthly_rewards",
   "force_redeem",
   "close_settled_market",
+  // DR-020 / deploy_index=7 — in-program CLOB
+  "init_order_book",
+  "grow_order_book",
+  "place_order",
+  "cancel_order",
+  "match_orders",
+  "update_usdc_mint",
 ] as const;
 
 export type BellMarketsIxName = (typeof BELL_MARKETS_IX_NAMES)[number];
@@ -345,6 +364,268 @@ const _DISCRIMINATOR_TO_NAME = (() => {
 
 /** Legacy export — kept for backward compat with prior settle-only callers. */
 export const SETTLE_MARKET_DISCRIMINATOR_BASE58 = BELL_MARKETS_IX_DISCRIMINATORS.settle_market;
+
+// ---------------------------------------------------------------------------
+// DR-020 — in-program CLOB event parsers (deploy_index=7)
+// ---------------------------------------------------------------------------
+//
+// Scaffolding parsers for the four order-book events Aria's deploy_index=7
+// will emit. Per the reference design (docs/architecture/reference-clob-spec.md
+// + reference-clob-decisions.md), the event shapes are:
+//
+//   OrderBookInitialized { market, order_book, usdc_escrow, yes_escrow }
+//   OrderPlaced          { market, order_book, owner, side, price, size, seq }
+//   OrderMatched         { market, order_book, taker, maker, side, price, size, taker_seq, maker_seq }
+//   OrderCancelled       { market, order_book, owner, side, seq, refunded_amount }
+//
+// These shapes are inferred from Keith's reference-clob-spec.md chunk
+// completion notes + ADR-002b. They MAY adjust slightly when Aria's IDL
+// lands; the parsers below are tolerant to both camelCase and snake_case
+// keys + accept BN-style numeric encodings. Live event verification waits
+// for deploy_index=7.
+//
+// Observability-only — no new DB tables yet (per dispatch). Lazy-add when
+// Drew/Cleo surface a need.
+
+export type ParsedOrderBookInitialized = {
+  txSig: string;
+  slot: number | undefined;
+  marketPubkey: string;
+  orderBookPubkey: string;
+  usdcEscrowPubkey: string | undefined;
+  yesEscrowPubkey: string | undefined;
+};
+
+export type OrderSide = "bid" | "ask";
+
+export type ParsedOrderPlaced = {
+  txSig: string;
+  slot: number | undefined;
+  marketPubkey: string;
+  orderBookPubkey: string;
+  ownerPubkey: string;
+  side: OrderSide;
+  /** Price in USDC-per-Yes at the program's fixed scale (PRICE_SCALE per reference spec). */
+  price: string;
+  /** Size in Yes-token base units. */
+  size: string;
+  /** Monotonic sequence number for time priority. */
+  seq: string;
+};
+
+export type ParsedOrderMatched = {
+  txSig: string;
+  slot: number | undefined;
+  marketPubkey: string;
+  orderBookPubkey: string;
+  takerPubkey: string;
+  makerPubkey: string;
+  /** Side of the resting maker order ("bid" → taker sold Yes; "ask" → taker bought Yes). */
+  side: OrderSide;
+  /** Fill price (per reference spec: trades at the bid's price so bid escrow drains exactly). */
+  price: string;
+  /** Fill size in Yes-token base units. */
+  size: string;
+  takerSeq: string | undefined;
+  makerSeq: string;
+};
+
+export type ParsedOrderCancelled = {
+  txSig: string;
+  slot: number | undefined;
+  marketPubkey: string;
+  orderBookPubkey: string;
+  ownerPubkey: string;
+  side: OrderSide;
+  seq: string;
+  /** Refunded escrow (USDC for a bid, Yes tokens for an ask) in atomic units. */
+  refundedAmount: string | undefined;
+};
+
+export type ParsedClobEvents = {
+  orderBookInitialized: ParsedOrderBookInitialized[];
+  orderPlaced: ParsedOrderPlaced[];
+  orderMatched: ParsedOrderMatched[];
+  orderCancelled: ParsedOrderCancelled[];
+};
+
+/**
+ * Walk Helius payload looking for any of the four CLOB events. Returns a
+ * grouped result keyed by event kind so the indexer can dispatch each kind
+ * to its own handler.
+ *
+ * If `events.anchor[]` is empty (Helius didn't decode events for this
+ * program), the result is all-empty arrays — callers can still fall back
+ * to `recognizeBellMarketsIxs` for ix-level visibility.
+ */
+export function parseClobEvents(
+  payload: ReadonlyArray<HeliusEnhancedTx> | HeliusEnhancedTx,
+  programId: string,
+): ParsedClobEvents {
+  const txs = Array.isArray(payload) ? payload : [payload];
+  const out: ParsedClobEvents = {
+    orderBookInitialized: [],
+    orderPlaced: [],
+    orderMatched: [],
+    orderCancelled: [],
+  };
+  for (const tx of txs) {
+    for (const ev of tx.events?.anchor ?? []) {
+      if (ev.programId !== programId) continue;
+      const name = (ev.name ?? "").toLowerCase();
+      const data = ev.data ?? {};
+      if (name === "orderbookinitialized" || name === "order_book_initialized") {
+        const parsed = parseOrderBookInitialized(tx, data);
+        if (parsed) out.orderBookInitialized.push(parsed);
+      } else if (name === "orderplaced" || name === "order_placed") {
+        const parsed = parseOrderPlaced(tx, data);
+        if (parsed) out.orderPlaced.push(parsed);
+      } else if (name === "ordermatched" || name === "order_matched") {
+        const parsed = parseOrderMatched(tx, data);
+        if (parsed) out.orderMatched.push(parsed);
+      } else if (name === "ordercancelled" || name === "order_cancelled") {
+        const parsed = parseOrderCancelled(tx, data);
+        if (parsed) out.orderCancelled.push(parsed);
+      }
+    }
+  }
+  return out;
+}
+
+function parseOrderBookInitialized(
+  tx: HeliusEnhancedTx,
+  data: Record<string, unknown>,
+): ParsedOrderBookInitialized | undefined {
+  const market = pickString(data, ["market", "strikeMarket", "strike_market"]);
+  const orderBook = pickString(data, ["orderBook", "order_book"]);
+  if (!market || !orderBook) return undefined;
+  return {
+    txSig: tx.signature,
+    slot: tx.slot,
+    marketPubkey: market,
+    orderBookPubkey: orderBook,
+    usdcEscrowPubkey: pickString(data, ["usdcEscrow", "usdc_escrow"]),
+    yesEscrowPubkey: pickString(data, ["yesEscrow", "yes_escrow"]),
+  };
+}
+
+function parseOrderPlaced(
+  tx: HeliusEnhancedTx,
+  data: Record<string, unknown>,
+): ParsedOrderPlaced | undefined {
+  const market = pickString(data, ["market", "strikeMarket", "strike_market"]);
+  const orderBook = pickString(data, ["orderBook", "order_book"]);
+  const owner = pickString(data, ["owner", "ownerPubkey"]);
+  const side = parseSide(pickEnum(data, ["side"]));
+  const price = pickStringy(data, ["price"]);
+  const size = pickStringy(data, ["size", "quantity"]);
+  const seq = pickStringy(data, ["seq", "sequence", "sequenceNumber", "sequence_number"]);
+  if (!market || !orderBook || !owner || !side || price === undefined || size === undefined || seq === undefined) {
+    return undefined;
+  }
+  return {
+    txSig: tx.signature,
+    slot: tx.slot,
+    marketPubkey: market,
+    orderBookPubkey: orderBook,
+    ownerPubkey: owner,
+    side,
+    price,
+    size,
+    seq,
+  };
+}
+
+function parseOrderMatched(
+  tx: HeliusEnhancedTx,
+  data: Record<string, unknown>,
+): ParsedOrderMatched | undefined {
+  const market = pickString(data, ["market", "strikeMarket", "strike_market"]);
+  const orderBook = pickString(data, ["orderBook", "order_book"]);
+  const taker = pickString(data, ["taker", "takerPubkey"]);
+  const maker = pickString(data, ["maker", "makerPubkey"]);
+  const side = parseSide(pickEnum(data, ["side", "makerSide", "maker_side"]));
+  const price = pickStringy(data, ["price", "fillPrice", "fill_price"]);
+  const size = pickStringy(data, ["size", "fillSize", "fill_size"]);
+  const takerSeq = pickStringy(data, ["takerSeq", "taker_seq"]);
+  const makerSeq = pickStringy(data, ["makerSeq", "maker_seq"]);
+  if (
+    !market || !orderBook || !taker || !maker || !side ||
+    price === undefined || size === undefined || makerSeq === undefined
+  ) {
+    return undefined;
+  }
+  return {
+    txSig: tx.signature,
+    slot: tx.slot,
+    marketPubkey: market,
+    orderBookPubkey: orderBook,
+    takerPubkey: taker,
+    makerPubkey: maker,
+    side,
+    price,
+    size,
+    takerSeq,
+    makerSeq,
+  };
+}
+
+function parseOrderCancelled(
+  tx: HeliusEnhancedTx,
+  data: Record<string, unknown>,
+): ParsedOrderCancelled | undefined {
+  const market = pickString(data, ["market", "strikeMarket", "strike_market"]);
+  const orderBook = pickString(data, ["orderBook", "order_book"]);
+  const owner = pickString(data, ["owner", "ownerPubkey"]);
+  const side = parseSide(pickEnum(data, ["side"]));
+  const seq = pickStringy(data, ["seq", "sequence", "sequenceNumber", "sequence_number"]);
+  if (!market || !orderBook || !owner || !side || seq === undefined) return undefined;
+  return {
+    txSig: tx.signature,
+    slot: tx.slot,
+    marketPubkey: market,
+    orderBookPubkey: orderBook,
+    ownerPubkey: owner,
+    side,
+    seq,
+    refundedAmount: pickStringy(data, ["refundedAmount", "refunded_amount", "refund"]),
+  };
+}
+
+function parseSide(value: unknown): OrderSide | undefined {
+  if (typeof value === "string") {
+    const lower = value.toLowerCase();
+    if (lower === "bid" || lower === "buy") return "bid";
+    if (lower === "ask" || lower === "sell" || lower === "offer") return "ask";
+  }
+  if (typeof value === "object" && value !== null) {
+    // Anchor enum borsh shape: { bid: {} } / { ask: {} }
+    if (Object.prototype.hasOwnProperty.call(value, "bid")) return "bid";
+    if (Object.prototype.hasOwnProperty.call(value, "buy")) return "bid";
+    if (Object.prototype.hasOwnProperty.call(value, "ask")) return "ask";
+    if (Object.prototype.hasOwnProperty.call(value, "sell")) return "ask";
+  }
+  return undefined;
+}
+
+/**
+ * Pick a numeric-ish field and stringify so the caller can store the exact
+ * on-chain bytes (BN, u64, etc.) without losing precision to JS Number.
+ */
+function pickStringy(obj: Record<string, unknown>, keys: ReadonlyArray<string>): string | undefined {
+  for (const k of keys) {
+    const v = obj[k];
+    if (v === undefined || v === null) continue;
+    if (typeof v === "string") return v;
+    if (typeof v === "number" && Number.isFinite(v)) return String(v);
+    if (typeof v === "bigint") return v.toString();
+    if (typeof v === "object" && v !== null && typeof (v as { toString?: () => string }).toString === "function") {
+      const s = (v as { toString: () => string }).toString();
+      if (s && s !== "[object Object]") return s;
+    }
+  }
+  return undefined;
+}
 
 /**
  * Walk a Helius payload and return the names of all Bell Markets ixs

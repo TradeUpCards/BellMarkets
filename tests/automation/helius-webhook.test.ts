@@ -285,10 +285,25 @@ describe("BELL_MARKETS_IX_NAMES — coverage check", () => {
     }
   });
 
-  it("totals exactly 20 ixs (matches Aria's deploy-5 IDL ix_count)", async () => {
+  it("totals exactly 26 ixs (20 through deploy_index=6 + 6 DR-020 CLOB ixs)", async () => {
     const mod = await import("../../services/automation/src/indexer/helius-webhook.js");
     const { BELL_MARKETS_IX_NAMES } = mod;
-    expect(BELL_MARKETS_IX_NAMES).toHaveLength(20);
+    expect(BELL_MARKETS_IX_NAMES).toHaveLength(26);
+  });
+
+  it("includes the 6 DR-020 CLOB ixs (init/grow_order_book, place/cancel_order, match_orders, update_usdc_mint)", async () => {
+    const mod = await import("../../services/automation/src/indexer/helius-webhook.js");
+    const { BELL_MARKETS_IX_NAMES } = mod;
+    for (const name of [
+      "init_order_book",
+      "grow_order_book",
+      "place_order",
+      "cancel_order",
+      "match_orders",
+      "update_usdc_mint",
+    ]) {
+      expect(BELL_MARKETS_IX_NAMES).toContain(name);
+    }
   });
 });
 
@@ -323,5 +338,377 @@ describe("parseHeliusSettleWebhook — defensive cases", () => {
       },
     };
     expect(parseHeliusSettleWebhook(tx, OUR_PROGRAM_ID)).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// DR-020 — in-program CLOB event parsing (deploy_index=7 scaffolding)
+// ---------------------------------------------------------------------------
+
+import { parseClobEvents } from "../../services/automation/src/indexer/helius-webhook.js";
+
+describe("parseClobEvents — OrderBookInitialized", () => {
+  it("extracts the four PDAs from a fresh init+grow tx", () => {
+    const tx: HeliusEnhancedTx = {
+      signature: "InitOBSig1",
+      slot: 100,
+      events: {
+        anchor: [
+          {
+            programId: OUR_PROGRAM_ID,
+            name: "OrderBookInitialized",
+            data: {
+              market: "MarketPK",
+              orderBook: "OrderBookPK",
+              usdcEscrow: "UsdcEscrowPK",
+              yesEscrow: "YesEscrowPK",
+            },
+          },
+        ],
+      },
+    };
+    const out = parseClobEvents(tx, OUR_PROGRAM_ID);
+    expect(out.orderBookInitialized).toHaveLength(1);
+    expect(out.orderBookInitialized[0]).toEqual({
+      txSig: "InitOBSig1",
+      slot: 100,
+      marketPubkey: "MarketPK",
+      orderBookPubkey: "OrderBookPK",
+      usdcEscrowPubkey: "UsdcEscrowPK",
+      yesEscrowPubkey: "YesEscrowPK",
+    });
+  });
+
+  it("tolerates snake_case keys (order_book / usdc_escrow / yes_escrow)", () => {
+    const tx: HeliusEnhancedTx = {
+      signature: "InitOBSig2",
+      events: {
+        anchor: [
+          {
+            programId: OUR_PROGRAM_ID,
+            name: "order_book_initialized",
+            data: {
+              strike_market: "M",
+              order_book: "OB",
+              usdc_escrow: "UE",
+              yes_escrow: "YE",
+            },
+          },
+        ],
+      },
+    };
+    const out = parseClobEvents(tx, OUR_PROGRAM_ID);
+    expect(out.orderBookInitialized).toHaveLength(1);
+    expect(out.orderBookInitialized[0]!.marketPubkey).toBe("M");
+    expect(out.orderBookInitialized[0]!.orderBookPubkey).toBe("OB");
+  });
+});
+
+describe("parseClobEvents — OrderPlaced", () => {
+  it("parses a bid limit order with BN-style price/size/seq", () => {
+    const tx: HeliusEnhancedTx = {
+      signature: "PlaceSig1",
+      slot: 200,
+      events: {
+        anchor: [
+          {
+            programId: OUR_PROGRAM_ID,
+            name: "OrderPlaced",
+            data: {
+              market: "M",
+              orderBook: "OB",
+              owner: "OwnerPK",
+              side: { bid: {} },
+              price: "550000", // 0.55 in PRICE_SCALE 1e6
+              size: "10000000", // 10 yes tokens at 6 decimals
+              seq: "42",
+            },
+          },
+        ],
+      },
+    };
+    const out = parseClobEvents(tx, OUR_PROGRAM_ID);
+    expect(out.orderPlaced).toHaveLength(1);
+    expect(out.orderPlaced[0]).toMatchObject({
+      txSig: "PlaceSig1",
+      slot: 200,
+      marketPubkey: "M",
+      orderBookPubkey: "OB",
+      ownerPubkey: "OwnerPK",
+      side: "bid",
+      price: "550000",
+      size: "10000000",
+      seq: "42",
+    });
+  });
+
+  it("recognizes ask side via Borsh enum + string aliases", () => {
+    const askEnum: HeliusEnhancedTx = {
+      signature: "PlaceSig2",
+      events: {
+        anchor: [
+          {
+            programId: OUR_PROGRAM_ID,
+            name: "OrderPlaced",
+            data: {
+              market: "M",
+              orderBook: "OB",
+              owner: "O",
+              side: { ask: {} },
+              price: 600000,
+              size: 5_000_000,
+              seq: 7,
+            },
+          },
+        ],
+      },
+    };
+    const askString: HeliusEnhancedTx = {
+      signature: "PlaceSig3",
+      events: {
+        anchor: [
+          {
+            programId: OUR_PROGRAM_ID,
+            name: "OrderPlaced",
+            data: {
+              market: "M",
+              orderBook: "OB",
+              owner: "O",
+              side: "sell",
+              price: 600000,
+              size: 5_000_000,
+              seq: 7,
+            },
+          },
+        ],
+      },
+    };
+    expect(parseClobEvents(askEnum, OUR_PROGRAM_ID).orderPlaced[0]!.side).toBe("ask");
+    expect(parseClobEvents(askString, OUR_PROGRAM_ID).orderPlaced[0]!.side).toBe("ask");
+  });
+});
+
+describe("parseClobEvents — OrderMatched", () => {
+  it("parses a taker-buy fill (maker on ask side)", () => {
+    const tx: HeliusEnhancedTx = {
+      signature: "MatchSig1",
+      slot: 300,
+      events: {
+        anchor: [
+          {
+            programId: OUR_PROGRAM_ID,
+            name: "OrderMatched",
+            data: {
+              market: "M",
+              orderBook: "OB",
+              taker: "TakerPK",
+              maker: "MakerPK",
+              side: { ask: {} }, // resting maker side
+              price: "600000",
+              size: "2500000",
+              takerSeq: "100",
+              makerSeq: "55",
+            },
+          },
+        ],
+      },
+    };
+    const out = parseClobEvents(tx, OUR_PROGRAM_ID);
+    expect(out.orderMatched).toHaveLength(1);
+    expect(out.orderMatched[0]).toEqual({
+      txSig: "MatchSig1",
+      slot: 300,
+      marketPubkey: "M",
+      orderBookPubkey: "OB",
+      takerPubkey: "TakerPK",
+      makerPubkey: "MakerPK",
+      side: "ask",
+      price: "600000",
+      size: "2500000",
+      takerSeq: "100",
+      makerSeq: "55",
+    });
+  });
+
+  it("accepts crank-driven matches with missing takerSeq", () => {
+    const tx: HeliusEnhancedTx = {
+      signature: "CrankSig",
+      events: {
+        anchor: [
+          {
+            programId: OUR_PROGRAM_ID,
+            name: "OrderMatched",
+            data: {
+              market: "M",
+              order_book: "OB",
+              taker: "Cranker",
+              maker: "Resting",
+              side: { bid: {} },
+              fill_price: "550000",
+              fill_size: "1000000",
+              maker_seq: "33",
+            },
+          },
+        ],
+      },
+    };
+    const out = parseClobEvents(tx, OUR_PROGRAM_ID);
+    expect(out.orderMatched).toHaveLength(1);
+    expect(out.orderMatched[0]!.takerSeq).toBeUndefined();
+    expect(out.orderMatched[0]!.side).toBe("bid");
+  });
+});
+
+describe("parseClobEvents — OrderCancelled", () => {
+  it("captures owner + side + refunded amount for a bid cancel", () => {
+    const tx: HeliusEnhancedTx = {
+      signature: "CancelSig1",
+      slot: 400,
+      events: {
+        anchor: [
+          {
+            programId: OUR_PROGRAM_ID,
+            name: "OrderCancelled",
+            data: {
+              market: "M",
+              orderBook: "OB",
+              owner: "OwnerPK",
+              side: "bid",
+              seq: "42",
+              refundedAmount: "5500000", // 5.5 USDC refund on a 10-yes bid at 0.55 partial-filled
+            },
+          },
+        ],
+      },
+    };
+    const out = parseClobEvents(tx, OUR_PROGRAM_ID);
+    expect(out.orderCancelled).toHaveLength(1);
+    expect(out.orderCancelled[0]).toEqual({
+      txSig: "CancelSig1",
+      slot: 400,
+      marketPubkey: "M",
+      orderBookPubkey: "OB",
+      ownerPubkey: "OwnerPK",
+      side: "bid",
+      seq: "42",
+      refundedAmount: "5500000",
+    });
+  });
+
+  it("missing refundedAmount is tolerated (older event shape)", () => {
+    const tx: HeliusEnhancedTx = {
+      signature: "CancelSig2",
+      events: {
+        anchor: [
+          {
+            programId: OUR_PROGRAM_ID,
+            name: "OrderCancelled",
+            data: {
+              market: "M",
+              orderBook: "OB",
+              owner: "O",
+              side: { ask: {} },
+              seq: "12",
+            },
+          },
+        ],
+      },
+    };
+    const out = parseClobEvents(tx, OUR_PROGRAM_ID);
+    expect(out.orderCancelled).toHaveLength(1);
+    expect(out.orderCancelled[0]!.refundedAmount).toBeUndefined();
+  });
+});
+
+describe("parseClobEvents — defensive cases", () => {
+  it("returns all-empty groups for an empty payload", () => {
+    const tx: HeliusEnhancedTx = { signature: "EmptyTx" };
+    const out = parseClobEvents(tx, OUR_PROGRAM_ID);
+    expect(out.orderBookInitialized).toEqual([]);
+    expect(out.orderPlaced).toEqual([]);
+    expect(out.orderMatched).toEqual([]);
+    expect(out.orderCancelled).toEqual([]);
+  });
+
+  it("ignores events from a different program id", () => {
+    const tx: HeliusEnhancedTx = {
+      signature: "WrongProgTx",
+      events: {
+        anchor: [
+          {
+            programId: OTHER_PROGRAM_ID,
+            name: "OrderPlaced",
+            data: {
+              market: "M",
+              orderBook: "OB",
+              owner: "O",
+              side: { bid: {} },
+              price: "1",
+              size: "1",
+              seq: "1",
+            },
+          },
+        ],
+      },
+    };
+    const out = parseClobEvents(tx, OUR_PROGRAM_ID);
+    expect(out.orderPlaced).toEqual([]);
+  });
+
+  it("drops OrderPlaced with missing price", () => {
+    const tx: HeliusEnhancedTx = {
+      signature: "BadPlaceTx",
+      events: {
+        anchor: [
+          {
+            programId: OUR_PROGRAM_ID,
+            name: "OrderPlaced",
+            data: { market: "M", orderBook: "OB", owner: "O", side: "bid", size: "1", seq: "1" },
+          },
+        ],
+      },
+    };
+    const out = parseClobEvents(tx, OUR_PROGRAM_ID);
+    expect(out.orderPlaced).toEqual([]);
+  });
+});
+
+describe("BELL_MARKETS_IX_DISCRIMINATORS — DR-020 CLOB ixs round-trip via recognizeBellMarketsIxs", () => {
+  it("recognizes a place_order ix purely from its discriminator prefix", async () => {
+    const mod = await import("../../services/automation/src/indexer/helius-webhook.js");
+    const { BELL_MARKETS_IX_DISCRIMINATORS, recognizeBellMarketsIxs } = mod;
+    const placeOrderDiscrim = BELL_MARKETS_IX_DISCRIMINATORS.place_order;
+    const tx: HeliusEnhancedTx = {
+      signature: "PlaceIxTx",
+      slot: 999,
+      instructions: [
+        {
+          programId: OUR_PROGRAM_ID,
+          // Append arbitrary suffix; recognizer prefix-matches the first 8 bytes.
+          data: placeOrderDiscrim + "AdditionalArgsBytes",
+          accounts: [],
+        },
+      ],
+    };
+    const observed = recognizeBellMarketsIxs(tx, OUR_PROGRAM_ID);
+    expect(observed).toHaveLength(1);
+    expect(observed[0]).toMatchObject({ txSig: "PlaceIxTx", ixName: "place_order", slot: 999 });
+  });
+
+  it("recognizes update_usdc_mint via discriminator (admin ix)", async () => {
+    const mod = await import("../../services/automation/src/indexer/helius-webhook.js");
+    const { BELL_MARKETS_IX_DISCRIMINATORS, recognizeBellMarketsIxs } = mod;
+    const tx: HeliusEnhancedTx = {
+      signature: "FlipUsdcMintTx",
+      instructions: [
+        {
+          programId: OUR_PROGRAM_ID,
+          data: BELL_MARKETS_IX_DISCRIMINATORS.update_usdc_mint,
+        },
+      ],
+    };
+    const observed = recognizeBellMarketsIxs(tx, OUR_PROGRAM_ID);
+    expect(observed).toHaveLength(1);
+    expect(observed[0]!.ixName).toBe("update_usdc_mint");
   });
 });
