@@ -17,6 +17,15 @@ import { useBellProSubscription, isBellProActive } from "@/hooks/use-bell-pro-su
 type MetricTab = "profit" | "streak" | "winrate";
 type PeriodTab = "weekly" | "monthly";
 
+// DR-020 demo strikes seeded by Bram on devnet (Path B / bUSDC). Routes matrix
+// click + hero CTA to the live on-chain StrikeMarket. Source:
+// .project/bell-markets/coordination/demo-strikes.md.
+const DEMO_LIVE_STRIKE: Record<string, number> = {
+  META: 610,
+  NVDA: 215,
+  AAPL: 309,
+};
+
 const TICKERS = [
   { sym: "AAPL", spot: "$229.84", chg: "+0.54%", up: true },
   { sym: "MSFT", spot: "$441.62", chg: "+0.73%", up: true },
@@ -217,7 +226,10 @@ export function LandingView() {
                     hand over a key.
                   </div>
                   <div className="hero-cta-row">
-                    <Link href="/trade/META/680" className="hero-cta primary">
+                    {/* Demo strike: Bram seeded META.610 / NVDA.215 / AAPL.309
+                        on devnet (full bid+ask depth). See
+                        .project/bell-markets/coordination/demo-strikes.md. */}
+                    <Link href="/trade/META/610" className="hero-cta primary">
                       Open trade panel →
                     </Link>
                     <Link href="#matrix" className="hero-cta secondary">
@@ -279,7 +291,11 @@ export function LandingView() {
             </div>
 
             {MATRIX_ROWS.map((row) => (
-              <Link key={row.sym} className="matrix-row" href={`/trade/${row.sym}/${row.strikes[3]}`}>
+              <Link
+                key={row.sym}
+                className="matrix-row"
+                href={`/trade/${row.sym}/${DEMO_LIVE_STRIKE[row.sym] ?? row.strikes[3]}`}
+              >
                 <div className="matrix-ticker">
                   <span className="matrix-ticker-mark">{row.sym.slice(0, 1)}</span>
                   {row.sym}
