@@ -17,6 +17,12 @@ export {
   normalizeOAuthProfile,
   verifyWalletSignature,
 } from "./options.js";
+export {
+  RANDOM_USERNAME_ADJECTIVES,
+  RANDOM_USERNAME_NOUNS,
+  RANDOM_USERNAME_REGEX,
+  isRandomUsername,
+} from "./random-username.js";
 export type {
   BellMarketsAuthUser,
   SignInCookieReader,
