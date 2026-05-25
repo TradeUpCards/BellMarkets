@@ -24,7 +24,9 @@
     "briefings:gen": "tsx --env-file=.env --env-file=.env.local scripts/gen-briefings.ts",
     "pnl-digest:gen": "tsx --env-file=.env --env-file=.env.local scripts/gen-pnl-digest.ts",
     "busdc:create": "tsx --env-file=.env scripts/create-busdc-mint.ts",
-    "mint-demo-usdc": "tsx --env-file=.env scripts/mint-demo-usdc.ts"
+    "mint-demo-usdc": "tsx --env-file=.env scripts/mint-demo-usdc.ts",
+    "update-usdc-mint": "tsx --env-file=.env scripts/update-usdc-mint.ts",
+    "seed-demo-liquidity": "tsx --env-file=.env scripts/seed-demo-liquidity.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
