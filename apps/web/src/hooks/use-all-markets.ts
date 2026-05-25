@@ -48,10 +48,30 @@ export function useAllMarkets() {
         },
       );
 
-      return accounts.map(({ pubkey, account }) => ({
-        pda: new PublicKey(pubkey),
-        data: decodeStrikeMarket(account.data as Buffer),
-      }));
+      // DR-020 deploy_index=8: StrikeMarket gained `order_book: Pubkey`,
+      // bumping LEN from 333 → 341 bytes. The 7 legacy META strikes from
+      // deploy_index=6 still exist on chain at the old layout and the borsh
+      // decoder either throws or produces a partial object with undefined
+      // fields. Filter them out so consumers (trade-view, admin, markets-table)
+      // can rely on `m.data.strikePrice` etc. being defined.
+      const decoded: StrikeMarketWithPda[] = [];
+      for (const { pubkey, account } of accounts) {
+        try {
+          const data = decodeStrikeMarket(account.data as Buffer);
+          // Defensive: even if borsh succeeds, drop entries where load-bearing
+          // fields are missing (legacy-schema accounts where partial decode
+          // produces undefined BN values).
+          if (!data?.strikePrice || !data.expiryUnix || !data.yesMint) {
+            continue;
+          }
+          decoded.push({ pda: new PublicKey(pubkey), data });
+        } catch {
+          // Legacy-schema or malformed; skip silently. Re-emerges as
+          // `liveMarket=null` in trade-view → "No on-chain StrikeMarket"
+          // disable banner.
+        }
+      }
+      return decoded;
     },
     staleTime: 60_000,
     refetchOnWindowFocus: false,

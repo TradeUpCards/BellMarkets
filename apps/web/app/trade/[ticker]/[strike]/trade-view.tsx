@@ -110,7 +110,15 @@ export function TradeView({ ticker, strike }: TradeViewParams) {
     const strikeE8 = BigInt(strikeNum) * 100_000_000n;
     return (
       allMarkets.find((m) => {
-        const sp = BigInt(m.data.strikePrice.toString());
+        // Defensive: useAllMarkets already filters bad rows, but a stale
+        // cache entry could still slip through during a schema migration.
+        if (!m?.data?.strikePrice) return false;
+        let sp: bigint;
+        try {
+          sp = BigInt(m.data.strikePrice.toString());
+        } catch {
+          return false;
+        }
         return sp === strikeE6 || sp === strikeE8;
       }) ?? null
     );
