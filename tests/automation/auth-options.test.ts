@@ -234,4 +234,84 @@ describe("handleSignIn", () => {
     expect(result.ok).toBe(false);
     expect(result.reason).toContain("no user id");
   });
+
+  // ── fanalytics auto-username override (coordinated with Cleo) ──────────
+
+  it("overrides an auto-gen handle with the OAuth display name", async () => {
+    const upsertUser = vi.fn().mockResolvedValue(fakeUserRow({ handle: "BraveFox42" }));
+    const linkAccount = vi.fn().mockResolvedValue({});
+    const updateHandle = vi
+      .fn()
+      .mockResolvedValue(fakeUserRow({ handle: "alice_x" }));
+    const user = fakeUser({ id: "tw1", username: "alice_x" });
+    const result = await handleSignIn(
+      { user, account: fakeAccount("twitter") as never, profile: { username: "alice_x" } as never },
+      {
+        cookieReader: async () => ({ signedData: "sig", publicKey: ALICE_PK }),
+        verifySignature: async () => ALICE_PK,
+        upsertUser,
+        linkAccount,
+        updateHandle,
+      },
+    );
+    expect(result.ok).toBe(true);
+    expect(updateHandle).toHaveBeenCalledOnce();
+    expect(updateHandle).toHaveBeenCalledWith("user-uuid-1", "alice_x");
+  });
+
+  it("preserves a user-customized handle (regex does not match)", async () => {
+    const upsertUser = vi.fn().mockResolvedValue(fakeUserRow({ handle: "my_real_name" }));
+    const linkAccount = vi.fn().mockResolvedValue({});
+    const updateHandle = vi.fn();
+    await handleSignIn(
+      { user: fakeUser({ id: "tw1", username: "alice_x" }), account: fakeAccount("twitter") as never },
+      {
+        cookieReader: async () => ({ signedData: "sig", publicKey: ALICE_PK }),
+        verifySignature: async () => ALICE_PK,
+        upsertUser,
+        linkAccount,
+        updateHandle,
+      },
+    );
+    expect(updateHandle).not.toHaveBeenCalled();
+  });
+
+  it("does not override when OAuth display name is empty/whitespace", async () => {
+    const upsertUser = vi.fn().mockResolvedValue(fakeUserRow({ handle: "LivelyKoala7" }));
+    const linkAccount = vi.fn().mockResolvedValue({});
+    const updateHandle = vi.fn();
+    await handleSignIn(
+      {
+        user: fakeUser({ id: "tw1", username: "   " }), // whitespace-only
+        account: fakeAccount("twitter") as never,
+        profile: { username: "   " } as never,
+      },
+      {
+        cookieReader: async () => ({ signedData: "sig", publicKey: ALICE_PK }),
+        verifySignature: async () => ALICE_PK,
+        upsertUser,
+        linkAccount,
+        updateHandle,
+      },
+    );
+    expect(updateHandle).not.toHaveBeenCalled();
+  });
+
+  it("override failure is non-fatal — signIn still succeeds", async () => {
+    const upsertUser = vi.fn().mockResolvedValue(fakeUserRow({ handle: "JollyOwl500" }));
+    const linkAccount = vi.fn().mockResolvedValue({});
+    const updateHandle = vi.fn().mockRejectedValue(new Error("transient db error"));
+    const result = await handleSignIn(
+      { user: fakeUser({ id: "tw1", username: "alice_x" }), account: fakeAccount("twitter") as never },
+      {
+        cookieReader: async () => ({ signedData: "sig", publicKey: ALICE_PK }),
+        verifySignature: async () => ALICE_PK,
+        upsertUser,
+        linkAccount,
+        updateHandle,
+      },
+    );
+    expect(result.ok).toBe(true);
+    expect(updateHandle).toHaveBeenCalledOnce();
+  });
 });

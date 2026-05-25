@@ -26,7 +26,8 @@
 import type { Account, NextAuthOptions, Profile, User as NextAuthUser } from "next-auth";
 import type { OAuthConfig } from "next-auth/providers/oauth";
 
-import { linkOAuthAccount, upsertUserByWallet } from "./db.js";
+import { linkOAuthAccount, updateUserHandle, upsertUserByWallet } from "./db.js";
+import { isRandomUsername } from "./random-username.js";
 import type { OAuthProfileInput, Provider, User } from "./types.js";
 
 // ---------------------------------------------------------------------------
@@ -218,6 +219,7 @@ export type SignInHandlerDeps = {
   verifySignature?: typeof verifyWalletSignature;
   upsertUser?: typeof upsertUserByWallet;
   linkAccount?: typeof linkOAuthAccount;
+  updateHandle?: typeof updateUserHandle;
 };
 
 export type SignInHandlerInput = {
@@ -256,6 +258,7 @@ export async function handleSignIn(
   const verifySig = deps.verifySignature ?? verifyWalletSignature;
   const upsertUser = deps.upsertUser ?? upsertUserByWallet;
   const linkAccount = deps.linkAccount ?? linkOAuthAccount;
+  const updateHandle = deps.updateHandle ?? updateUserHandle;
 
   const { signedData, publicKey } = await cookieReader();
   if (!signedData || !publicKey) {
@@ -290,6 +293,29 @@ export async function handleSignIn(
     );
   } catch (err) {
     return { ok: false, reason: `db write failed: ${(err as Error).message}` };
+  }
+
+  // ── Auto-gen handle → OAuth display-name override (fanalytics pattern) ──
+  //
+  // Coordinated with Cleo per cleo-handoff.md "For Bram — RAISE: fanalytics
+  // auto-username flow". If the existing handle still matches the auto-gen
+  // dictionary regex (= user never customized it in settings) AND the OAuth
+  // provider gave us a non-empty display name, overwrite the handle. Users
+  // who set their own handle in settings have a non-matching pattern → safe.
+  //
+  // Non-fatal on failure: the upsert + link already succeeded; the handle
+  // can be fixed in settings later. We log + continue.
+  const oauthDisplayName = normalized.username?.trim();
+  if (dbUser.handle && isRandomUsername(dbUser.handle) && oauthDisplayName) {
+    try {
+      const updated = await updateHandle(dbUser.id, oauthDisplayName);
+      if (updated) dbUser = updated;
+    } catch (err) {
+      console.warn(
+        "[auth] auto-gen handle overwrite failed:",
+        (err as Error).message,
+      );
+    }
   }
 
   // Stash the DB id + walletPubkey on the NextAuth user so the jwt callback
