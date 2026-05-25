@@ -1,15 +1,13 @@
 import { NextResponse } from "next/server";
 
-// Deep file-path import to bypass the @bell-markets/automation/auth barrel,
-// which re-exports discord-bot.js + web-push.js — both of which pull in
-// transitive deps (discord.js → @discordjs/ws → zlib-sync optional native dep,
-// and web-push) that don't bundle in Next.js's webpack. Cleo's earlier
-// paired-sprint commit established this deep-import pattern for the same
-// reason (see commit 81f68ab; auth/options.js was imported the same way).
+// Tight subpath `./auth/db` (per services/automation package.json `exports`
+// field) — bypasses the auth barrel which re-exports discord-bot.js +
+// web-push.js. Those pull in transitive deps (discord.js → @discordjs/ws
+// → zlib-sync optional native dep) that don't bundle in Next.js webpack.
 import {
   getUserByWalletPubkey,
   upsertUserByWallet,
-} from "@bell-markets/automation/src/auth/db.js";
+} from "@bell-markets/automation/auth/db";
 
 import {
   generateUsername,

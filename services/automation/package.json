@@ -9,7 +9,10 @@
   "exports": {
     ".": "./src/index.ts",
     "./ai": "./src/ai/index.ts",
-    "./auth": "./src/auth/index.ts"
+    "./auth": "./src/auth/index.ts",
+    "./auth/db": "./src/auth/db.ts",
+    "./auth/options": "./src/auth/options.ts",
+    "./auth/random-username": "./src/auth/random-username.ts"
   },
   "scripts": {
     "dev": "trigger dev",
