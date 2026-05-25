@@ -895,6 +895,108 @@ We have three distinct token-issuance surfaces: (a) YES/NO position tokens that 
 
 ---
 
+### DR-018 — Fee model v1.5: 25 bps mint + 10 bps Phoenix taker (amends DR-008)
+
+**Date:** 2026-05-24
+**Status:** Active — v1 submission ships with `mint_fee_bps=0` on devnet (no behavior change for demo); activates at admin flip post-DR-009 Model D deploy
+**Made by:** Cory (Tate-routed)
+
+**Context:** DR-008 specced a 2% mint-side fee under the assumption that Phoenix-side fees were unreachable. DR-009 Model D verification (2026-05-24) confirmed Phoenix `fee_recipient` is reachable via a ~6-8 hr CPI integration (locked as v1.5 P0). With both surfaces available, the original 2% mint design is over-rotated and structurally asymmetric:
+
+- **Asymmetric YES/NO entry**: traders buying YES from existing inventory pay 0 fees; traders buying NO via the atomic `mint_pair + sell-YES` flow pay the full 2%
+- **MM-hostile**: bootstrappers (e.g., Bob in scenario 1) pay the 2% on every mint they do to seed liquidity — discouraging the exact behavior we need most
+- **Arbitrage-incentive**: sophisticated traders learn to never call `mint_pair`, freeloading on MMs who do
+- **Outlier vs comparable Solana CLOBs**: Drift = 10 bps taker; dYdX = 10-15 bps; Hyperliquid = 2.5 bps; Polymarket = 0%
+
+**Decision:** Move to a two-surface fee model with industry-standard taker-only Phoenix economics:
+
+| Fee surface | Rate | Charged on |
+|---|---|---|
+| `mint_fee_bps` | **25 bps** (was 200 under DR-008) | Every `mint_pair` call EXCEPT the strike creator's own mints in their own strike (per DR-008 `creator_rebate_bps` mechanism — default 100% waiver) |
+| `phoenix_taker_fee_bps` | **10 bps** (new, requires DR-009 Model D ship) | Every Phoenix fill where the user is the taker (aggressive crossing order). Accrues to our `fee_recipient` ATA at fill time. |
+| `phoenix_maker_fee_bps` | **0 bps** (structural; Phoenix v1 doesn't support maker fees natively) | Limit orders that rest and get filled |
+| Redeem / redeem_pair / redeem_invalid | 0 bps (unchanged) | — |
+
+**Hardcoded program ceilings (defensive against admin compromise):**
+- `mint_fee_bps ≤ 100` (max 1%)
+- `phoenix_taker_fee_bps ≤ 50` (max 50 bps)
+- Enforced via `require!` in `update_fee_config` and `create_strike_market`
+
+**Fee split (admin-configurable via `update_fee_config`):**
+- Mint fee: 70% to pools (50% weekly + 20% monthly) / 30% to platform retain
+- Phoenix fee: 70% to pools / 30% to platform retain
+- Note: "creator rebate" is a fee WAIVER (creator pays nothing on their own mints in their strike), NOT a kickback. There is no creator-direct payment surface.
+
+**Trade-off:** Projected MVP revenue drops from ~$100K/yr (DR-008's 2% mint design) to ~$25.5K/yr (this design), in exchange for:
+- Symmetric YES/NO entry pricing — every trader path now pays proportional to value extracted
+- ~85% reduction in trader-facing fees on every Buy-NO / Sell-NO / MM-bootstrap path
+- Aligned with Drift's 10 bps taker — easy interview defense ("we match the largest Solana perp DEX")
+- Removes the arbitrage incentive to bypass `mint_pair`
+- Preserves DR-005 creator's fee-waiver incentive to spawn strikes (creator personally mints at 0% while everyone else pays 25 bps)
+- DR-010 pool funding preserved at ~$15-18K/yr (vs ~$60-70K under DR-008; smaller pools but still meaningful — ~$300-350/wk weekly leaderboard prize)
+
+**Consequences:**
+- DR-008's 2% mint design is **amended** (not superseded — the mint fee mechanism stays; only the rate changes from 200 → 25 bps)
+- DR-018 activation gated on DR-009 Model D shipping (otherwise we have a mint fee but no Phoenix fee, and the asymmetry returns)
+- v1 submission ships with `mint_fee_bps=0` on devnet (already current state per Aria's deploy_index=6) — zero migration risk, zero demo impact
+- Post-DR-009 Model D + DR-018 activation: a single `update_fee_config` + `phoenix::ChangeFeeRecipient` CPI (admin-signed) flips both rates on simultaneously
+- Frontend (Cleo): add Phoenix-fee surface to the fee preview in `trade-view.tsx` — show "25 bps mint + 10 bps Phoenix fill" breakdown alongside the existing tier display
+
+**Alternatives considered:**
+
+- **(a) Keep DR-008's 2% mint, no Phoenix fee:** rejected. Asymmetry, MM friction, arbitrage incentive, outlier vs comps. Already covered above.
+- **(b) 0% mint + 25 bps Phoenix only:** rejected. Loses DR-005 creator's fee-waiver incentive (creator's "rebate" becomes meaningless at 0% mint). Also outlier-high vs Drift's 10 bps.
+- **(c) 0% mint + 10 bps Phoenix only:** rejected. Same DR-005 issue. Plus pool funding drops to ~$10.5K/yr — sub-$200/wk leaderboard prizes feel anemic.
+- **(d) 25 bps mint + 10 bps Phoenix + 5 bps maker fee:** rejected. Maker fee discourages limit-order liquidity provision; Phoenix v1 doesn't support it natively (would need fork — DR-009 Option 4); industry-standard CLOB economics is taker-only.
+- **(e) 50 bps mint + 5 bps Phoenix:** rejected. Higher mint fee re-introduces some of DR-008's asymmetry; below-industry Phoenix rate looks underpriced and signals weak revenue confidence.
+
+---
+
+### DR-019 — NO-side trades are market-only (IOC) in v1; Limit Buy NO / Sell NO deferred to v1.5+
+
+**Date:** 2026-05-24
+**Status:** Active — v1 design lock; revisit when MVP usage data justifies Limit-NO mechanism choice
+**Made by:** Cory (Tate-routed)
+
+**Context:** The atomic Buy-NO and Sell-NO flows bundle `mint_pair` + Phoenix swap or Phoenix swap + `redeem_pair` into a single user-signed transaction (POV-3 atomicity). The current implementation uses Phoenix's `swap` instruction (IOC — immediate-or-cancel) which guarantees all-or-nothing execution. Adding a Limit variant of either flow raises orthogonal but real issues:
+
+| Flow | If we shipped a Limit variant today |
+|---|---|
+| **Limit Buy NO** | `mint_pair` must fire BEFORE the Phoenix sell-YES leg can post (you can't sell YES you don't own). Mint fee taken upfront. If the Phoenix limit doesn't fill and user cancels → user stranded with unwanted YES+NO pair + sunk mint fee. Violates the "atomic, can't get stranded" promise of POV-3. |
+| **Limit Sell NO** | Phoenix limit buy-YES posts safely (no fee). But `redeem_pair` requires the YES to already exist — can't run in the same tx as a limit that hasn't filled. Requires a 2-tx flow: (1) limit post; (2) when filled, user manually fires `redeem_pair`. UX gap; easy to forget step 2, leaving user with stranded YES+NO that needs manual cleanup. |
+
+**Decision:** Lock v1 design as **NO-side trades are market-only (IOC).** The UI MUST disable the Limit toggle on Buy NO and Sell NO paths. The state-eval function in `trade-view.tsx` MUST return "disabled with tooltip" for any Buy/Sell × NO × Limit combination.
+
+**Bonus protocol-level guarantee:** even if the UI is bypassed (e.g., direct CLI tx submission), the IOC + atomic-tx properties on `swap` mean a malformed Limit-NO attempt would fail at the Phoenix leg, which would revert the entire tx including the `mint_pair`. **There is no way to end up with a stranded fee from a malformed NO trade** — the protocol enforces atomicity even when the UI is wrong.
+
+**Trade-off:** v1 NO-side traders can only express market orders (with slippage caps). No "I'll buy NO at exactly $0.40 if it ever gets there" patience. Sophisticated NO traders work around this by:
+- Manually minting a pair via standalone `mint_pair` (paying the fee)
+- Then placing a Phoenix Limit Sell YES at their target NO price (free)
+- Keeping the unwanted NO until they redeem at settle
+
+This works because once they own both tokens, the Phoenix limit YES sell is a clean atomic single-ix (no atomicity bundle needed). It's just less ergonomic than a one-click "Limit Buy NO" button.
+
+**v1.5 reopen options (documented for future decision):**
+
+| Option | Mechanism | Cost |
+|---|---|---|
+| **Option 2** — Auto-redeem on cancel | Frontend wires Phoenix order cancel to also fire `redeem_pair` for any stranded matched pair. User accepts they eat the mint fee as sunk cost if they bail mid-trade. | ~30-60 min Cleo + an event listener |
+| **Option 3** — Custom matcher with atomic complementary-mint (Polymarket CTF pattern) | Fork Phoenix or build a custom matching engine that mints fresh pairs when two opposite-side limit orders meet. Removes the stranding issue entirely. | $40-80K + 1-2 weeks + new audit category (per DR-009 Option 4) |
+| **Option 4** — Async-fill claim ix | Add a new `claim_after_fill` ix that the user can fire post-fill to atomically complete the Sell NO sequence. Indexer watches Phoenix fill events + notifies user. | ~2-3 hr Aria + indexer logic |
+
+**Consequences:**
+- Cleo MUST update `trade-view.tsx` to disable Limit toggle on Buy/Sell NO (single state-eval function update; ~10 lines)
+- Drew adds an adversarial test confirming Limit-NO paths are unreachable (tx builder doesn't construct them; UI doesn't allow them; protocol would reject them anyway)
+- v1.5 product decision: which Option to ship. Defer decision until MVP usage data reveals if Limit-NO demand is meaningful enough to justify the cost.
+
+**Alternatives considered:**
+
+- **(a) Ship Limit-NO with explicit "you'll eat the fee on cancel" warning:** rejected. Erodes POV-3 atomicity guarantee; users will angrily report "you stole my fee" without understanding the design.
+- **(b) Don't ship NO paths at all (only Buy/Sell YES):** rejected. NO is a first-class product surface per PRD §3.2 / §3.4. Cutting it would mean users can only express bullish views — major UX regression.
+- **(c) Ship Limit-NO + Option 2 (auto-redeem on cancel) in v1:** rejected. Adds Cleo scope + an event-listener dependency; v1 submission timeline doesn't accommodate the testing surface. v1.5+ work.
+
+---
+
 > Aim for 5–15 active DRs over a project's life. Fewer and you're not
 > locking enough; more and the file becomes unscannable (rotate stable
 > ones into `specs/architecture.md` if they've become "just how the
