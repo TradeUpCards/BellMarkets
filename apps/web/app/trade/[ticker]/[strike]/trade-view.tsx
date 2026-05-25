@@ -25,6 +25,7 @@ import Link from "next/link";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey, Transaction } from "@solana/web3.js";
 
+import { LeftRail } from "@/components/v8/left-rail";
 import { useUserConfig } from "@/hooks/use-user-config";
 import { useBellProSubscription } from "@/hooks/use-bell-pro-subscription";
 import { useMarketConfig } from "@/hooks/use-market-config";
@@ -635,11 +636,10 @@ export function TradeView({ ticker, strike }: TradeViewParams) {
       </div>
 
       <div className="layout">
-        <aside className="left-rail">
-          <RailTickers active={tickerUpper} />
-          <RailPositions />
-          <RailLeaders />
-        </aside>
+        {/* Shared <LeftRail/> — same component used on the landing page.
+            `showFilters` is intentionally false here (filter matrix only
+            makes sense on the landing's probability-matrix card). */}
+        <LeftRail activeTicker={tickerUpper} />
 
         <main>
           <div className="trade-grid">
@@ -1105,115 +1105,11 @@ export function TradeView({ ticker, strike }: TradeViewParams) {
 
 // ─── Sub-components ───────────────────────────────────────────────────────
 
-function RailTickers({ active }: { active: string }) {
-  const TICKERS = [
-    { sym: "META", spot: 679.84, chg: 0.32 },
-    { sym: "NVDA", spot: 1342.71, chg: 1.39 },
-    { sym: "AAPL", spot: 229.84, chg: 0.54 },
-    { sym: "MSFT", spot: 441.62, chg: 0.73 },
-    { sym: "GOOGL", spot: 184.27, chg: -0.5 },
-    { sym: "AMZN", spot: 201.13, chg: 0.2 },
-    { sym: "TSLA", spot: 261.04, chg: -0.7 },
-  ];
-  return (
-    <details className="rail-section" id="rail-tickers" open>
-      <summary className="rail-section-h">
-        <span className="rail-section-title">Tickers</span>
-        <span className="rail-chevron" aria-hidden="true">▾</span>
-      </summary>
-      <div className="rail-section-body">
-        <div className="rail-ticker-list">
-          {TICKERS.map((t) => (
-            <Link
-              key={t.sym}
-              href={`/trade/${t.sym}/680`}
-              className={`rail-ticker${t.sym === active ? " active" : ""}`}
-            >
-              <div className="rail-ticker-info">
-                <span className="rail-ticker-sym">{t.sym}</span>
-                <span className="rail-ticker-spot">${t.spot.toFixed(2)}</span>
-              </div>
-              <span className={`rail-ticker-chg ${t.chg >= 0 ? "up" : "down"}`}>
-                {t.chg >= 0 ? "+" : ""}
-                {t.chg.toFixed(2)}%
-              </span>
-            </Link>
-          ))}
-        </div>
-      </div>
-    </details>
-  );
-}
-
-// STATIC FIXTURE — wire to useAllMarkets × usePosition(wallet) post-MVP for live rail.
-function RailPositions() {
-  return (
-    <details className="rail-section" id="rail-positions" open data-mock="true">
-      <summary className="rail-section-h">
-        <span className="rail-section-title">My positions · 3</span>
-        <span className="rail-chevron" aria-hidden="true">▾</span>
-      </summary>
-      <div className="rail-section-body">
-        <div className="rail-position">
-          <div>
-            <span className="rail-position-market">META.680.YES</span>
-            <br />
-            <span className="rail-position-side">5 · entry $0.62</span>
-          </div>
-          <span className="rail-position-pnl down">−$0.50</span>
-        </div>
-        <div className="rail-position">
-          <div>
-            <span className="rail-position-market">NVDA.1340.NO</span>
-            <br />
-            <span className="rail-position-side">3 · entry $0.50</span>
-          </div>
-          <span className="rail-position-pnl down">−$0.06</span>
-        </div>
-        <div className="rail-position">
-          <div>
-            <span className="rail-position-market">AAPL.230.YES</span>
-            <br />
-            <span className="rail-position-side">8 · entry $0.42</span>
-          </div>
-          <span className="rail-position-pnl up">+$2.80</span>
-        </div>
-      </div>
-    </details>
-  );
-}
-
-// STATIC FIXTURE — wire to useLeaderboard("weekly") once Bram's indexer URL ships.
-function RailLeaders() {
-  return (
-    <details className="rail-section" id="rail-leaders" open data-mock="true">
-      <summary className="rail-section-h">
-        <span className="rail-section-title">🏆 Weekly leaders</span>
-        <Link href="/leaderboard" className="rail-section-link" onClick={(e) => e.stopPropagation()}>
-          all →
-        </Link>
-        <span className="rail-chevron" aria-hidden="true">▾</span>
-      </summary>
-      <div className="rail-section-body">
-        <div className="rail-lb-row">
-          <span className="rank gold">#1</span>
-          <span className="name">degen.sol</span>
-          <span className="pnl">+$2,847</span>
-        </div>
-        <div className="rail-lb-row">
-          <span className="rank silver">#2</span>
-          <span className="name">maxprob.eth</span>
-          <span className="pnl">+$2,103</span>
-        </div>
-        <div className="rail-lb-row">
-          <span className="rank bronze">#3</span>
-          <span className="name">quantfox</span>
-          <span className="pnl">+$1,876</span>
-        </div>
-      </div>
-    </details>
-  );
-}
+// (RailTickers / RailPositions / RailLeaders removed — replaced by the
+// shared <LeftRail/> component at @/components/v8/left-rail. The trade
+// page and the landing page now use identical rail markup; the only
+// page-specific variant is the "Filter matrix" section, which the trade
+// page omits via the default `showFilters=false`.)
 
 function ChartCard({ ticker, strike }: { ticker: string; strike: number }) {
   return (

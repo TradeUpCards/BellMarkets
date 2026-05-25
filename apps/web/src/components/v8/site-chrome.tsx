@@ -21,11 +21,13 @@
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { useWallet } from "@solana/wallet-adapter-react";
-
-const WalletMultiButton = dynamic(
-  async () =>
-    (await import("@solana/wallet-adapter-react-ui")).WalletMultiButton,
+// Custom <UserMenu/> replaces the wallet-adapter default WalletMultiButton
+// dropdown. Surfaces wallet pubkey + linked socials + Bell Pro tier +
+// settings/disconnect in one cohesive dropdown (fanalytics pattern).
+// Dynamic-imported with ssr:false because it reads wallet + session
+// client-only.
+const UserMenu = dynamic(
+  async () => (await import("./user-menu")).UserMenu,
   { ssr: false },
 );
 
@@ -82,11 +84,6 @@ export function TopStatusBar({ settleCountdown = "02:13:47" }: { settleCountdown
 }
 
 export function SiteHeader({ active }: { active: ActiveNav }) {
-  const wallet = useWallet();
-  const walletShort = wallet.publicKey
-    ? `${wallet.publicKey.toBase58().slice(0, 4)}…${wallet.publicKey.toBase58().slice(-4)}`
-    : null;
-
   const toggleTheme = () => {
     const root = document.documentElement;
     const next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
@@ -141,14 +138,10 @@ export function SiteHeader({ active }: { active: ActiveNav }) {
             <span aria-hidden="true">✦</span>
             <span>Go Pro</span>
           </Link>
-          {walletShort ? (
-            <button className="connect-btn" type="button" aria-label={`Wallet ${walletShort}`}>
-              <span style={{ fontSize: 14 }} aria-hidden="true">⬢</span>
-              <span>{walletShort}</span>
-            </button>
-          ) : (
-            <WalletMultiButton className="connect-btn" />
-          )}
+          {/* Custom dropdown — handles both connect ("Connect Wallet"
+              CTA) and post-connect (pubkey chip + linked-socials +
+              Bell Pro + settings) states. */}
+          <UserMenu />
         </div>
       </div>
     </header>
