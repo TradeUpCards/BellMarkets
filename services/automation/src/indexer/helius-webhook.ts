@@ -304,6 +304,8 @@ export const BELL_MARKETS_IX_NAMES = [
   "cancel_order",
   "match_orders",
   "update_usdc_mint",
+  // DR-020 / deploy_index=8 — Path B unblock for mint_pair under bUSDC
+  "reinit_rewards_pools",
 ] as const;
 
 export type BellMarketsIxName = (typeof BELL_MARKETS_IX_NAMES)[number];

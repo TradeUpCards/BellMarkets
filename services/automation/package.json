@@ -26,6 +26,7 @@
     "busdc:create": "tsx --env-file=.env scripts/create-busdc-mint.ts",
     "mint-demo-usdc": "tsx --env-file=.env scripts/mint-demo-usdc.ts",
     "update-usdc-mint": "tsx --env-file=.env scripts/update-usdc-mint.ts",
+    "reinit-rewards-pools": "tsx --env-file=.env scripts/reinit-rewards-pools.ts",
     "seed-demo-liquidity": "tsx --env-file=.env scripts/seed-demo-liquidity.ts"
   },
   "dependencies": {

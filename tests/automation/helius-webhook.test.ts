@@ -285,13 +285,13 @@ describe("BELL_MARKETS_IX_NAMES — coverage check", () => {
     }
   });
 
-  it("totals exactly 26 ixs (20 through deploy_index=6 + 6 DR-020 CLOB ixs)", async () => {
+  it("totals exactly 27 ixs (20 through deploy_index=6 + 6 DR-020 CLOB ixs + reinit_rewards_pools deploy_index=8)", async () => {
     const mod = await import("../../services/automation/src/indexer/helius-webhook.js");
     const { BELL_MARKETS_IX_NAMES } = mod;
-    expect(BELL_MARKETS_IX_NAMES).toHaveLength(26);
+    expect(BELL_MARKETS_IX_NAMES).toHaveLength(27);
   });
 
-  it("includes the 6 DR-020 CLOB ixs (init/grow_order_book, place/cancel_order, match_orders, update_usdc_mint)", async () => {
+  it("includes the 6 DR-020 CLOB ixs + reinit_rewards_pools (deploy_index=8 Path B unblock)", async () => {
     const mod = await import("../../services/automation/src/indexer/helius-webhook.js");
     const { BELL_MARKETS_IX_NAMES } = mod;
     for (const name of [
@@ -301,6 +301,7 @@ describe("BELL_MARKETS_IX_NAMES — coverage check", () => {
       "cancel_order",
       "match_orders",
       "update_usdc_mint",
+      "reinit_rewards_pools",
     ]) {
       expect(BELL_MARKETS_IX_NAMES).toContain(name);
     }
