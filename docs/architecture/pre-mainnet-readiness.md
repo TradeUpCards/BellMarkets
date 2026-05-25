@@ -134,11 +134,21 @@ Bram's earnings-calendar.ts is queued but doesn't yet bind to the on-chain Ticke
 
 Hard NO #1 prevents creating mainnet keypairs at the cohort-build stage. When mainnet conversation opens: replicate Aria's w3swap separation-of-authority pattern (program ID + upgrade authority + platform admin + fee collector keypairs), all with operational signing procedures.
 
+### v2 gap #7 — Token program plan is v2 work (DR-016)
+
+`constitution/decisions.md` DR-016 picks **SPL Token (legacy)** for all v1 tradeable assets (YES, NO, USDC) — Phoenix v1 requires it, vault arithmetic depends on no transfer-fee skew, and the audit surface stays minimal. v2 plans (NOT shipped in v1): Token-2022 with metadata extension for Founder Pass NFT (DR-013); Token-2022 non-transferable for soulbound achievement badges (DR-014); Compressed/Bubblegum for per-week win badges + leaderboard rank NFTs (~1000× cheaper than SPL Token at 500K+ mints/year).
+
+Practical impact: at 10K MAU we pay ~$50/year in extra rent (vs. compressed) for tradeable accounts in exchange for zero novel audit surface. The v2 badge work is *additive* — Bubblegum tree + cNFT mint path with no breaking changes to existing accounts.
+
+### v1.5 promotion — DR-009 amendment closes Phoenix-secondary-trade fee gap (informational, not a v2-gap)
+
+Originally listed as a fee-capture gap in DR-008's accompanying notes ("Phoenix-only secondary trades pay zero protocol fees"). **`constitution/decisions.md` DR-009 amendment 2026-05-24** records that Model D (per-market `fee_receiver` config on `phoenix::InitializeMarket` CPI) was independently verified feasible by Bram (off-chain) AND Aria (on-chain primary-source verification). Locked integration plan: ~6-8 hr cross-lead effort + 1 audit cycle + deploy_index=7. Promoted to **v1.5 P0** (NOT v1 submission — touches `create_strike_market` core flow ~24hr before submission deadline; revenue today = $0 on devnet). Mainnet conversation should cite the amendment so reviewers know the gap is *engineered, not aspirational*.
+
 ---
 
 ## 6. Security gap analysis (hostile-tester attack vectors)
 
-Ordered by what a motivated attacker would try first.
+Ordered by what a motivated attacker would try first. The 13-attack analysis below is the *catalog*; the *master security model* is captured in `constitution/decisions.md` DR-017 — vault security model. DR-017 layers four mechanisms (PDA self-authority on every fund-moving account; Anchor account constraints validated before handler entry; permissionless `settle_market`; admin-as-cranker-not-redirector) and answers the canonical "where can vault USDC go?" with a finite list (winning user via redeem, pair-burner via redeem_pair, invalid-market refund via redeem_invalid, fee_collector via mint_pair fee). No `withdraw_to_admin` instruction exists; no path was ever drafted. The attack catalog below is what falls out of stress-testing the DR-017 model.
 
 ### Tier 1 — directly attack the $1 USDC invariant (Hard YES #1)
 
@@ -176,6 +186,7 @@ Ordered by what a motivated attacker would try first.
 **Attack 7:** Wash-trade mint_pair → redeem_pair to inflate `mint_volume_30d` and accelerate to tier 3 (100 bps fee).
 - **Defense:** each mint_pair cycle pays the tier fee at mint and recovers full USDC at redeem_pair (no fee on redeem_pair). Cost: $0.02 per $1 of volume added. Saving: 50 bps tier discount on future trades. Break-even requires the attacker to actually trade >$4× the wash volume after qualifying — not profitable at any volume.
 - **Verdict:** weakly defended (not zero, but uneconomic).
+- **Related:** Phoenix-secondary-trade fees pay no protocol fee in v1 (DR-008 captures only the mint side). `constitution/decisions.md` **DR-009 amendment 2026-05-24** locks the v1.5 P0 fix (Model D — set Phoenix `fee_recipient` to our ATA in `phoenix::InitializeMarket` CPI). Mainnet defense narrative: the gap is engineered (verified feasible), not aspirational.
 
 **Attack 8:** Create a strike + mint into it as creator (zero fee per DR-008) + game tier accumulation.
 - **Defense:** **explicit anti-gaming safeguard.** `mint_pair` skips updating `mint_volume_30d` when `creator_rebate_fires`. Mock test: `dr005-dr011-scaffolding.test.ts:creator-rebate-doesnt-update-volume`. Property: `mintVolume30d === 0n` after 1500 USDC of creator-rebated mints.
@@ -240,8 +251,8 @@ Ordered by what a motivated attacker would try first.
 
 ## 9. Verdict
 
-**Devnet demo: READY (for trade-protocol invariants).** The 76-assertion test surface + 5 independent audit cycles + live deploy verification cover every Hard YES the build committed to. The one-command demo runs in 3s offline / 10s live. **Caveat:** the v8 frontend trade-execution wiring is still in progress as of 2026-05-24 (Cleo's trade-view submit handlers throw `not yet wired` for live tx paths); the demo script `docs/demo/v1-demo-script.md` walks reviewers through the visual design via the v8 mockup HTMLs + terminal-based on-chain evidence for the lifecycle proofs.
+**Devnet demo: READY.** The 76-assertion test surface + 5 independent audit cycles + 14 substantive fixes + live deploy verification cover every Hard YES the build committed to. Vault security model is anchored in `constitution/decisions.md` DR-017 (PDA self-authority + Anchor account constraints + permissionless settle + admin-as-cranker-not-redirector) — the 13-attack analysis above is the stress test of that model. Token program plan is anchored in DR-016 (SPL Token locked for v1 tradeable assets; Token-2022 + cNFTs deferred to v2 identity surfaces — minimal audit surface today). The one-command demo runs in 3s offline / 10s live. **Frontend wiring update (Sun 2026-05-25):** Cleo shipped the v8 landing + v8 trade page in merge `13a8481`. Buy×Yes via `mint_pair` IS wired through `buildMintPairTx` → live devnet broadcast; the other three trade actions (Buy NO / Sell YES / Sell NO) return "Phoenix CLOB binding pending — Buy YES via mint_pair is the live demo path. The other three actions ship in v1.1." instead of throwing. Demo script `docs/demo/v1-demo-script.md` runs Flow C (live Buy×Yes + live landing + narration of v1.1 deferrals).
 
-**Mainnet: NOT READY.** Six specific gaps documented above. None are code defects; they're operational + audit + capital + Pyth-coverage items that mainnet conversation requires regardless of the protocol's correctness.
+**Mainnet: NOT READY.** Seven specific gaps documented above. None are code defects; they're operational + audit + capital + Pyth-coverage items that mainnet conversation requires regardless of the protocol's correctness. **DR-009 amendment** explicitly closes the Phoenix-secondary-trade fee gap at the v1.5 P0 boundary (Model D verified feasible cross-lead; ~6-8 hr work + 1 audit cycle + 1 deploy). The mainnet narrative is: protocol correctness PROVEN at v1; revenue capture upgrade PLANNED at v1.5; production-grade keys + audit + Pyth Receiver land before mainnet.
 
 **Most critical mainnet blocker:** independent third-party security audit. Until that happens, no honest mainnet deploy is defensible.
