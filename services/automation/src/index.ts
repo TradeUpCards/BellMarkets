@@ -174,9 +174,24 @@ export type {
 } from "./indexer/distribute.js";
 export {
   parseHeliusSettleWebhook,
+  parseClobEvents,
+  recognizeBellMarketsIxs,
+  ixDiscriminatorBase58,
+  BELL_MARKETS_IX_NAMES,
+  BELL_MARKETS_IX_DISCRIMINATORS,
   SETTLE_MARKET_DISCRIMINATOR_BASE58,
 } from "./indexer/helius-webhook.js";
-export type { HeliusEnhancedTx, ParsedSettleEvent } from "./indexer/helius-webhook.js";
+export type {
+  HeliusEnhancedTx,
+  ParsedSettleEvent,
+  ParsedClobEvents,
+  ParsedOrderBookInitialized,
+  ParsedOrderPlaced,
+  ParsedOrderMatched,
+  ParsedOrderCancelled,
+  OrderSide,
+  BellMarketsIxName,
+} from "./indexer/helius-webhook.js";
 
 // DR-014 — user profiles + social linking + notification channels
 export * from "./auth/index.js";
