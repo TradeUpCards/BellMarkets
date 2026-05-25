@@ -44,7 +44,7 @@ easier; what gets harder.
 ### DR-001 — Integrate Phoenix CLOB; do not build a custom matcher
 
 **Date:** 2026-05-21
-**Status:** Active
+**Status:** **SUPERSEDED by DR-020 (2026-05-24)** — pivoted to in-program minimal CLOB after Phoenix devnet bootstrap proved impractical inside the demo window. Phoenix integration deferred to v2 candidate per DR-020.
 **Made by:** Cory (Tate) at Day-0 brainlift
 
 **Context:** PRD allows either an existing on-chain CLOB or a hand-built minimal order book. Three-day build window. Team has zero Solana production experience prior to this project. Building a price-time-priority matching engine inside Anchor is a credible interview narrative but consumes a meaningful fraction of the available time and introduces a class of correctness bugs (off-by-one fills, partial-fill accounting, self-trade prevention) that we have no test coverage for yet.
@@ -387,7 +387,7 @@ Per-market revenue at $10K mint volume / 95% redemption rate: A ~$190, B ~$200, 
 ### DR-009 — CLOB strategy: integrate Phoenix v1 for MVP; revisit at scale
 
 **Date:** 2026-05-22 (Fri evening — extends DR-001)
-**Status:** Active — MVP commitment; **Model D verified feasible 2026-05-24 (Aria + Bram primary-source verification); execution promoted to v1.5 P0**
+**Status:** **DEFERRED to v2 by DR-020 (2026-05-24)** — irrelevant under in-program CLOB pivot. Model D feasibility verification stays on record as future reference for v2 Phoenix-as-secondary-venue work.
 **Made by:** Cory (Tate-routed)
 
 **Context:** DR-001 chose Phoenix v1 integration over building our own CLOB primarily on time-budget grounds (1.5-day build savings). DR-008 surfaced a fee-capture concern: Phoenix trades bypass our `mint_pair`/`redeem` fee touchpoints entirely. The question: does the missed Phoenix-fee revenue justify building (or forking) our own CLOB?
@@ -895,11 +895,13 @@ We have three distinct token-issuance surfaces: (a) YES/NO position tokens that 
 
 ---
 
-### DR-018 — Fee model v1.5: 25 bps mint + 10 bps Phoenix taker (amends DR-008)
+### DR-018 — Fee model v1.5: 25 bps mint + 10 bps in-program taker (amends DR-008; amended 2026-05-24 post-DR-020)
 
-**Date:** 2026-05-24
-**Status:** Active — v1 submission ships with `mint_fee_bps=0` on devnet (no behavior change for demo); activates at admin flip post-DR-009 Model D deploy
+**Date:** 2026-05-24 (originally for Phoenix; amended same day for in-program CLOB)
+**Status:** Active — v1 submission ships with `mint_fee_bps=0` on devnet (no behavior change for demo); activates at admin flip post-deploy_index=7
 **Made by:** Cory (Tate-routed)
+
+**AMENDMENT 2026-05-24 — Post DR-020:** "10 bps Phoenix taker fee" is replaced with "10 bps in-program taker fee" charged on `place_order` fills that cross resting orders (the taker side of any cross). Mechanism: fee accrues to `fee_collector_usdc` ATA during the matching settlement leg, deducted from USDC flowing to the taker. Same rate, same split semantics, just inside our own matching engine instead of Phoenix's. Phoenix-specific language elsewhere in this DR should be read as "in-program CLOB" post-DR-020.
 
 **Context:** DR-008 specced a 2% mint-side fee under the assumption that Phoenix-side fees were unreachable. DR-009 Model D verification (2026-05-24) confirmed Phoenix `fee_recipient` is reachable via a ~6-8 hr CPI integration (locked as v1.5 P0). With both surfaces available, the original 2% mint design is over-rotated and structurally asymmetric:
 
@@ -994,6 +996,60 @@ This works because once they own both tokens, the Phoenix limit YES sell is a cl
 - **(a) Ship Limit-NO with explicit "you'll eat the fee on cancel" warning:** rejected. Erodes POV-3 atomicity guarantee; users will angrily report "you stole my fee" without understanding the design.
 - **(b) Don't ship NO paths at all (only Buy/Sell YES):** rejected. NO is a first-class product surface per PRD §3.2 / §3.4. Cutting it would mean users can only express bullish views — major UX regression.
 - **(c) Ship Limit-NO + Option 2 (auto-redeem on cancel) in v1:** rejected. Adds Cleo scope + an event-listener dependency; v1 submission timeline doesn't accommodate the testing surface. v1.5+ work.
+
+---
+
+### DR-020 — Pivot to in-program minimal CLOB (supersedes DR-001; defers DR-009)
+
+**Date:** 2026-05-24 (late Sun, ~22hr to submission)
+**Status:** Active — v1 architecture lock; CLOB implementation in deploy_index=7
+**Made by:** Cory (Tate-routed)
+
+**Context:** DR-001 chose Phoenix v1 CLOB integration. The integration was implemented and tested at the *program* level (`verify_phoenix_market` magic-prefix check; 7 META strikes bound to a placeholder SOL/USDC Phoenix market on devnet). However, the PRD's four trade paths (Buy/Sell × YES/NO) were never tested end-to-end on devnet because **no Phoenix v1 YES/USDC market exists for our YES mints**. The fundamental constraint:
+
+- Phoenix v1's `InitializeMarket` requires the base mint to exist before the market can be initialized
+- Our YES mints don't exist until `create_strike_market` runs
+- `create_strike_market` requires a valid Phoenix market via `verify_phoenix_market` at create time → chicken-and-egg
+- The DR-009 Model D path (wrap `phoenix::InitializeMarket` as a CPI) was verified feasible but estimated 10-14 hr to ship with full security hardening — too risky inside the demo window
+- Manual off-chain Phoenix market creation (Option A) hit a wall in Bram's ~50 min discovery on the exact byte size of `FIFOMarket<Pubkey, 512, 512, 128>` — solvable with proper coordination but adds operational complexity for a non-load-bearing demo dependency
+
+**Reference design:** Keith's parallel reference implementation (ARCHITECTURE.md ADR-002 + F-03 spec, both committed at `docs/architecture/reference-clob-{design,decisions}.md`) provides a fully adversarially-reviewed minimal on-chain CLOB pattern. We adopt it.
+
+**Decision:** Build a minimal on-chain CLOB inside our program. Follow Keith's reference design (bounded `OrderBook` PDA, two-instruction creation pattern, three-phase matching with telescoping escrow, permissionless `match_orders` crank). Implementation lands in deploy_index=7. Phoenix integration code stays dormant in the program (additive change, no destructive removal) — preserves audit history of the 5 prior deploys and keeps Phoenix as a v2 candidate.
+
+**Why (PRD alignment):** the PRD explicitly says *"Build a minimal order book as part of your smart contract (more ambitious, demonstrates deeper understanding)."* That language prescribes the in-program CLOB path as the more-ambitious option. By pivoting to it, we land on the PRD's "more ambitious" track AND eliminate the external-devnet-dependency risk that broke the Phoenix path. The reference design's adversarial review already covers the matching engine's failure modes (book-lock DoS, frozen accounts, PDA-seed defenses, zero-price griefing, unchecked arithmetic), letting us inherit a proven security posture rather than re-discover bugs.
+
+**Why (architectural fit):** binary options markets have a structurally smaller trading surface than Phoenix's general spot orderbook design — prices bounded [$0.00, $1.00], one book per strike, modest depth requirements, short market lifetimes (one day per strike), and tight coupling to mint/redeem invariants. Owning the matching engine in the same program lets the trade and settlement state share a single audit surface, and lets the `vault_USDC == $1 × pairs_minted` invariant be enforced *mechanically* across the trade lifecycle (escrow accounts strictly separate from the collateralization vault — see Keith's spec §"Escrow accounts (invariant #1 safety)").
+
+**Why (timeline):** the in-program CLOB lands in a single deploy_index=7 cycle (~10-12 hr Aria) versus the Phoenix Model D path (~10-14 hr Aria + ongoing external bootstrap operational risk). The matching engine is bounded scope (~250-350 lines Rust), well-tested patterns (Keith's chunks 1-6 each passed), and lives in our existing trust boundary instead of straddling two programs.
+
+**Trade-off:**
+- We pay ~10-12 hr of focused engineering + skip a formal audit on the matching engine (high-risk audit category) in exchange for:
+  - PRD-aligned "more ambitious" implementation path
+  - Cohesive on-chain state (trade + settlement in one program)
+  - Zero external devnet dependency for the demo
+  - Reference-design inheritance from Keith's adversarial review
+- We accept bounded-array `N=128` orders/side/market (documented demo limitation; production path is a slab structure per Keith's ADR-002b)
+- Phoenix integration code stays in the program but unused — minor program bloat (~few KB), kept for v2 optionality
+- DR-018 fee model: "Phoenix taker fee" semantics now refer to OUR in-program `place_order` taker (same rate, same accrual logic, just our matching engine)
+
+**Consequences:**
+- New PDAs: `OrderBook` per strike, `usdc_escrow` per strike, `yes_escrow` per strike
+- New ixs: `init_order_book`, `grow_order_book`, `place_order`, `cancel_order`, `match_orders`
+- `StrikeMarket` gains an `order_book: Pubkey` field (wired by `grow_order_book` as the trading gate)
+- Existing Phoenix-related code (verify_phoenix_market, phoenix_market field on StrikeMarket) stays in place but unused — see "Trade-off"
+- `update_usdc_mint` admin ix added (~15 lines Rust) so we can swap to a self-controlled "bUSDC" demo mint without re-deploying program from scratch
+- The 7 legacy META strikes (deploy_index=6) become trade-inert after the USDC mint flip — their vaults hold Circle USDC, config will say bUSDC. Acceptable per the pivot scope.
+- DR-001 marked superseded; DR-009 deferred to v2; DR-018 amended to reflect in-program taker fee semantics
+- Reference docs committed at `docs/architecture/reference-clob-design.md` (Keith's full ARCHITECTURE.md) + `docs/architecture/reference-clob-decisions.md` (adoption notes — which of his decisions we adopt verbatim vs adapt vs defer)
+
+**Alternatives considered:**
+
+- **(a) Stay with Phoenix; ship DR-009 Model D CPI for v1:** rejected. Phoenix `InitializeMarket` CPI is the highest-risk audit category (matching-engine wrapping). 10-14 hr realistic + audit cycle skipped under deadline pressure = production-bug surface. PRD also explicitly prefers the in-program path.
+- **(b) Stay with Phoenix; manual market creation for one demo strike (Option A):** rejected. Bram's exploration hit byte-size discovery blocker (~50 min sunk); even with cross-lead coordination the operational cost (initial liquidity bootstrap, authority isolation, devnet rent burn) outweighs the path simplicity. Demo would be brittle.
+- **(c) Pivot to AMM (constant-product on YES/NO pair):** rejected. AMM is structurally simpler but the PRD specifically says "order book." Choosing AMM would be a documented PRD deviation; the in-program CLOB is the PRD-aligned ambitious path with comparable build cost.
+- **(d) Drop trading entirely; ship mint_pair + redeem only:** rejected. PRD §3.1-3.4 explicitly require all four trade paths working. The "four buttons" UX is the load-bearing product surface.
+- **(e) Fork Phoenix v1:** rejected. Multi-week effort + $40-80K audit per existing DR-009 cost analysis. Not feasible in submission window.
 
 ---
 
