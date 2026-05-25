@@ -117,7 +117,15 @@ pub struct StrikeMarket {
     pub vault_bump: u8,
     pub creator: Pubkey,
     pub pairs_outstanding: u64,
-    pub _reserved: [u8; 24],
+    /// DR-020 in-program CLOB trading gate (Keith's spec §4.3 `Market.order_book`).
+    /// Set by `grow_order_book` to the per-market `OrderBook` PDA address.
+    /// `Pubkey::default()` until `grow_order_book` runs — every trading ix
+    /// requires `strike_market.order_book == order_book.key()` to reject
+    /// trading on a strike whose book isn't fully allocated. Backward-compat
+    /// note: the 7 legacy META markets (deploy_index=6, ~333-byte schema)
+    /// won't deserialize against the new ~349-byte schema — acceptable per
+    /// Cory's "devnet only, nothing in use" green-light on this dispatch.
+    pub order_book: Pubkey,
 }
 
 impl StrikeMarket {
@@ -139,7 +147,7 @@ impl StrikeMarket {
         + 1 + 1 + 1 + 1 // bumps
         + 32 // creator (DR-005)
         + 8  // pairs_outstanding (DR-008 / P4)
-        + 24; // _reserved (was 64; -32 creator, -8 pairs_outstanding)
+        + 32; // order_book (DR-020 — replaced 24-byte _reserved)
 }
 
 // ─── TickerConfig (DR-005 / DR-006) ─────────────────────────────────────────
@@ -439,3 +447,139 @@ impl LeaderboardCommitments {
 // (kickoff §4.11). P3 introduces it as `#[account(zero_copy)]` + `repr(C)`
 // + `AccountLoader<'info, T>` accessor so the struct stays in mapped memory
 // and never enters the stack.
+
+// ─── DR-020 — In-program CLOB (Keith's reference adapted) ───────────────────
+//
+// Per DR-020 + docs/architecture/reference-clob-decisions.md, we adopt Keith's
+// bounded-array CLOB with two-instruction creation (init_order_book +
+// grow_order_book to dodge Solana's MAX_PERMITTED_DATA_INCREASE = 10_240 B/ix
+// cap on the ~14.7 KB OrderBook PDA).
+//
+// **Trading gate** — `StrikeMarket.order_book` is written by `grow_order_book`
+// to the per-market `OrderBook` PDA address. Trading ixs require both the
+// PDA seed constraint at `[ORDER_BOOK_SEED, strike_market.key()]` AND
+// `strike_market.order_book == order_book.key()` — defense in depth (the seed
+// check catches malicious caller-supplied pubkeys; the field check enforces
+// "grow_order_book has actually run" because the field is `Pubkey::default()`
+// until then).
+
+pub const ORDER_BOOK_SEED: &[u8] = b"order_book";
+pub const USDC_ESCROW_SEED: &[u8] = b"usdc_escrow";
+pub const YES_ESCROW_SEED: &[u8] = b"yes_escrow";
+
+/// Resting order capacity per side per market. Per ADR-002b: bounded array
+/// is a documented demo limitation; production path is a slab structure.
+/// 128 = Keith's reference. Each side at 128 × 57 B = 7,296 B; both sides
+/// = 14,592 B. Plus head fields → `OrderBook::LEN` = 14,691 B (just under the
+/// ~14.9 KB Keith's spec assumed; difference is `bids_len`/`asks_len` u16s
+/// vs his `Order.active` flag approach).
+pub const ORDERBOOK_N: usize = 128;
+
+/// USDC base units per $1.00 of YES (= per 1 unit of pair). Phoenix-equivalent
+/// PRICE_SCALE. Allows price granularity of ~0.0001 USDC per YES.
+pub const PRICE_SCALE: u64 = 1_000_000;
+
+/// `init_order_book` allocates THIS many bytes. < MAX_PERMITTED_DATA_INCREASE
+/// (10,240) so it succeeds in one ix. `grow_order_book` reallocs the remaining
+/// ~4,683 bytes to reach OrderBook::LEN.
+pub const ORDER_BOOK_INIT_ALLOC: usize = 10_000;
+
+/// Side discriminator on `Order.side`.
+pub const SIDE_BID: u8 = 0;
+pub const SIDE_ASK: u8 = 1;
+
+/// One resting order. `#[zero_copy]` + `#[repr(C)]` for stack-safety —
+/// avoids the §4.11 BPF stack overflow that a borsh-deserialized
+/// `[Order; 128]` would trigger inside Anchor's `try_accounts`.
+///
+/// Size = 64 bytes (with 7-byte explicit pad to make `[Order; N]` Pod-safe).
+/// Time priority comes from `seq` (monotonic from `OrderBook.next_seq` at
+/// place time).
+///
+/// **No `escrow_amount` field** — escrow is computed at every point from
+/// `price` + `size` via `matching::bid_cost_ceil` and `matching::fill_usdc`.
+/// The telescoping property means escrow drains to exactly 0 on full fill
+/// with no dust. See `matching::fill_usdc` doc.
+#[zero_copy]
+#[repr(C)]
+#[derive(Debug, PartialEq, Eq, Default)]
+pub struct Order {
+    pub owner: Pubkey, // 32, align 1
+    pub price: u64,    // 8,  align 8
+    pub size: u64,     // 8,  align 8
+    pub seq: u64,      // 8,  align 8
+    pub side: u8,      // 1
+    pub _pad: [u8; 7], // 7 — align next array slot to 8 (Pod requirement)
+}
+
+impl Order {
+    /// 32 + 8 + 8 + 8 + 1 + 7 = 64 bytes (Pod-aligned).
+    pub const LEN: usize = 64;
+}
+
+/// Per-market on-chain order book. PDA seed = `[ORDER_BOOK_SEED, strike_market]`.
+/// `#[account(zero_copy)]` + `#[repr(C)]` + `AccountLoader` — the 14.7 KB
+/// account never enters the BPF stack (§4.11). Field order is largest-first
+/// to keep natural alignment without implicit padding (bytemuck::Pod
+/// requirement).
+///
+/// **Layout (no implicit padding):**
+///
+/// | Offset | Field | Size | Align |
+/// |---|---|---|---|
+/// | 0 | discriminator (Anchor) | 8 | 1 |
+/// | 8 | market | 32 | 1 |
+/// | 40 | next_seq | 8 | 8 |
+/// | 48 | bids[128] | 8192 | 8 |
+/// | 8240 | asks[128] | 8192 | 8 |
+/// | 16432 | bids_len | 2 | 2 |
+/// | 16434 | asks_len | 2 | 2 |
+/// | 16436 | bump | 1 | 1 |
+/// | 16437 | _reserved[11] | 11 | 1 |
+/// | 16448 | end (size-aligned to 8) | — | — |
+///
+/// **Two-instruction creation** (Keith's spec): `init_order_book` allocates
+/// `ORDER_BOOK_INIT_ALLOC` payload (10,000 + 8 disc = 10,008 bytes), under
+/// the `MAX_PERMITTED_DATA_INCREASE` cap. `grow_order_book` reallocs the
+/// remaining ~6,440 bytes (10_008 → 16_448) — also under the cap.
+///
+/// Pre-grow, `AccountLoader::load()` fails because the buffer is smaller
+/// than the type — natural trading gate. Post-grow, `load()` / `load_mut()`
+/// succeed and trading is open.
+///
+/// **Garbage bytes in unused tail slots** (Solana doesn't zero realloc'd
+/// bytes per Keith's L-5) are never observed: all reads gate on
+/// `bids_len` / `asks_len` (zero at init time, bumped only by genuine
+/// `place_order` writes).
+#[account(zero_copy)]
+#[repr(C)]
+pub struct OrderBook {
+    /// Back-reference to the StrikeMarket this book serves.
+    pub market: Pubkey, // 32
+    /// Monotonic counter for time priority.
+    pub next_seq: u64, // 8 — placed early to keep alignment after Pubkey
+    /// Sorted price-desc, then seq-asc. `bids[0]` = best (highest price).
+    pub bids: [Order; ORDERBOOK_N],
+    /// Sorted price-asc, then seq-asc. `asks[0]` = best (lowest price).
+    pub asks: [Order; ORDERBOOK_N],
+    /// Number of valid (non-garbage) Orders at the head of `bids`.
+    /// `bids[..bids_len]` is the active set.
+    pub bids_len: u16, // 2
+    /// Same for asks.
+    pub asks_len: u16, // 2
+    pub bump: u8,            // 1
+    pub _reserved: [u8; 11], // 11 — pad to 8-byte struct alignment
+}
+
+impl OrderBook {
+    /// 8 (disc) + 32 + 8 + (64 × 128) + (64 × 128) + 2 + 2 + 1 + 11 = 16,448 bytes.
+    pub const LEN: usize = 8
+        + 32                                // market
+        + 8                                 // next_seq
+        + Order::LEN * ORDERBOOK_N          // bids
+        + Order::LEN * ORDERBOOK_N          // asks
+        + 2                                 // bids_len
+        + 2                                 // asks_len
+        + 1                                 // bump
+        + 11;                               // _reserved
+}
