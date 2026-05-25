@@ -1,56 +1,75 @@
-import {
-  createAssociatedTokenAccountIdempotentInstruction,
-  getAssociatedTokenAddressSync,
-} from "@solana/spl-token";
-import {
+import type { Program, Idl } from "@coral-xyz/anchor";
+import type {
   PublicKey,
   Transaction,
-  type TransactionInstruction,
 } from "@solana/web3.js";
-import type { MarketState } from "@ellipsis-labs/phoenix-sdk";
 
-import { PhoenixSide, buildPhoenixSwapIx } from "./phoenix";
+import {
+  SIDE_ASK,
+  type OrderBookAccount,
+  planFills,
+} from "@/lib/solana/order-book";
+import { buildPlaceOrderTx, type BuildPlaceOrderResult } from "./build-place-order";
 
 export interface BuildSellYesParams {
-  phoenixMarket: MarketState;
+  program: Program<Idl>;
   trader: PublicKey;
-  /** Yes base lots to sell. */
-  numBaseLots: number;
-  /** Optional slippage floor: minimum USDC quote lots to receive. */
-  minQuoteLotsToFill?: number;
+  marketPda: PublicKey;
+  usdcMint: PublicKey;
+  /** Live OrderBook snapshot (required for crossing/market plans). */
+  book: OrderBookAccount | null;
+  /** YES base units to sell. */
+  size: bigint;
+  /**
+   * For limit: ask price in USDC base units per YES, range [1, PRICE_SCALE].
+   * For market: ignored on chain (pass 0n).
+   */
+  price: bigint;
+  isMarket: boolean;
 }
 
+export type BuildSellYesResult = BuildPlaceOrderResult & {
+  plannedFilled: bigint;
+  plannedRest: bigint;
+};
+
 /**
- * Build a single-instruction transaction that sells Yes tokens for USDC via
- * Phoenix IOC. Idempotent ATA-creation for USDC so first-time sellers'
- * proceeds land cleanly.
+ * Sell YES via the DR-020 in-program CLOB. Wraps `place_order` on the ask
+ * side. Escrow on chain = `size` YES tokens — refunded on cancel / unfilled
+ * market remainder.
  */
-export function buildSellYesTx(params: BuildSellYesParams): Transaction {
-  const { phoenixMarket, trader, numBaseLots, minQuoteLotsToFill } = params;
+export async function buildSellYesTx(
+  params: BuildSellYesParams,
+): Promise<Transaction> {
+  const built = await buildSellYesBuilt(params);
+  return built.tx;
+}
 
-  const quoteMint = phoenixMarket.data.header.quoteParams.mintKey;
-  const quoteAta = getAssociatedTokenAddressSync(quoteMint, trader, true);
+export async function buildSellYesBuilt(
+  params: BuildSellYesParams,
+): Promise<BuildSellYesResult> {
+  const { program, trader, marketPda, usdcMint, book, size, price, isMarket } =
+    params;
 
-  const prelude: TransactionInstruction[] = [
-    createAssociatedTokenAccountIdempotentInstruction(
-      trader,
-      quoteAta,
-      trader,
-      quoteMint,
-    ),
-  ];
+  const plan = book
+    ? planFills(book, SIDE_ASK, price, size, isMarket)
+    : { fills: [], totalFilled: 0n, remaining: size };
 
-  const swap = buildPhoenixSwapIx({
-    market: phoenixMarket,
+  const result = await buildPlaceOrderTx({
+    program,
     trader,
-    side: PhoenixSide.Ask,
-    numBaseLots,
-    numQuoteLots: 0,
-    minQuoteLotsToFill,
+    marketPda,
+    usdcMint,
+    side: SIDE_ASK,
+    price,
+    size,
+    isMarket,
+    plannedFills: plan.fills,
   });
 
-  const tx = new Transaction();
-  for (const p of prelude) tx.add(p);
-  tx.add(swap);
-  return tx;
+  return {
+    ...result,
+    plannedFilled: plan.totalFilled,
+    plannedRest: isMarket ? 0n : plan.remaining,
+  };
 }
