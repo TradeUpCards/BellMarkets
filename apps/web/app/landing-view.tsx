@@ -212,7 +212,7 @@ export function LandingView() {
                     Daily binary outcomes on the names you watch
                   </div>
                   <div className="hero-sub">
-                    Pick a strike. Pick YES or NO. $1 USDC payouts settled
+                    Pick a strike. Pick YES or NO. $1 bUSDC payouts settled
                     on-chain by Pyth at 4 PM ET. Non-custodial — you never
                     hand over a key.
                   </div>
@@ -383,7 +383,7 @@ export function LandingView() {
                   <div className="contest-title">NVDA Earnings Surge</div>
                   <span className="contest-status mono">3d left</span>
                 </div>
-                <div className="contest-pool mono">$3,400 USDC prize pool</div>
+                <div className="contest-pool mono">$3,400 bUSDC prize pool</div>
                 <div className="contest-meta">
                   <span>187 entries</span>
                   <button type="button" className="link">join →</button>
@@ -394,7 +394,7 @@ export function LandingView() {
                   <div className="contest-title">May Top-10</div>
                   <span className="contest-status mono">8d left</span>
                 </div>
-                <div className="contest-pool mono">$12,500 USDC prize pool</div>
+                <div className="contest-pool mono">$12,500 bUSDC prize pool</div>
                 <div className="contest-meta">
                   <span>You · #5</span>
                   <button type="button" className="link">view →</button>
@@ -405,7 +405,7 @@ export function LandingView() {
                   <div className="contest-title">Daily Sharpshooter</div>
                   <span className="contest-status mono">14h left</span>
                 </div>
-                <div className="contest-pool mono">$420 USDC prize pool</div>
+                <div className="contest-pool mono">$420 bUSDC prize pool</div>
                 <div className="contest-meta">
                   <span>42 entries</span>
                   <button type="button" className="link">join →</button>
@@ -511,7 +511,7 @@ export function LandingView() {
               <div className="how-step-num mono">02</div>
               <div className="how-step-title">Buy YES or NO</div>
               <div className="how-step-body">
-                Each $1 USDC mints 1 YES + 1 NO contract. Trade the side you
+                Each $1 bUSDC mints 1 YES + 1 NO contract. Trade the side you
                 believe in; the other side is the opposite bet.
               </div>
             </div>
@@ -528,7 +528,7 @@ export function LandingView() {
               <div className="how-step-num mono">04</div>
               <div className="how-step-title">Redeem winners</div>
               <div className="how-step-body">
-                Holders of the winning side burn their contracts for $1 USDC
+                Holders of the winning side burn their contracts for $1 bUSDC
                 each. Losers expire worthless. Non-custodial throughout —
                 you keep your keys.
               </div>

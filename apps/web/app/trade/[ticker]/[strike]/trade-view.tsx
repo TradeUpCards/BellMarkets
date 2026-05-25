@@ -167,7 +167,7 @@ export function TradeView({ ticker, strike }: TradeViewParams) {
     if (buy.contracts === 0)
       return `Amount too small to buy 1 contract at ${fmtUsd(ask, 3)}.`;
     if (buy.total > usdcAvail)
-      return `Order total ${fmtUsd(buy.total)} exceeds your ${fmtUsd(usdcAvail)} available USDC.`;
+      return `Order total ${fmtUsd(buy.total)} exceeds your ${fmtUsd(usdcAvail)} available bUSDC.`;
     return null;
   }, [side, buy.contracts, buy.total, ask, usdcAvail]);
 
@@ -290,7 +290,7 @@ export function TradeView({ ticker, strike }: TradeViewParams) {
       ? `${fmtUsd(usdcAvail)} avail`
       : `${pos.contracts} owned · avg ${fmtUsd(pos.avgEntry, 2)}`;
   const inputSuffix =
-    side === "buy" ? (unit === "usdc" ? "USDC" : outcome.toUpperCase()) : outcome.toUpperCase();
+    side === "buy" ? (unit === "usdc" ? "bUSDC" : outcome.toUpperCase()) : outcome.toUpperCase();
   const sbAction = side.toUpperCase();
   const sbDetail =
     side === "buy"
@@ -471,7 +471,7 @@ export function TradeView({ ticker, strike }: TradeViewParams) {
                                   onClick={() => handleUnitSwap("usdc")}
                                   type="button"
                                 >
-                                  USDC
+                                  bUSDC
                                 </button>
                                 <button
                                   className={`unit-btn${unit === "contracts" ? " active" : ""}`}
@@ -531,7 +531,7 @@ export function TradeView({ ticker, strike }: TradeViewParams) {
                                 max="0.99"
                                 inputMode="decimal"
                               />
-                              <span className="suffix">USDC</span>
+                              <span className="suffix">bUSDC</span>
                             </div>
                             <div className="quick-amounts">
                               <button

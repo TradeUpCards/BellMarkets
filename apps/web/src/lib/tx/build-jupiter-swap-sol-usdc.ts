@@ -4,7 +4,17 @@ import {
   type Connection,
 } from "@solana/web3.js";
 
-/** Circle's devnet USDC mint — the same one BellMarkets binds at `MarketConfig.usdc_mint`. */
+/**
+ * Circle's devnet USDC mint.
+ *
+ * NOTE (DR-020, 2026-05-24): this file is DORMANT. BellMarkets no longer
+ * binds to Circle USDC — `MarketConfig.usdc_mint` now points at a
+ * self-controlled bUSDC mint (Bram's `mint-demo-usdc` CLI). Callers that
+ * need a USDC mint pubkey MUST read `useMarketConfig().usdcMint` instead of
+ * importing this constant. Kept here only as a record of the pre-pivot
+ * deploy-6 baseline; will be removed when the Jupiter onramp ships against
+ * the new mint (v2 candidate).
+ */
 export const USDC_DEVNET_MINT = new PublicKey(
   "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
 );
