@@ -29,8 +29,17 @@ import { useUserConfig } from "@/hooks/use-user-config";
 import { useBellProSubscription } from "@/hooks/use-bell-pro-subscription";
 import { useMarketConfig } from "@/hooks/use-market-config";
 import { useAllMarkets } from "@/hooks/use-all-markets";
+import { useOrderBook } from "@/hooks/use-order-book";
+import { usePosition } from "@/hooks/use-position";
 import { useBellMarketsProgram } from "@/lib/solana/anchor";
+import { outcomeTag } from "@/lib/solana/types";
+import { PRICE_SCALE } from "@/lib/solana/order-book";
 import { buildMintPairTx } from "@/lib/tx/build-mint-pair";
+import { buildBuyYesBuilt } from "@/lib/tx/build-buy-yes";
+import { buildSellYesBuilt } from "@/lib/tx/build-sell-yes";
+import { buildBuyNoTx, BuyNoIocError } from "@/lib/tx/build-buy-no";
+import { buildSellNoTx, SellNoIocError } from "@/lib/tx/build-sell-no";
+import { buildRedeemPairTx } from "@/lib/tx/build-redeem-pair";
 
 export interface TradeViewParams {
   ticker: string;
@@ -107,28 +116,164 @@ export function TradeView({ ticker, strike }: TradeViewParams) {
     );
   }, [allMarkets, strikeNum]);
 
-  // STATIC FIXTURE — wire to usePosition(wallet, liveMarket.pda) once cost-basis tracking lands.
-  // Today the on-chain side only stores current balances; cost basis comes from an off-chain
-  // tx history index (Bram's indexer scope).
-  const position = useMemo(
-    () => ({
-      yes: { contracts: 5, avgEntry: 0.62, costBasis: 3.10 },
-      no: { contracts: 0, avgEntry: 0, costBasis: 0 },
-    }),
-    [],
+  // Live YES + NO balances. Cost basis is still 0 — needs Bram's tx-history
+  // indexer to compute (DR-010 indexer scope). Showing real contract counts +
+  // 0 cost basis is honest; faking entry prices would be a worse demo.
+  const livePosition = usePosition(
+    wallet.publicKey ?? null,
+    liveMarket?.pda ?? null,
   );
 
+  // YES + NO mints are 6 decimals just like USDC; 1e6 raw = one macro contract.
+  const TOKEN_SCALE = 1_000_000n;
+  const yesContracts = livePosition.data
+    ? Number(livePosition.data.yesBalance / TOKEN_SCALE)
+    : 0;
+  const noContracts = livePosition.data
+    ? Number(livePosition.data.noBalance / TOKEN_SCALE)
+    : 0;
+
+  // Matched / directional decomposition (Hard YES #8 §6.1 + DR-020 disable
+  // matrix). Matched pairs aren't a sellable directional position — they're
+  // recoverable via redeem_pair for $1 each.
+  const matchedPairs = Math.min(yesContracts, noContracts);
+  const directionalYes = Math.max(0, yesContracts - noContracts);
+  const directionalNo = Math.max(0, noContracts - yesContracts);
+
+  const position = useMemo(
+    () => ({
+      yes: { contracts: directionalYes, avgEntry: 0, costBasis: 0 },
+      no: { contracts: directionalNo, avgEntry: 0, costBasis: 0 },
+    }),
+    [directionalYes, directionalNo],
+  );
+
+  // Live on-chain order book (DR-020 in-program CLOB). Drives both the
+  // pre-flight disable matrix and the off-chain plan_fills inside the
+  // builders.
+  const { data: bookSnapshot } = useOrderBook(liveMarket?.pda ?? null);
+  const book = bookSnapshot?.raw ?? null;
+  const yesAsks = bookSnapshot?.book?.asks ?? [];
+  const yesBids = bookSnapshot?.book?.bids ?? [];
+  const bookUninitialized = bookSnapshot?.uninitialized ?? true;
+
+  // Market settled / paused → all trade actions disabled.
+  const marketSettled = liveMarket
+    ? outcomeTag(liveMarket.data.outcome) !== "unsettled"
+    : false;
+  const marketPaused = marketConfig?.paused === true;
+
+  // Trading gate: `strike_market.order_book == Pubkey::default()` until
+  // `grow_order_book` runs. Catches the "init only, not grown" half-state.
+  const orderBookBound = useMemo(() => {
+    if (!liveMarket) return false;
+    const ob = liveMarket.data.orderBook;
+    if (!ob) return false;
+    return !ob.equals(PublicKey.default);
+  }, [liveMarket]);
+
+  // DR-019: NO-side trades are market-only. Snap orderType back to Market if
+  // the user flipped outcome to NO while Limit was selected.
+  useEffect(() => {
+    if (outcome === "no" && orderType === "limit") {
+      setOrderType("market");
+    }
+  }, [outcome, orderType]);
+
   // ─── Derived ────────────────────────────────────────────────────────────
-  const opp: Outcome = outcome === "yes" ? "no" : "yes";
   const pos = position[outcome];
 
-  const ask = outcome === "yes" ? PRICE_YES_ASK : PRICE_NO_ASK;
-  const bid = outcome === "yes" ? PRICE_YES_BID : PRICE_NO_BID;
+  // Prefer live book prices; fall back to mockup constants for visual
+  // continuity when the book is empty (the disable matrix prevents the user
+  // from acting on the fallback prices).
+  const liveYesAsk = yesAsks[0]?.price;
+  const liveYesBid = yesBids[0]?.price;
+  const liveNoAsk =
+    liveYesBid !== undefined ? 1 - liveYesBid : undefined;
+  const liveNoBid =
+    liveYesAsk !== undefined ? 1 - liveYesAsk : undefined;
+
+  const ask =
+    outcome === "yes"
+      ? liveYesAsk ?? PRICE_YES_ASK
+      : liveNoAsk ?? PRICE_NO_ASK;
+  const bid =
+    outcome === "yes"
+      ? liveYesBid ?? PRICE_YES_BID
+      : liveNoBid ?? PRICE_NO_BID;
   const feeBps = userConfigDerived.projectedFeeBps || FEE_BPS_DEFAULT;
   const feeRatio = feeBps / 10_000;
   const usdcAvail = USDC_AVAIL_FALLBACK; // TODO: useTokenBalance(usdcAta)
 
   const sellEmpty = side === "sell" && pos.contracts === 0;
+
+  // ─── Pre-flight disable matrix (P5) ─────────────────────────────────────
+  // Single derived reason — gates the submit button + surfaces in-band.
+  const disableReason: string | null = useMemo(() => {
+    if (!liveMarket) {
+      return `No on-chain StrikeMarket for ${tickerUpper} @ $${strikeNum}.`;
+    }
+    if (marketSettled) return "Market settled — use Redeem for winnings.";
+    if (marketPaused) return "Market paused by admin.";
+    if (!orderBookBound) {
+      return "Order book not yet bound — init_order_book + grow_order_book need to run on this strike.";
+    }
+    if (bookUninitialized) {
+      return "Order book account missing or pre-grow — trading gate closed on chain.";
+    }
+    // DR-019 fallback guard (useEffect should have already flipped this).
+    if (outcome === "no" && orderType === "limit") {
+      return "Limit Buy/Sell NO coming in v1.5 — use Market for now.";
+    }
+    // Hard YES #8: position-exclusivity on directional holdings.
+    if (side === "buy" && outcome === "yes" && directionalNo > 0) {
+      return `You hold ${directionalNo} directional NO — close those (Sell NO) before buying YES.`;
+    }
+    if (side === "buy" && outcome === "no" && directionalYes > 0) {
+      return `You hold ${directionalYes} directional YES — close those (Sell YES) before buying NO.`;
+    }
+    if (side === "buy" && outcome === "yes") {
+      // Market falls back to mint_pair if no YES asks — always allowed.
+      if (orderType === "limit") return null;
+      return null;
+    }
+    if (side === "sell" && outcome === "yes") {
+      if (directionalYes === 0) return "You hold no YES contracts to sell.";
+      if (orderType === "market" && yesBids.length === 0) {
+        return "No YES bids — wait for a buyer or place a Limit Sell.";
+      }
+      return null;
+    }
+    if (side === "buy" && outcome === "no") {
+      if (yesBids.length === 0) {
+        return "Empty YES bid book — atomic Buy NO would strand on the place_order leg.";
+      }
+      return null;
+    }
+    if (side === "sell" && outcome === "no") {
+      if (directionalNo === 0) return "You hold no NO contracts to sell.";
+      if (yesAsks.length === 0) {
+        return "Empty YES ask book — atomic Sell NO would revert on the place_order leg.";
+      }
+      return null;
+    }
+    return null;
+  }, [
+    liveMarket,
+    tickerUpper,
+    strikeNum,
+    marketSettled,
+    marketPaused,
+    orderBookBound,
+    bookUninitialized,
+    outcome,
+    orderType,
+    side,
+    directionalYes,
+    directionalNo,
+    yesAsks.length,
+    yesBids.length,
+  ]);
 
   // BUY compute
   const buy = useMemo(() => {
@@ -167,7 +312,7 @@ export function TradeView({ ticker, strike }: TradeViewParams) {
     if (buy.contracts === 0)
       return `Amount too small to buy 1 contract at ${fmtUsd(ask, 3)}.`;
     if (buy.total > usdcAvail)
-      return `Order total ${fmtUsd(buy.total)} exceeds your ${fmtUsd(usdcAvail)} available USDC.`;
+      return `Order total ${fmtUsd(buy.total)} exceeds your ${fmtUsd(usdcAvail)} available bUSDC.`;
     return null;
   }, [side, buy.contracts, buy.total, ask, usdcAvail]);
 
@@ -211,6 +356,14 @@ export function TradeView({ ticker, strike }: TradeViewParams) {
   const [submitting, setSubmitting] = useState(false);
   const [submitResult, setSubmitResult] = useState<{ ok: boolean; msg: string } | null>(null);
 
+  const broadcast = async (tx: Transaction): Promise<string> => {
+    if (!wallet.publicKey) throw new Error("wallet disconnected");
+    const { blockhash } = await connection.getLatestBlockhash("confirmed");
+    tx.recentBlockhash = blockhash;
+    tx.feePayer = wallet.publicKey;
+    return wallet.sendTransaction(tx, connection, { skipPreflight: false });
+  };
+
   const handleSubmit = async () => {
     setSubmitResult(null);
     if (!wallet.publicKey || !wallet.signTransaction) {
@@ -221,25 +374,6 @@ export function TradeView({ ticker, strike }: TradeViewParams) {
       setSubmitResult({ ok: false, msg: "Anchor program loading — wait a beat." });
       return;
     }
-    if (sellEmpty) {
-      setSubmitResult({ ok: false, msg: "No contracts to sell." });
-      return;
-    }
-
-    // v1 demo enables Buy×Yes via mint_pair. The atomic Buy×No / Sell×Yes
-    // / Sell×No flows require a loaded Phoenix MarketState — Phoenix is not
-    // yet bound to BellMarkets strikes on devnet (mint-mismatch flag, Day-3
-    // handoff). Surface a clear "Phoenix CLOB pending" message rather than
-    // pretend to submit.
-    if (!(side === "buy" && outcome === "yes")) {
-      setSubmitResult({
-        ok: false,
-        msg:
-          "Phoenix CLOB binding pending — Buy YES via mint_pair is the live demo path. The other three actions ship in v1.1.",
-      });
-      return;
-    }
-
     if (!marketConfig) {
       setSubmitResult({ ok: false, msg: "Market config loading — wait a beat." });
       return;
@@ -251,27 +385,165 @@ export function TradeView({ ticker, strike }: TradeViewParams) {
       });
       return;
     }
+    if (disableReason) {
+      setSubmitResult({ ok: false, msg: disableReason });
+      return;
+    }
 
     setSubmitting(true);
     try {
-      const contractAmount = BigInt(Math.max(1, buy.contracts));
-      const built = await buildMintPairTx({
-        program,
-        user: wallet.publicKey,
-        marketPda: liveMarket.pda,
-        usdcMint: marketConfig.usdcMint,
-        treasury: marketConfig.treasury,
-        amount: contractAmount * 1_000_000n, // mint_pair takes USDC micros = pair count
-      });
-      const { blockhash } = await connection.getLatestBlockhash("confirmed");
-      built.tx.recentBlockhash = blockhash;
-      built.tx.feePayer = wallet.publicKey;
-      const sig = await wallet.sendTransaction(built.tx, connection, {
-        skipPreflight: false,
-      });
+      const trader = wallet.publicKey;
+      const marketPda = liveMarket.pda;
+      const usdcMint = marketConfig.usdcMint;
+      const treasury = marketConfig.treasury;
+      let tx: Transaction;
+
+      if (side === "buy" && outcome === "yes") {
+        // Buy YES: prefer the CLOB if asks exist; else mint_pair fallback so
+        // the load-bearing v1 demo path always works.
+        const macroSize = BigInt(Math.max(1, buy.contracts));
+        const sizeBase = macroSize * TOKEN_SCALE;
+        if (orderType === "market" && yesAsks.length > 0 && book) {
+          const built = await buildBuyYesBuilt({
+            program,
+            trader,
+            marketPda,
+            usdcMint,
+            book,
+            size: sizeBase,
+            price: 0n,
+            isMarket: true,
+          });
+          tx = built.tx;
+        } else if (orderType === "limit") {
+          // Price in dollars → USDC base units per YES.
+          const priceFloat = parseFloat(limitPrice) || 0;
+          const priceBase = BigInt(Math.round(priceFloat * Number(PRICE_SCALE)));
+          const qtyMacro = BigInt(Math.max(1, parseInt(limitQty, 10) || 0));
+          const built = await buildBuyYesBuilt({
+            program,
+            trader,
+            marketPda,
+            usdcMint,
+            book,
+            size: qtyMacro * TOKEN_SCALE,
+            price: priceBase,
+            isMarket: false,
+          });
+          tx = built.tx;
+        } else {
+          // mint_pair fallback (no asks or no book) — always works.
+          const built = await buildMintPairTx({
+            program,
+            user: trader,
+            marketPda,
+            usdcMint,
+            treasury,
+            amount: sizeBase,
+          });
+          tx = built.tx;
+        }
+      } else if (side === "sell" && outcome === "yes") {
+        const macroSize = BigInt(Math.max(1, sell.sellCount));
+        const sizeBase = macroSize * TOKEN_SCALE;
+        if (orderType === "limit") {
+          const priceFloat = parseFloat(limitPrice) || 0;
+          const priceBase = BigInt(Math.round(priceFloat * Number(PRICE_SCALE)));
+          const qtyMacro = BigInt(Math.max(1, parseInt(limitQty, 10) || 0));
+          const built = await buildSellYesBuilt({
+            program,
+            trader,
+            marketPda,
+            usdcMint,
+            book,
+            size: qtyMacro * TOKEN_SCALE,
+            price: priceBase,
+            isMarket: false,
+          });
+          tx = built.tx;
+        } else {
+          const built = await buildSellYesBuilt({
+            program,
+            trader,
+            marketPda,
+            usdcMint,
+            book,
+            size: sizeBase,
+            price: 0n,
+            isMarket: true,
+          });
+          tx = built.tx;
+        }
+      } else if (side === "buy" && outcome === "no") {
+        // DR-019: NO is market-only. Atomic mint_pair + place_order(ASK, market).
+        const macroSize = BigInt(Math.max(1, buy.contracts));
+        const built = await buildBuyNoTx({
+          program,
+          trader,
+          marketPda,
+          usdcMint,
+          treasury,
+          book,
+          amount: macroSize * TOKEN_SCALE,
+        });
+        tx = built.tx;
+      } else {
+        // Sell NO: atomic place_order(BID, market) + redeem_pair.
+        const macroSize = BigInt(Math.max(1, sell.sellCount));
+        const built = await buildSellNoTx({
+          program,
+          trader,
+          marketPda,
+          usdcMint,
+          book,
+          amount: macroSize * TOKEN_SCALE,
+        });
+        tx = built.tx;
+      }
+
+      const sig = await broadcast(tx);
       setSubmitResult({
         ok: true,
         msg: `Submitted! ${sig.slice(0, 16)}… (confirming)`,
+      });
+    } catch (err) {
+      // Builder-thrown IOC errors are first-class: surface their precise
+      // required vs available numbers instead of a bare exception string.
+      if (err instanceof BuyNoIocError || err instanceof SellNoIocError) {
+        setSubmitResult({ ok: false, msg: err.message });
+      } else {
+        setSubmitResult({
+          ok: false,
+          msg: err instanceof Error ? err.message : String(err),
+        });
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // ─── Redeem Pair (P5) ───────────────────────────────────────────────────
+  const [redeemingPair, setRedeemingPair] = useState(false);
+  const handleRedeemPair = async () => {
+    setSubmitResult(null);
+    if (!wallet.publicKey || !wallet.signTransaction) {
+      setSubmitResult({ ok: false, msg: "Connect a wallet to redeem." });
+      return;
+    }
+    if (!program || !marketConfig || !liveMarket || matchedPairs === 0) return;
+    setRedeemingPair(true);
+    try {
+      const built = await buildRedeemPairTx({
+        program,
+        trader: wallet.publicKey,
+        marketPda: liveMarket.pda,
+        usdcMint: marketConfig.usdcMint,
+        amount: BigInt(matchedPairs) * TOKEN_SCALE,
+      });
+      const sig = await broadcast(built.tx);
+      setSubmitResult({
+        ok: true,
+        msg: `Redeemed ${matchedPairs} pair${matchedPairs === 1 ? "" : "s"} — ${sig.slice(0, 16)}…`,
       });
     } catch (err) {
       setSubmitResult({
@@ -279,7 +551,7 @@ export function TradeView({ ticker, strike }: TradeViewParams) {
         msg: err instanceof Error ? err.message : String(err),
       });
     } finally {
-      setSubmitting(false);
+      setRedeemingPair(false);
     }
   };
 
@@ -290,7 +562,7 @@ export function TradeView({ ticker, strike }: TradeViewParams) {
       ? `${fmtUsd(usdcAvail)} avail`
       : `${pos.contracts} owned · avg ${fmtUsd(pos.avgEntry, 2)}`;
   const inputSuffix =
-    side === "buy" ? (unit === "usdc" ? "USDC" : outcome.toUpperCase()) : outcome.toUpperCase();
+    side === "buy" ? (unit === "usdc" ? "bUSDC" : outcome.toUpperCase()) : outcome.toUpperCase();
   const sbAction = side.toUpperCase();
   const sbDetail =
     side === "buy"
@@ -373,6 +645,45 @@ export function TradeView({ ticker, strike }: TradeViewParams) {
             </div>
 
             <aside className="right-col">
+              {matchedPairs > 0 && (
+                <div
+                  className="stranded-pair-banner"
+                  data-matched-pairs={matchedPairs}
+                  style={{
+                    padding: 12,
+                    marginBottom: 12,
+                    border: "1px solid var(--bell-amber, #f59e0b)",
+                    background: "rgba(245, 158, 11, 0.08)",
+                    borderRadius: 6,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
+                  }}
+                >
+                  <div style={{ fontSize: 13, lineHeight: 1.5 }}>
+                    <strong>Matched pair{matchedPairs === 1 ? "" : "s"} detected.</strong>{" "}
+                    You hold {matchedPairs} matched YES+NO pair
+                    {matchedPairs === 1 ? "" : "s"} for this strike — click
+                    Redeem Pair to recover ${matchedPairs.toFixed(2)} bUSDC, or
+                    trade your directional position normally.
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleRedeemPair}
+                    disabled={redeemingPair || !program || !marketConfig}
+                    className="submit-btn primary-cta"
+                    style={{
+                      alignSelf: "flex-start",
+                      padding: "6px 14px",
+                      fontSize: 13,
+                    }}
+                  >
+                    {redeemingPair
+                      ? "Redeeming…"
+                      : `Redeem ${matchedPairs} Pair${matchedPairs === 1 ? "" : "s"} → $${matchedPairs.toFixed(2)}`}
+                  </button>
+                </div>
+              )}
               <div
                 className="trade-card"
                 data-side={side}
@@ -426,10 +737,24 @@ export function TradeView({ ticker, strike }: TradeViewParams) {
                     >
                       Market
                     </button>
+                    {/* DR-019: Limit Buy/Sell NO deferred to v1.5 — disable
+                        on NO outcome with a tooltip. The useEffect above
+                        also snaps the toggle back to Market if state races. */}
                     <button
                       className={`order-type-btn${orderType === "limit" ? " active" : ""}`}
-                      onClick={() => setOrderType("limit")}
+                      onClick={() => outcome === "yes" && setOrderType("limit")}
                       type="button"
+                      disabled={outcome === "no"}
+                      title={
+                        outcome === "no"
+                          ? "Limit Buy/Sell NO coming in v1.5 — use Market for now."
+                          : undefined
+                      }
+                      style={
+                        outcome === "no"
+                          ? { opacity: 0.4, cursor: "not-allowed" }
+                          : undefined
+                      }
                     >
                       Limit
                     </button>
@@ -471,7 +796,7 @@ export function TradeView({ ticker, strike }: TradeViewParams) {
                                   onClick={() => handleUnitSwap("usdc")}
                                   type="button"
                                 >
-                                  USDC
+                                  bUSDC
                                 </button>
                                 <button
                                   className={`unit-btn${unit === "contracts" ? " active" : ""}`}
@@ -531,7 +856,7 @@ export function TradeView({ ticker, strike }: TradeViewParams) {
                                 max="0.99"
                                 inputMode="decimal"
                               />
-                              <span className="suffix">USDC</span>
+                              <span className="suffix">bUSDC</span>
                             </div>
                             <div className="quick-amounts">
                               <button
@@ -649,14 +974,29 @@ export function TradeView({ ticker, strike }: TradeViewParams) {
 
                       <button
                         className={`submit-btn primary-cta ${outcome === "yes" ? "yes" : "no"}`}
-                        disabled={!!fundsWarning || submitting}
+                        disabled={
+                          !!fundsWarning ||
+                          !!disableReason ||
+                          submitting
+                        }
                         onClick={handleSubmit}
                         type="button"
+                        title={disableReason ?? undefined}
                       >
                         <span className="sb-action">{sbAction}</span>
                         <span className={`sb-outcome ${outcome}`}>{outcome.toUpperCase()}</span>
                         <span className="sb-detail">{sbDetail}</span>
                       </button>
+                      {disableReason && !fundsWarning && (
+                        <div
+                          className="funds-warning"
+                          style={{ marginTop: 8 }}
+                          data-disable-reason
+                        >
+                          <span aria-hidden="true">⚠</span>
+                          <span>{disableReason}</span>
+                        </div>
+                      )}
 
                       {submitResult && (
                         <div
@@ -739,7 +1079,7 @@ export function TradeView({ ticker, strike }: TradeViewParams) {
                 </div>
               </div>
 
-              <OrderBookCard />
+              <OrderBookCard yesAsks={yesAsks} yesBids={yesBids} />
             </aside>
           </div>
         </main>
@@ -1087,8 +1427,74 @@ function OpenOrdersTrades() {
   );
 }
 
-function OrderBookCard() {
+interface OrderBookLevelLike {
+  price: number;
+  quantity: number;
+}
+
+interface OrderBookCardProps {
+  yesAsks: OrderBookLevelLike[];
+  yesBids: OrderBookLevelLike[];
+}
+
+interface BookRow {
+  price: number;
+  size: number;
+  total: number;
+  depthPct: number;
+}
+
+function buildRows(levels: OrderBookLevelLike[]): BookRow[] {
+  if (levels.length === 0) return [];
+  // Cumulative total (depth at this level + worse).
+  let cum = 0;
+  const totals = levels.map((l) => {
+    cum += l.quantity;
+    return cum;
+  });
+  const max = totals[totals.length - 1] ?? 1;
+  return levels.map((l, i) => ({
+    price: l.price,
+    size: l.quantity,
+    total: totals[i] ?? 0,
+    depthPct: max > 0 ? Math.min(100, Math.round(((totals[i] ?? 0) / max) * 100)) : 0,
+  }));
+}
+
+const fmtPrice = (n: number) => n.toFixed(3);
+const fmtSize = (n: number) =>
+  n >= 1000 ? n.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ",") : n.toFixed(0);
+
+function OrderBookCard({ yesAsks, yesBids }: OrderBookCardProps) {
   const [view, setView] = useState<"yes" | "no" | "both">("both");
+
+  // YES is the on-chain single source of truth. NO mirror: invert price
+  // (1 - p) and reverse semantics — selling-NO maps to buying-YES + redeem_pair,
+  // so a YES ASK at $0.55 implies a NO BID at $0.45 (and vice versa).
+  const yesAskRows = buildRows(yesAsks);
+  const yesBidRows = buildRows(yesBids);
+
+  const noBidRows = yesAsks.map((l) => ({ price: 1 - l.price, quantity: l.quantity }));
+  const noAskRows = yesBids.map((l) => ({ price: 1 - l.price, quantity: l.quantity }));
+  // NO asks should be sorted asc by price; NO bids desc.
+  noAskRows.sort((a, b) => a.price - b.price);
+  noBidRows.sort((a, b) => b.price - a.price);
+  const noAskBuilt = buildRows(noAskRows);
+  const noBidBuilt = buildRows(noBidRows);
+
+  const bestYesAsk = yesAsks[0]?.price;
+  const bestYesBid = yesBids[0]?.price;
+  const spread =
+    bestYesAsk !== undefined && bestYesBid !== undefined
+      ? bestYesAsk - bestYesBid
+      : undefined;
+  const spreadPct =
+    spread !== undefined && bestYesBid !== undefined && bestYesBid > 0
+      ? (spread / bestYesBid) * 100
+      : undefined;
+  const lastYes = bestYesAsk ?? bestYesBid;
+  const lastNo = lastYes !== undefined ? 1 - lastYes : undefined;
+
   return (
     <div className="ob-card" data-view={view}>
       <div className="ob-h">
@@ -1113,63 +1519,83 @@ function OrderBookCard() {
           <div>size</div>
           <div>total</div>
         </div>
-        {[
-          ["0.555", "490", "1,964", 18],
-          ["0.550", "375", "1,474", 14],
-          ["0.545", "722", "1,099", 26],
-          ["0.540", "377", "377", 12],
-        ].map(([p, s, t, w], i) => (
-          <div className="ob-row ask" key={i}>
-            <div className="depth-bar" style={{ width: `${w}%` }} />
-            <span className="price">{p}</span>
-            <span className="size">{s}</span>
-            <span className="total">{t}</span>
+        {(view === "no" ? noAskBuilt : yesAskRows).length === 0 ? (
+          <div className="ob-empty mono" style={{ padding: 8, opacity: 0.6, fontSize: 12 }}>
+            no resting asks
           </div>
-        ))}
+        ) : (
+          (view === "no" ? noAskBuilt : yesAskRows).map((r, i) => (
+            <div className="ob-row ask" key={i}>
+              <div className="depth-bar" style={{ width: `${r.depthPct}%` }} />
+              <span className="price">{fmtPrice(r.price)}</span>
+              <span className="size">{fmtSize(r.size)}</span>
+              <span className="total">{fmtSize(r.total)}</span>
+            </div>
+          ))
+        )}
         <div className="ob-spread">
-          <span className="last mono">$0.520 ↑</span>
-          <span className="spread mono">spread 0.040 · 7.7%</span>
+          <span className="last mono">
+            {view === "no"
+              ? lastNo !== undefined
+                ? `$${lastNo.toFixed(3)}`
+                : "—"
+              : lastYes !== undefined
+                ? `$${lastYes.toFixed(3)}`
+                : "—"}
+          </span>
+          <span className="spread mono">
+            {spread !== undefined && spreadPct !== undefined
+              ? `spread ${spread.toFixed(3)} · ${spreadPct.toFixed(1)}%`
+              : "spread —"}
+          </span>
         </div>
-        {[
-          ["0.500", "560", "560", 20],
-          ["0.495", "440", "1,000", 16],
-          ["0.490", "830", "1,830", 30],
-          ["0.485", "270", "2,100", 10],
-        ].map(([p, s, t, w], i) => (
-          <div className="ob-row bid" key={i}>
-            <div className="depth-bar" style={{ width: `${w}%` }} />
-            <span className="price">{p}</span>
-            <span className="size">{s}</span>
-            <span className="total">{t}</span>
+        {(view === "no" ? noBidBuilt : yesBidRows).length === 0 ? (
+          <div className="ob-empty mono" style={{ padding: 8, opacity: 0.6, fontSize: 12 }}>
+            no resting bids
           </div>
-        ))}
+        ) : (
+          (view === "no" ? noBidBuilt : yesBidRows).map((r, i) => (
+            <div className="ob-row bid" key={i}>
+              <div className="depth-bar" style={{ width: `${r.depthPct}%` }} />
+              <span className="price">{fmtPrice(r.price)}</span>
+              <span className="size">{fmtSize(r.size)}</span>
+              <span className="total">{fmtSize(r.total)}</span>
+            </div>
+          ))
+        )}
       </div>
 
       <div className="ob-both" hidden={view !== "both"}>
         <div className="ob-both-explain">
-          YES + NO are separate tradeable contracts. Prices sum to ~$1 (binary payoff).
+          YES + NO are separate tradeable contracts. NO depth is derived from
+          YES (NO price = 1 − YES price) since both sides clear through the
+          same on-chain book.
         </div>
-        <BookCol side="YES" />
-        <BookCol side="NO" />
+        <BookCol side="YES" asks={yesAskRows} bids={yesBidRows} last={lastYes} />
+        <BookCol side="NO" asks={noAskBuilt} bids={noBidBuilt} last={lastNo} />
       </div>
     </div>
   );
 }
 
-function BookCol({ side }: { side: "YES" | "NO" }) {
-  const isYes = side === "YES";
-  const last = isYes ? "$0.520" : "$0.480";
-  const asks = isYes
-    ? [["0.555", "490", "1,964", 18], ["0.550", "375", "1,474", 14], ["0.545", "722", "1,099", 26], ["0.540", "377", "377", 12]]
-    : [["0.515", "560", "2,100", 20], ["0.510", "440", "1,540", 16], ["0.505", "830", "1,100", 30], ["0.500", "270", "270", 10]];
-  const bids = isYes
-    ? [["0.500", "560", "560", 20], ["0.495", "440", "1,000", 16], ["0.490", "830", "1,830", 30], ["0.485", "270", "2,100", 10]]
-    : [["0.460", "490", "490", 18], ["0.455", "375", "865", 14], ["0.450", "722", "1,587", 26], ["0.445", "377", "1,964", 12]];
+function BookCol({
+  side,
+  asks,
+  bids,
+  last,
+}: {
+  side: "YES" | "NO";
+  asks: BookRow[];
+  bids: BookRow[];
+  last: number | undefined;
+}) {
   return (
     <div className="ob-both-col">
       <div className="ob-both-h">
         <span>{side}</span>
-        <span className="ob-both-h-meta mono">last {last}</span>
+        <span className="ob-both-h-meta mono">
+          last {last !== undefined ? `$${last.toFixed(3)}` : "—"}
+        </span>
       </div>
       <div className="ob-rows-h">
         <div>price</div>
@@ -1177,23 +1603,35 @@ function BookCol({ side }: { side: "YES" | "NO" }) {
         <div>total</div>
       </div>
       <div className="ob-section-label asks">— Asks (selling {side}) —</div>
-      {asks.map(([p, s, t, w], i) => (
-        <div className="ob-row ask" key={i}>
-          <div className="depth-bar" style={{ width: `${w}%` }} />
-          <span className="price">{p}</span>
-          <span className="size">{s}</span>
-          <span className="total">{t}</span>
+      {asks.length === 0 ? (
+        <div className="ob-empty mono" style={{ padding: 8, opacity: 0.6, fontSize: 12 }}>
+          no resting asks
         </div>
-      ))}
+      ) : (
+        asks.map((r, i) => (
+          <div className="ob-row ask" key={i}>
+            <div className="depth-bar" style={{ width: `${r.depthPct}%` }} />
+            <span className="price">{fmtPrice(r.price)}</span>
+            <span className="size">{fmtSize(r.size)}</span>
+            <span className="total">{fmtSize(r.total)}</span>
+          </div>
+        ))
+      )}
       <div className="ob-section-label bids">— Bids (buying {side}) —</div>
-      {bids.map(([p, s, t, w], i) => (
-        <div className="ob-row bid" key={i}>
-          <div className="depth-bar" style={{ width: `${w}%` }} />
-          <span className="price">{p}</span>
-          <span className="size">{s}</span>
-          <span className="total">{t}</span>
+      {bids.length === 0 ? (
+        <div className="ob-empty mono" style={{ padding: 8, opacity: 0.6, fontSize: 12 }}>
+          no resting bids
         </div>
-      ))}
+      ) : (
+        bids.map((r, i) => (
+          <div className="ob-row bid" key={i}>
+            <div className="depth-bar" style={{ width: `${r.depthPct}%` }} />
+            <span className="price">{fmtPrice(r.price)}</span>
+            <span className="size">{fmtSize(r.size)}</span>
+            <span className="total">{fmtSize(r.total)}</span>
+          </div>
+        ))
+      )}
     </div>
   );
 }

@@ -58,6 +58,38 @@ export interface StrikeMarket {
   creator: PublicKey;
   /** Total Yes (and No) tokens outstanding — invariant: usdc_vault.amount == pairs_outstanding × $1. */
   pairsOutstanding: BN;
+  /**
+   * DR-020 in-program CLOB trading gate. `Pubkey::default()` until
+   * `grow_order_book` runs against this strike. Trading ixs (`place_order`,
+   * `cancel_order`) require `strike_market.order_book == order_book.key()`,
+   * so a non-default value here signals "ready to trade."
+   */
+  orderBook: PublicKey;
+}
+
+/**
+ * Single resting order in the on-chain `OrderBook` (DR-020, zero_copy / bytemuck).
+ * Mirrors `programs/bell-markets/src/state.rs::Order`.
+ */
+export interface Order {
+  owner: PublicKey;
+  price: bigint;
+  size: bigint;
+  seq: bigint;
+  side: 0 | 1; // SIDE_BID=0, SIDE_ASK=1
+}
+
+/**
+ * Mirror of the on-chain `OrderBook` zero-copy account. We expose decoded
+ * bid/ask slices (length-bounded by `bids_len` / `asks_len`) — the tail
+ * garbage bytes per Keith's L-5 are sliced off here.
+ */
+export interface OrderBookAccount {
+  market: PublicKey;
+  nextSeq: bigint;
+  bids: Order[];
+  asks: Order[];
+  bump: number;
 }
 
 /** Mirror of `programs/bell-markets/src/state.rs::FeeConfig` per DR-008. */

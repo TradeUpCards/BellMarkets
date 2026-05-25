@@ -36,6 +36,12 @@ const RPC =
 // Asserting these against on-chain state proves the deployed bootstrap is the
 // one the team coordinated — protects against silent re-initialization
 // against a wrong admin or a different USDC mint.
+//
+// NOTE (DR-020, 2026-05-24): `usdcMint` here is the pre-pivot Circle USDC
+// baseline. Aria's deploy_index=7 + `update_usdc_mint` admin ix flips
+// MarketConfig.usdc_mint to a self-controlled bUSDC mint. After the flip
+// runs, update the EXPECTED.usdcMint value to the new bUSDC pubkey (Bram's
+// `mint-demo-usdc` CLI prints it).
 const EXPECTED = {
   admin: "7b17F2woUy9hgHcRjuLckBVAtNnKAJBRD769URvLprp5",
   usdcMint: "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",

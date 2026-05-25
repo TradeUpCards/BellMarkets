@@ -7,133 +7,150 @@ import {
 import {
   PublicKey,
   Transaction,
+  type AccountMeta,
   type TransactionInstruction,
 } from "@solana/web3.js";
-import type { MarketState } from "@ellipsis-labs/phoenix-sdk";
 
 import { deriveMarketConfigPda } from "@/lib/solana/anchor";
 import {
   deriveNoMintPda,
+  deriveOrderBookPda,
+  deriveUsdcEscrowPda,
   deriveUsdcVaultPda,
+  deriveYesEscrowPda,
   deriveYesMintPda,
 } from "@/lib/solana/pdas";
+import {
+  SIDE_BID,
+  type OrderBookAccount,
+  planFills,
+} from "@/lib/solana/order-book";
 
 import { callAnchorMethod } from "./anchor-helper";
-import { PhoenixSide, buildPhoenixSwapIx } from "./phoenix";
 
 export interface BuildSellNoParams {
   program: Program<Idl>;
   trader: PublicKey;
-  /** BellMarkets `StrikeMarket` PDA (Anchor-owned). */
   marketPda: PublicKey;
-  /** Phoenix Yes/USDC market loaded via MarketState.load(). */
-  phoenixMarket: MarketState;
-  /** USDC mint pubkey from MarketConfig. */
   usdcMint: PublicKey;
-  /** No tokens to sell. Also the exact amount of Yes to buy + pair to redeem. */
+  /** Live OrderBook snapshot — REQUIRED for pre-flight fill coverage check. */
+  book: OrderBookAccount | null;
+  /**
+   * NO base units to sell (= YES base units to buy + redeem_pair burn count).
+   * 10^6 = one macro NO. The atomic place_order(SIDE_BID, market) leg buys
+   * exactly `amount` YES; the redeem_pair leg burns `amount` YES + `amount`
+   * NO and refunds `amount` USDC base units.
+   */
   amount: bigint;
-  /** Max USDC the trader is willing to spend on the Phoenix buy leg (slippage cap). */
-  maxQuoteLotsToSpend: number;
 }
 
 export interface BuildSellNoResult {
   tx: Transaction;
   prelude: TransactionInstruction[];
-  /** Phoenix swap (buy Yes for USDC). */
-  buyYesIx: TransactionInstruction;
-  /** BellMarkets redeem_pair (burn equal Yes+No for `amount` USDC back). */
+  placeOrderIx: TransactionInstruction;
   redeemPairIx: TransactionInstruction;
+  plannedFilled: bigint;
 }
 
 /**
- * Build the **atomic** Sell-No transaction per POV-3 / `specs/architecture.md`
- * §103 + Aria's `redeem_pair` instruction (her Day-3 follow-up that unblocked
- * this flow):
+ * Build the **atomic** Sell-NO transaction per DR-020 §"Trade-path mapping":
  *
  *   tx = [
  *     <ATA creates>,
- *     phoenix.swap(Side.Bid, numBaseLots=amount),   // buy exactly `amount` Yes
- *     bell_markets.redeem_pair(amount),             // burn amount Yes + amount No → amount USDC
+ *     place_order(side=BID, size=amount, is_market=true),  // buy YES at market
+ *     redeem_pair(amount),                                 // burn YES+NO, refund $amount USDC
  *   ]
  *
- * Net effect: user's No balance drops by `amount`, USDC balance net up by
- * approximately `amount * (1 - yesAsk)` (the difference between the $1
- * pair-redemption and the Phoenix swap cost). The user never sees an
- * intermediate Yes balance — POV-3 atomicity enforced at the tx level.
+ * Net effect: user's NO balance drops by `amount`, USDC up by approximately
+ * `amount × (1 − best_ask)`. The user never sees an intermediate YES balance
+ * — POV-3 atomicity enforced IF the buy-YES leg fully fills.
  *
- * Why `numBaseLots=amount` + `minBaseLotsToFill=amount` rather than a quote
- * budget: `redeem_pair` requires the user to hold EXACTLY `amount` Yes
- * (plus their existing `amount` No). If Phoenix returns fewer Yes due to
- * slippage, the redeem leg fails. By demanding exact base-lot fill with a
- * quote-lot ceiling, we abort the whole tx atomically if liquidity can't
- * support it — better UX than a half-completed flow.
+ * ## DR-019 + IOC partial-fill defense
  *
- * Tx-size note: same budget concerns as `buildBuyNoTx` apply (ATA creates +
- * 2 main ixes ≈ ~900 b under the 1232 cap). Documented escape hatch: split
- * ATA creates into a one-time setup tx per user per market.
+ * `redeem_pair(amount)` requires the user to hold EXACTLY `amount` YES (in
+ * addition to their existing `amount` NO). If `place_order` returns less
+ * than `amount` YES (thin ask book), redeem_pair fails and Solana atomicity
+ * unwinds the whole tx — so unlike the Buy NO case, partial-fill here is
+ * SAFE: it just reverts cleanly with no stranded state.
+ *
+ * Even so, we pre-flight the fill plan and throw `SellNoIocError` BEFORE
+ * broadcasting — the UX of "your tx will revert, here's why" is better than
+ * "your tx reverted, parse the simulation log."
  */
 export async function buildSellNoTx(
   params: BuildSellNoParams,
 ): Promise<BuildSellNoResult> {
-  const {
-    program,
-    trader,
-    marketPda,
-    phoenixMarket,
-    usdcMint,
-    amount,
-    maxQuoteLotsToSpend,
-  } = params;
+  const { program, trader, marketPda, usdcMint, book, amount } = params;
 
+  if (amount <= 0n) {
+    throw new Error("buildSellNoTx: amount must be > 0");
+  }
+
+  const plan = book
+    ? planFills(book, SIDE_BID, 0n, amount, true /* isMarket */)
+    : { fills: [], totalFilled: 0n, remaining: amount };
+  if (plan.totalFilled < amount) {
+    throw new SellNoIocError(
+      `Atomic Sell NO needs ${amount} YES of ask liquidity; only ${plan.totalFilled} available. Aborting before submission (on-chain redeem_pair would also revert).`,
+      amount,
+      plan.totalFilled,
+    );
+  }
+
+  // ── PDAs + ATAs ─────────────────────────────────────────────────────────
   const [config] = deriveMarketConfigPda();
   const [yesMint] = deriveYesMintPda(marketPda);
   const [noMint] = deriveNoMintPda(marketPda);
   const [usdcVault] = deriveUsdcVaultPda(marketPda);
+  const [orderBook] = deriveOrderBookPda(marketPda);
+  const [usdcEscrow] = deriveUsdcEscrowPda(marketPda);
+  const [yesEscrow] = deriveYesEscrowPda(marketPda);
 
   const userUsdc = getAssociatedTokenAddressSync(usdcMint, trader, true);
   const userYes = getAssociatedTokenAddressSync(yesMint, trader, true);
   const userNo = getAssociatedTokenAddressSync(noMint, trader, true);
 
   const prelude: TransactionInstruction[] = [
-    createAssociatedTokenAccountIdempotentInstruction(
-      trader,
-      userUsdc,
-      trader,
-      usdcMint,
-    ),
-    createAssociatedTokenAccountIdempotentInstruction(
-      trader,
-      userYes,
-      trader,
-      yesMint,
-    ),
-    createAssociatedTokenAccountIdempotentInstruction(
-      trader,
-      userNo,
-      trader,
-      noMint,
-    ),
+    createAssociatedTokenAccountIdempotentInstruction(trader, userUsdc, trader, usdcMint),
+    createAssociatedTokenAccountIdempotentInstruction(trader, userYes, trader, yesMint),
+    createAssociatedTokenAccountIdempotentInstruction(trader, userNo, trader, noMint),
   ];
 
-  // Safety guard: Phoenix market base mint must match our derived yes_mint.
-  // Mirrors the check in buildBuyNoTx — catches wrong-market arguments early.
-  const phoenixBase = phoenixMarket.data.header.baseParams.mintKey;
-  if (!phoenixBase.equals(yesMint)) {
-    throw new Error(
-      `buildSellNoTx: phoenixMarket.base (${phoenixBase.toBase58()}) != derived yes_mint (${yesMint.toBase58()}). Mismatched market arguments.`,
-    );
+  // ── place_order(BID, market) leg — maker payouts in USDC ────────────────
+  const remainingAccounts: AccountMeta[] = plan.fills.map((fill) => ({
+    pubkey: getAssociatedTokenAddressSync(usdcMint, fill.makerOwner, true),
+    isSigner: false,
+    isWritable: true,
+  }));
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const placeOrderBuilders = (program.methods as any).placeOrder;
+  if (!placeOrderBuilders) {
+    throw new Error("buildSellNoTx: 'placeOrder' missing from IDL.");
   }
+  const placeOrderIx: TransactionInstruction = await placeOrderBuilders(
+    SIDE_BID,
+    new BN(0),
+    new BN(amount.toString()),
+    true /* is_market */,
+  )
+    .accounts({
+      user: trader,
+      config,
+      strikeMarket: marketPda,
+      orderBook,
+      yesMint,
+      usdcMint,
+      userYes,
+      userUsdc,
+      usdcEscrow,
+      yesEscrow,
+      tokenProgram: TOKEN_PROGRAM_ID,
+    })
+    .remainingAccounts(remainingAccounts)
+    .instruction();
 
-  const buyYesIx = buildPhoenixSwapIx({
-    market: phoenixMarket,
-    trader,
-    side: PhoenixSide.Bid,
-    numBaseLots: Number(amount),
-    numQuoteLots: maxQuoteLotsToSpend,
-    // Demand the exact amount or fail the tx — see docstring.
-    minBaseLotsToFill: Number(amount),
-  });
-
+  // ── redeem_pair leg ─────────────────────────────────────────────────────
   const redeemPairIx = await callAnchorMethod(
     program,
     "redeemPair",
@@ -155,8 +172,30 @@ export async function buildSellNoTx(
 
   const tx = new Transaction();
   for (const p of prelude) tx.add(p);
-  tx.add(buyYesIx);
+  tx.add(placeOrderIx);
   tx.add(redeemPairIx);
 
-  return { tx, prelude, buyYesIx, redeemPairIx };
+  return {
+    tx,
+    prelude,
+    placeOrderIx,
+    redeemPairIx,
+    plannedFilled: plan.totalFilled,
+  };
+}
+
+/**
+ * Thrown by `buildSellNoTx` when the ask book can't fully absorb the
+ * `amount` YES the bid leg would need. Caller catches to present a clear
+ * "thin/empty ask book" UX state.
+ */
+export class SellNoIocError extends Error {
+  constructor(
+    message: string,
+    public readonly required: bigint,
+    public readonly available: bigint,
+  ) {
+    super(message);
+    this.name = "SellNoIocError";
+  }
 }

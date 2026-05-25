@@ -18,7 +18,7 @@ const fontMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "Bell.Markets — non-custodial markets for MAG7 daily binary options",
   description:
-    "Non-custodial Solana markets for binary outcome contracts on daily MAG7 stock prices. $1 USDC payouts settled on-chain by Pyth at 4 PM ET.",
+    "Non-custodial Solana markets for binary outcome contracts on daily MAG7 stock prices. $1 bUSDC payouts settled on-chain by Pyth at 4 PM ET.",
 };
 
 export default function RootLayout({

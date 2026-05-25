@@ -17,6 +17,11 @@ const MONTHLY_POOL_PREFIX = Buffer.from("monthly_pool");
 const LEADERBOARD_PREFIX = Buffer.from("leaderboard_commits");
 const FEE_CONFIG_PREFIX = Buffer.from("fee_config");
 
+// DR-020 in-program CLOB seeds (deploy_index=7).
+const ORDER_BOOK_PREFIX = Buffer.from("order_book");
+const USDC_ESCROW_PREFIX = Buffer.from("usdc_escrow");
+const YES_ESCROW_PREFIX = Buffer.from("yes_escrow");
+
 function bnLe(value: bigint, byteLength: number): Buffer {
   const buf = Buffer.alloc(byteLength);
   let v = value;
@@ -140,6 +145,49 @@ export function deriveLeaderboardCommitmentsPda(): [PublicKey, number] {
 export function deriveFeeConfigPda(): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [FEE_CONFIG_PREFIX],
+    BELL_MARKETS_PROGRAM_PUBKEY,
+  );
+}
+
+/**
+ * `OrderBook` PDA per strike (DR-020 in-program CLOB, deploy_index=7).
+ * Seeds `[b"order_book", strike_market]`. Zero-copy account (16,448 bytes
+ * post `grow_order_book`). The address is also written to
+ * `strike_market.order_book` as the trading gate.
+ */
+export function deriveOrderBookPda(
+  strikeMarket: PublicKey,
+): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [ORDER_BOOK_PREFIX, strikeMarket.toBuffer()],
+    BELL_MARKETS_PROGRAM_PUBKEY,
+  );
+}
+
+/**
+ * Per-strike USDC escrow PDA — holds escrowed USDC for resting bid orders.
+ * Authority = strike_market PDA (reused per DR-020). Seeds
+ * `[b"usdc_escrow", strike_market]`.
+ */
+export function deriveUsdcEscrowPda(
+  strikeMarket: PublicKey,
+): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [USDC_ESCROW_PREFIX, strikeMarket.toBuffer()],
+    BELL_MARKETS_PROGRAM_PUBKEY,
+  );
+}
+
+/**
+ * Per-strike YES escrow PDA — holds escrowed YES tokens for resting ask
+ * orders. Authority = strike_market PDA. Seeds
+ * `[b"yes_escrow", strike_market]`.
+ */
+export function deriveYesEscrowPda(
+  strikeMarket: PublicKey,
+): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [YES_ESCROW_PREFIX, strikeMarket.toBuffer()],
     BELL_MARKETS_PROGRAM_PUBKEY,
   );
 }

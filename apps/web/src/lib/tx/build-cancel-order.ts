@@ -1,93 +1,108 @@
-import { BN } from "@coral-xyz/anchor";
-import {
-  PROGRAM_ID as PHOENIX_PROGRAM_ID,
-  Side,
-  createCancelMultipleOrdersByIdInstruction,
-  getLogAuthority,
-  type MarketState,
-} from "@ellipsis-labs/phoenix-sdk";
+import { BN, type Program, type Idl } from "@coral-xyz/anchor";
 import {
   TOKEN_PROGRAM_ID,
+  createAssociatedTokenAccountIdempotentInstruction,
   getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
 import {
+  PublicKey,
   Transaction,
-  type PublicKey,
   type TransactionInstruction,
 } from "@solana/web3.js";
 
-const PHOENIX_LOG_AUTHORITY: PublicKey = getLogAuthority();
-
-export interface CancelOrderRef {
-  side: Side;
-  /** Phoenix internal price in ticks (read from L3 order or trader-state). */
-  priceInTicks: number | bigint;
-  /** Phoenix per-side monotonically increasing order seq number. */
-  orderSequenceNumber: number | bigint;
-}
+import { deriveMarketConfigPda } from "@/lib/solana/anchor";
+import {
+  deriveOrderBookPda,
+  deriveUsdcEscrowPda,
+  deriveYesEscrowPda,
+  deriveYesMintPda,
+} from "@/lib/solana/pdas";
+import {
+  SIDE_ASK,
+  SIDE_BID,
+} from "@/lib/solana/order-book";
 
 export interface BuildCancelOrderParams {
-  /** Phoenix market loaded via `MarketState.load`. */
-  market: MarketState;
-  /** Wallet of the order's owner — must match `trader` on the resting order. */
+  program: Program<Idl>;
   trader: PublicKey;
-  /** One or more order refs to cancel atomically. */
-  orders: CancelOrderRef[];
+  /** BellMarkets `StrikeMarket` PDA. */
+  marketPda: PublicKey;
+  /** USDC mint pubkey from MarketConfig. */
+  usdcMint: PublicKey;
+  /** SIDE_BID (0) or SIDE_ASK (1) — the resting side being cancelled. */
+  side: typeof SIDE_BID | typeof SIDE_ASK;
+  /** Per-side monotonic seq from `Order.seq` (read from the order book). */
+  seq: bigint;
 }
 
 export interface BuildCancelOrderResult {
   tx: Transaction;
+  prelude: TransactionInstruction[];
   ix: TransactionInstruction;
 }
 
 /**
- * Build (don't send) a single Phoenix `CancelMultipleOrdersById` instruction
- * that cancels every order in `orders` in a single tx.
+ * Build (don't send) a `cancel_order` transaction against the DR-020
+ * in-program CLOB. The on-chain handler verifies `caller == order.owner`,
+ * refunds the exact remaining escrow (USDC for bids, YES for asks) via
+ * PDA-signed transfer, and removes the order from the book.
  *
- * Phoenix matches by (side, priceInTicks, orderSequenceNumber) — the trader
- * who placed the order must sign. Callers typically read order refs from
- * `useOpenOrders` (PhoenixSdk `MarketState.getTraderState(...)`) which returns
- * the live resting orders for a trader on a market.
- *
- * For UX symmetry with the four trade actions, the cancel surfaces as a
- * single-tx flow (one signature, atomic).
+ * Allowed while the market is paused or settled (recovery path).
  */
-export function buildCancelOrderTx(
+export async function buildCancelOrderTx(
   params: BuildCancelOrderParams,
-): BuildCancelOrderResult {
-  const { market, trader, orders } = params;
-  if (orders.length === 0) {
-    throw new Error("buildCancelOrderTx: orders array is empty.");
+): Promise<BuildCancelOrderResult> {
+  const { program, trader, marketPda, usdcMint, side, seq } = params;
+
+  const [config] = deriveMarketConfigPda();
+  const [orderBook] = deriveOrderBookPda(marketPda);
+  const [yesMint] = deriveYesMintPda(marketPda);
+  const [usdcEscrow] = deriveUsdcEscrowPda(marketPda);
+  const [yesEscrow] = deriveYesEscrowPda(marketPda);
+
+  const userUsdc = getAssociatedTokenAddressSync(usdcMint, trader, true);
+  const userYes = getAssociatedTokenAddressSync(yesMint, trader, true);
+
+  const prelude: TransactionInstruction[] = [
+    createAssociatedTokenAccountIdempotentInstruction(
+      trader,
+      userUsdc,
+      trader,
+      usdcMint,
+    ),
+    createAssociatedTokenAccountIdempotentInstruction(
+      trader,
+      userYes,
+      trader,
+      yesMint,
+    ),
+  ];
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const builders = (program.methods as any).cancelOrder;
+  if (!builders) {
+    throw new Error("buildCancelOrderTx: 'cancelOrder' missing from IDL.");
   }
 
-  const baseMint = market.data.header.baseParams.mintKey;
-  const quoteMint = market.data.header.quoteParams.mintKey;
-
-  const ix = createCancelMultipleOrdersByIdInstruction(
-    {
-      phoenixProgram: PHOENIX_PROGRAM_ID,
-      logAuthority: PHOENIX_LOG_AUTHORITY,
-      market: market.address,
-      trader,
-      baseAccount: getAssociatedTokenAddressSync(baseMint, trader, true),
-      quoteAccount: getAssociatedTokenAddressSync(quoteMint, trader, true),
-      baseVault: market.getBaseVaultKey(),
-      quoteVault: market.getQuoteVaultKey(),
+  const ix: TransactionInstruction = await builders(side, new BN(seq.toString()))
+    .accounts({
+      user: trader,
+      config,
+      strikeMarket: marketPda,
+      orderBook,
+      yesMint,
+      usdcMint,
+      userYes,
+      userUsdc,
+      usdcEscrow,
+      yesEscrow,
       tokenProgram: TOKEN_PROGRAM_ID,
-    },
-    {
-      params: {
-        orders: orders.map((o) => ({
-          side: o.side,
-          priceInTicks: new BN(o.priceInTicks.toString()),
-          orderSequenceNumber: new BN(o.orderSequenceNumber.toString()),
-        })),
-      },
-    },
-  );
+    })
+    .instruction();
 
-  const tx = new Transaction().add(ix);
-  return { tx, ix };
+  const tx = new Transaction();
+  for (const p of prelude) tx.add(p);
+  tx.add(ix);
+
+  return { tx, prelude, ix };
 }
-
-export { Side as PhoenixSide } from "@ellipsis-labs/phoenix-sdk";
