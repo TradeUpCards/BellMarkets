@@ -2956,6 +2956,51 @@
       "args": []
     },
     {
+      "name": "update_admin_override_delay_secs",
+      "discriminator": [
+        22,
+        175,
+        161,
+        166,
+        7,
+        15,
+        47,
+        128
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "new_secs",
+          "type": "i64"
+        }
+      ]
+    },
+    {
       "name": "update_fee_config",
       "discriminator": [
         104,
