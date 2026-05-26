@@ -4,12 +4,38 @@ import { PublicKey, clusterApiUrl } from "@solana/web3.js";
 export const SOLANA_NETWORK: WalletAdapterNetwork = WalletAdapterNetwork.Devnet;
 
 /**
- * RPC endpoint. Prefer NEXT_PUBLIC_SOLANA_RPC (Helius/QuickNode) for production;
+ * RPC endpoint. Prefer NEXT_PUBLIC_SOLANA_RPC (Helius proxy via /api/solana-rpc
+ * — keeps Helius key server-side, see apps/web/app/api/solana-rpc/route.ts);
  * fall back to clusterApiUrl(devnet) for local dev. Public Solana endpoints
  * are rate-limited — set NEXT_PUBLIC_SOLANA_RPC before any meaningful testing.
+ *
+ * Supports relative URLs (e.g. "/api/solana-rpc?network=devnet"):
+ *   - Browser: resolved against window.location.origin.
+ *   - SSR/SSG (no window): falls back to public devnet URL — the Connection
+ *     constructor validates URL syntax at module load but doesn't actually
+ *     fetch until client hydration, where the resolved-against-origin URL
+ *     takes over.
  */
-export const SOLANA_RPC_ENDPOINT: string =
-  process.env.NEXT_PUBLIC_SOLANA_RPC ?? clusterApiUrl(SOLANA_NETWORK);
+function resolveRpcEndpoint(): string {
+  const envValue = process.env.NEXT_PUBLIC_SOLANA_RPC;
+  if (!envValue) return clusterApiUrl(SOLANA_NETWORK);
+
+  if (envValue.startsWith("http://") || envValue.startsWith("https://")) {
+    return envValue;
+  }
+
+  // Relative URL (proxy route). Browser-only resolution.
+  if (typeof window !== "undefined") {
+    return new URL(envValue, window.location.origin).toString();
+  }
+
+  // SSR/SSG: return a syntactically-valid absolute URL so Connection
+  // construction doesn't throw. The browser bundle re-runs this code
+  // post-hydration and gets the proper proxy URL.
+  return clusterApiUrl(SOLANA_NETWORK);
+}
+
+export const SOLANA_RPC_ENDPOINT: string = resolveRpcEndpoint();
 
 /**
  * Canonical devnet deployment of the BellMarkets program (Aria, 2026-05-21).

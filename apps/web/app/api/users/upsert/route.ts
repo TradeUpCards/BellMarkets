@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 
-// Subpath export from @bell-markets/automation/auth (per services/automation
-// package.json `exports` field) — bypasses the root barrel's transitive
-// discord.js / web-push / arweave imports that don't bundle in Next.js.
+// Tight subpath `./auth/db` (per services/automation package.json `exports`
+// field) — bypasses the auth barrel which re-exports discord-bot.js +
+// web-push.js. Those pull in transitive deps (discord.js → @discordjs/ws
+// → zlib-sync optional native dep) that don't bundle in Next.js webpack.
 import {
   getUserByWalletPubkey,
   upsertUserByWallet,
-} from "@bell-markets/automation/auth";
+} from "@bell-markets/automation/auth/db";
 
 import {
   generateUsername,

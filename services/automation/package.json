@@ -9,7 +9,10 @@
   "exports": {
     ".": "./src/index.ts",
     "./ai": "./src/ai/index.ts",
-    "./auth": "./src/auth/index.ts"
+    "./auth": "./src/auth/index.ts",
+    "./auth/db": "./src/auth/db.ts",
+    "./auth/options": "./src/auth/options.ts",
+    "./auth/random-username": "./src/auth/random-username.ts"
   },
   "scripts": {
     "dev": "trigger dev",
@@ -27,7 +30,10 @@
     "mint-demo-usdc": "tsx --env-file=.env scripts/mint-demo-usdc.ts",
     "update-usdc-mint": "tsx --env-file=.env scripts/update-usdc-mint.ts",
     "reinit-rewards-pools": "tsx --env-file=.env scripts/reinit-rewards-pools.ts",
-    "seed-demo-liquidity": "tsx --env-file=.env scripts/seed-demo-liquidity.ts"
+    "seed-demo-liquidity": "tsx --env-file=.env scripts/seed-demo-liquidity.ts",
+    "gen-test-wallets": "tsx scripts/generate-test-wallets.ts",
+    "fund-test-wallets": "tsx --env-file=.env scripts/fund-test-wallets.ts",
+    "export-phantom": "tsx scripts/export-wallets-for-phantom.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
