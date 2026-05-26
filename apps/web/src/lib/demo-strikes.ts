@@ -54,3 +54,57 @@ export function liveStrikesForTicker(sym: string): number[] | null {
 
 /** Default destination for the main nav "Trade" link + bottom tab. */
 export const DEFAULT_TRADE_ROUTE = `/trade/META/${DEMO_LIVE_STRIKE.META}`;
+
+/**
+ * Per-strike registry of Bram's seeded markets — explicit map from on-chain
+ * StrikeMarket PDA to (ticker, spot, ATM strike). Used by the landing-page
+ * matrix and trade-view strike rail to group live markets by ticker.
+ *
+ * Source: `.project/bell-markets/coordination/demo-strikes.md`.
+ *
+ * Why a PDA map (not a Pyth-feed map): Bram's current seed uses SOL/USD as
+ * the `underlying_pyth_feed` for all 3 strikes (Pyth devnet doesn't have
+ * MAG7 feeds), so feed-based grouping collapses everything into one group.
+ * The PDA map is deterministic and survives until Pyth devnet adds real
+ * MAG7 feeds (post-v1). Append new strikes as Bram seeds them.
+ */
+export interface DemoStrikeMarket {
+  ticker: string;
+  /** Display spot for the underlying — used by the matrix row + trade
+   *  page header. Refreshed manually as the demo runs. */
+  spot: number;
+  /** Strike price in whole-dollar units (matches what the URL carries). */
+  strike: number;
+  /** StrikeMarket PDA on devnet — the canonical key. */
+  marketPda: string;
+}
+
+export const DEMO_STRIKE_MARKETS: DemoStrikeMarket[] = [
+  {
+    ticker: "META",
+    spot: 610.42,
+    strike: 610,
+    marketPda: "2QFPN74m7epEiXo61gEUUZZzuqmwDyUS2oEDavoMe3VV",
+  },
+  {
+    ticker: "NVDA",
+    spot: 215.36,
+    strike: 215,
+    marketPda: "Gcc1PPD8VzZGYhfbjZEz9JeF22fuJJRAbAkb3GxV4W5h",
+  },
+  {
+    ticker: "AAPL",
+    spot: 308.88,
+    strike: 309,
+    marketPda: "JBAVMqhowrnckAUbJKNxeaT7zYZQebrfF33K9kncQqy1",
+  },
+];
+
+/** PDA → ticker (uppercase). Returns null when the market isn't in the
+ *  registry — caller can fall back to "UNKNOWN" or hide the row. */
+export function marketToTicker(pdaBase58: string): string | null {
+  return (
+    DEMO_STRIKE_MARKETS.find((m) => m.marketPda === pdaBase58)?.ticker ?? null
+  );
+}
+

@@ -35,11 +35,18 @@ import {
   useBellProSubscription,
   isBellProActive,
 } from "@/hooks/use-bell-pro-subscription";
+import { PublicKey } from "@solana/web3.js";
+
+import { useAllMarkets } from "@/hooks/use-all-markets";
+import { useOrderBook } from "@/hooks/use-order-book";
 import { LeftRail, TickerAccordion } from "@/components/v8/left-rail";
 import {
   DEFAULT_TRADE_ROUTE,
+  DEMO_STRIKE_MARKETS,
+  marketToTicker,
   navStrike,
 } from "@/lib/demo-strikes";
+import type { StrikeMarketWithPda } from "@/lib/solana/types";
 
 const BELL_PRO_DEFAULT_TICKER = "AAPL";
 
@@ -310,6 +317,181 @@ const SLIDES: CarouselSlide[] = [
   },
 ];
 
+// ── Live probability-matrix helpers (replaces MATRIX_ROWS fixture) ────────
+
+const PROB_BUCKETS: Array<{ min: number; max: number; cls: string }> = [
+  { min: 95, max: 100, cls: "p-95-100" },
+  { min: 80, max: 94, cls: "p-80-94" },
+  { min: 60, max: 79, cls: "p-60-79" },
+  { min: 40, max: 59, cls: "p-40-59" },
+  { min: 20, max: 39, cls: "p-20-39" },
+  { min: 5, max: 19, cls: "p-5-19" },
+  { min: 0, max: 4, cls: "p-0-4" },
+];
+
+function probToCls(prob: number): string {
+  const b = PROB_BUCKETS.find((bk) => prob >= bk.min && prob <= bk.max);
+  return b ? b.cls : "p-0-4";
+}
+
+/**
+ * On-chain strike is in Pyth-feed-exponent micros (we accept either e-6 or
+ * e-8 scaling per the trade-view's `liveMarket` matcher). Returns dollars.
+ */
+function strikeToDollars(rawBn: { toString(): string }): number {
+  const raw = BigInt(rawBn.toString());
+  if (raw === 0n) return 0;
+  const e8 = 100_000_000n;
+  const e6 = 1_000_000n;
+  const div = raw >= e8 ? e8 : e6;
+  return Number(raw) / Number(div);
+}
+
+interface LiveMatrixCellProps {
+  marketPda: PublicKey;
+  strike: number;
+  ticker: string;
+  isAtm: boolean;
+}
+
+/** One live cell — owns its own useOrderBook subscription so each cell
+ *  re-renders independently as the book updates. */
+function LiveMatrixCell({ marketPda, strike, ticker, isAtm }: LiveMatrixCellProps) {
+  const { data: snap } = useOrderBook(marketPda);
+  const bestBid = snap?.book?.bids[0]?.price;
+  const bestAsk = snap?.book?.asks[0]?.price;
+  // Mid-price in dollars (0..1 for YES contracts). Fall back to one-sided
+  // best price; if the book is fully empty, show "—".
+  const mid =
+    bestBid !== undefined && bestAsk !== undefined
+      ? (bestBid + bestAsk) / 2
+      : bestAsk ?? bestBid;
+  if (mid === undefined) {
+    return (
+      <div className={`prob-cell empty${isAtm ? " atm" : ""}`}>
+        <span className="strike">${strike}</span>
+        <span className="prob">—</span>
+      </div>
+    );
+  }
+  const probPct = Math.round(mid * 100);
+  const cls = probToCls(probPct);
+  return (
+    <Link
+      href={`/trade/${ticker}/${strike}`}
+      className={`prob-cell ${cls}${isAtm ? " atm" : ""}`}
+    >
+      <span className="strike">${strike}</span>
+      <span className="prob">{probPct}%</span>
+    </Link>
+  );
+}
+
+/** Empty cell placeholder — keeps the grid layout consistent when a ticker
+ *  doesn't have 7 seeded strikes yet. */
+function EmptyMatrixCell({ strike }: { strike: number | null }) {
+  return (
+    <div className="prob-cell empty">
+      <span className="strike">{strike !== null ? `$${strike}` : "—"}</span>
+      <span className="prob">—</span>
+    </div>
+  );
+}
+
+interface LiveTickerGroup {
+  ticker: string;
+  /** Display spot. Derived from the demo-strikes registry; updates manually
+   *  as the demo runs (Pyth feed wiring is post-v1). */
+  spot: number;
+  /** Markets seeded for this ticker, sorted by strike asc. */
+  markets: StrikeMarketWithPda[];
+  /** Strike that should render as ATM (the ticker's canonical demo strike). */
+  atmStrike: number;
+}
+
+function groupLiveMarkets(allMarkets: StrikeMarketWithPda[]): LiveTickerGroup[] {
+  const byTicker = new Map<string, StrikeMarketWithPda[]>();
+  for (const m of allMarkets) {
+    const ticker = marketToTicker(m.pda.toBase58());
+    if (!ticker) continue; // unseeded / unknown market — hide from matrix
+    const arr = byTicker.get(ticker) ?? [];
+    arr.push(m);
+    byTicker.set(ticker, arr);
+  }
+  return DEMO_STRIKE_MARKETS.reduce<LiveTickerGroup[]>((acc, demo) => {
+    const markets = byTicker.get(demo.ticker);
+    if (!markets || markets.length === 0) return acc;
+    markets.sort(
+      (a, b) =>
+        strikeToDollars(a.data.strikePrice) -
+        strikeToDollars(b.data.strikePrice),
+    );
+    // Dedup so we don't double-up if multiple registry entries point at the
+    // same ticker (single ATM strike today, but defensive).
+    if (acc.some((g) => g.ticker === demo.ticker)) return acc;
+    acc.push({
+      ticker: demo.ticker,
+      spot: demo.spot,
+      markets,
+      atmStrike: demo.strike,
+    });
+    return acc;
+  }, []);
+}
+
+interface LiveMatrixRowProps {
+  group: LiveTickerGroup;
+}
+
+const MAX_CELLS_PER_ROW = 7;
+
+function LiveMatrixRow({ group }: LiveMatrixRowProps) {
+  // Up to 7 cells per row to match the desktop heatmap grid. Fill from
+  // seeded markets (sorted by strike); pad with EmptyMatrixCell to keep
+  // the column count consistent.
+  const cells: React.ReactNode[] = [];
+  for (let i = 0; i < MAX_CELLS_PER_ROW; i++) {
+    const m = group.markets[i];
+    if (!m) {
+      cells.push(<EmptyMatrixCell key={`empty-${i}`} strike={null} />);
+      continue;
+    }
+    const strike = Math.round(strikeToDollars(m.data.strikePrice));
+    cells.push(
+      <LiveMatrixCell
+        key={m.pda.toBase58()}
+        marketPda={m.pda}
+        strike={strike}
+        ticker={group.ticker}
+        isAtm={strike === group.atmStrike}
+      />,
+    );
+  }
+  const rowRoute = `/trade/${group.ticker}/${navStrike(group.ticker, group.atmStrike)}`;
+  const mark = group.ticker.slice(0, 1);
+  return (
+    <div className="matrix-row">
+      <Link href={rowRoute} className="matrix-ticker">
+        <span className="matrix-ticker-mark">{mark}</span>
+        {group.ticker}
+      </Link>
+      <div className="matrix-spot mono">
+        <span className="px">${group.spot.toFixed(2)}</span>
+        <span className="chg up">+0.00%</span>
+      </div>
+      {cells}
+      <div className="matrix-vol mono">
+        {group.markets.length} mkt{group.markets.length === 1 ? "" : "s"}
+      </div>
+      <div className="matrix-action">
+        <Link href={rowRoute}>
+          <button type="button">OPEN →</button>
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 // ───────────────────────────────────────────────────────────────────────────
 
 export function LandingView() {
@@ -321,6 +503,15 @@ export function LandingView() {
   const [matrixView, setMatrixView] = useState<MatrixView>("matrix");
   const { data: sub } = useBellProSubscription();
   const proActive = isBellProActive(sub);
+
+  // Live probability matrix — drives the matrix-card on desktop. Each cell
+  // owns its own useOrderBook subscription so prices update live without
+  // re-rendering the whole list.
+  const { data: allMarkets } = useAllMarkets();
+  const liveGroups = useMemo(
+    () => (allMarkets ? groupLiveMarkets(allMarkets) : []),
+    [allMarkets],
+  );
 
   // Live AAPL briefing (P2-paired-sprint pattern).
   const [briefing, setBriefing] = useState<LiveBriefing | null>(null);
@@ -582,52 +773,23 @@ export function LandingView() {
               <div />
             </div>
 
-            {MATRIX_ROWS.map((row) => {
-              const atmIdx = row.cells.findIndex((c) => c.atm);
-              const atmStrike = atmIdx >= 0 ? row.cells[atmIdx]!.strike : row.cells[3]?.strike ?? 0;
-              const rowRoute = `/trade/${row.sym}/${navStrike(row.sym, atmStrike)}`;
-              return (
-                <div className="matrix-row" key={row.sym}>
-                  <Link href={rowRoute} className="matrix-ticker">
-                    <span className="matrix-ticker-mark">{row.mark}</span>
-                    {row.sym}
-                  </Link>
-                  <div className="matrix-spot mono">
-                    <span className="px">{row.spot}</span>
-                    <span className={`chg ${row.chgUp ? "up" : "down"}`}>{row.chg}</span>
-                  </div>
-                  {row.cells.map((c) => {
-                    if (c.empty) {
-                      return (
-                        <div key={c.strike} className={`prob-cell ${c.cls}`}>
-                          <span className="strike">{c.label}</span>
-                          <span className="prob">—</span>
-                        </div>
-                      );
-                    }
-                    return (
-                      <Link
-                        key={c.strike}
-                        href={`/trade/${row.sym}/${navStrike(row.sym, c.strike)}`}
-                        className={`prob-cell ${c.cls}`}
-                      >
-                        <span className="strike">{c.label}</span>
-                        <span className="prob">{renderCellLabel(c)}</span>
-                      </Link>
-                    );
-                  })}
-                  <div className="matrix-vol mono">
-                    {row.vol}
-                    <span className={`delta ${row.deltaUp ? "up" : "down"}`}>{row.delta}</span>
-                  </div>
-                  <div className="matrix-action">
-                    <Link href={rowRoute}>
-                      <button type="button">OPEN →</button>
-                    </Link>
-                  </div>
-                </div>
-              );
-            })}
+            {liveGroups.length === 0 && (
+              <div
+                className="matrix-row"
+                style={{ padding: "20px", opacity: 0.6, fontSize: 13 }}
+              >
+                <span>
+                  Loading live markets from{" "}
+                  <code style={{ fontFamily: "var(--font-mono)" }}>
+                    program.account.strikeMarket.all()
+                  </code>
+                  …
+                </span>
+              </div>
+            )}
+            {liveGroups.map((group) => (
+              <LiveMatrixRow key={group.ticker} group={group} />
+            ))}
           </div>
         </div>
 
