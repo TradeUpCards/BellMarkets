@@ -7,7 +7,7 @@
 > the heavyweight architectural detail (repo layout, type signatures,
 > data model, deployment, dependencies) that doesn't fit in the brainlift.
 >
-> **Status:** Refreshed 2026-05-25 post-DR-020 (Phoenix → in-program CLOB pivot) + post-deploy_index=8. Where this file disagrees with `constitution/decisions.md`, the DR file wins.
+> **Status:** Refreshed 2026-05-25 post-DR-020 (Phoenix → in-program CLOB pivot) + post-deploy_index=9. Where this file disagrees with `constitution/decisions.md`, the DR file wins.
 
 ---
 
@@ -32,7 +32,7 @@ graph TB
     Auto -->|write briefings + user state| DB
 
     RPC --> Solana[Solana devnet]
-    Solana --> Program[BellMarkets Anchor program - deploy_index=8]
+    Solana --> Program[BellMarkets Anchor program - deploy_index=9]
     Solana --> PythAccts[Pyth price accounts on-chain]
 
     Program -->|reads + validates| PythAccts
@@ -52,7 +52,7 @@ Three runtime surfaces: frontend (Cleo), automation service (Bram), on-chain pro
 
 **Tech:** Rust + Anchor framework (Anchor 0.31.1 / Solana 3.1.14 / Rust 1.95 per LESSONS.md-validated toolchain triple). SPL Token program for YES/NO mints + bUSDC vault. **Vendored 30-line Pyth price-account parser** at `programs/bell-markets/src/oracle.rs` for on-chain price reads — `pyth-sdk-solana` NOT used (Borsh cascade per `hard-rules.md` §4.13). `OrderBook` PDA uses Anchor's `zero_copy` + `AccountLoader` pattern for the 16,448-byte fixed-size order book (128 orders/side). All `Account<T>` fields in instruction `Accounts` structs are `Box<Account<'info, T>>` (`hard-rules.md` §4.10). Dormant Phoenix adapter code remains in the program for Phoenix-as-secondary-venue v2 candidate (DR-009 deferred under DR-020).
 
-**Instructions exposed (27 total at deploy_index=8):**
+**Instructions exposed (28 total at deploy_index=9):**
 - `initialize_config` — admin sets up global config (supported tickers, Pyth feed map, admin authority, override delay)
 - `initialize_fee_config` / `update_fee_config` — admin sets up + updates fee bps + distribution weights
 - `initialize_rewards_pools` / `reinit_rewards_pools` — admin sets up the leaderboard reward pools (the reinit ix handles bUSDC mint migration mid-flight)

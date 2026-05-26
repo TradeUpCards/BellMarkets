@@ -1,6 +1,11 @@
 # Pre-Mainnet Readiness — BellMarkets
 
-**Owner:** Drew (Quality + Integration + Demo lead). **Status:** Day-7 snapshot (2026-05-25) — post-DR-020 pivot to in-program CLOB. **Scope:** the deployed program at `599h7VznYR4CxyrG5nQbhR13qtRuwPcbnNr5QqbkS7uV` on devnet through deploy-5 (slot 464349904); deploy_index=7 (in-program CLOB + bUSDC mint flip) pending Aria.
+**Owner:** Drew (Quality + Integration + Demo lead). **Status:** Submission-day snapshot (2026-05-25) — post-DR-020 pivot to in-program CLOB + post-deploy_index=9 (compressed-time settle patches + Pyth devnet audit). **Scope:** the deployed program at `599h7VznYR4CxyrG5nQbhR13qtRuwPcbnNr5QqbkS7uV` on devnet through deploy_index=9 (28 ix · 9 cumulative deploys · 6.683 SOL spent).
+
+**Post-deploy-7 ADDENDUM (this doc was originally snapshotted at deploy_index=7):**
+- **deploy_index=8** added 1 admin ix: `reinit_rewards_pools` (Path B bUSDC migration — closes + re-initializes the 2 reward-pool token PDAs at the same addresses bound to the new `config.usdc_mint`).
+- **deploy_index=9** added 1 admin ix: `update_admin_override_delay_secs` (enables compressed-time settle simulation by shrinking the 1hr admin-override gate to 0; production stays at 1hr) + elided the `expiry_is_market_close_time` check from admin `create_strike_market` (user-funded path keeps it — only admin can create off-grid expiries for tests).
+- Neither change altered the security model or the load-bearing invariants. Full lifecycle (create → mint → trade → settle → redeem) verified on-chain on submission day; receipts in `README.md`. Pyth devnet audit landed in `docs/pyth-feed-status.md` (headline: devnet v2 push feeds are ~660 days stale; operational settle path on devnet is `admin_settle` only; mainnet path same code, live feeds, no admin fallback).
 
 **DR-020 pivot note:** On 2026-05-24, DR-020 locked a pivot from Phoenix v1 CLOB integration to a minimal in-program CLOB (following Keith's adversarially-reviewed reference design). This doc is updated to reflect that pivot. Phoenix-related callouts in section 1 are replaced with in-program CLOB callouts. Phoenix integration code stays dormant in the program (DR-020 §"Trade-off") — it is not removed. References to "audit-6" in earlier versions of this doc become "audit-7" for the next cycle: deploy_index=7 introduces new program state (OrderBook PDA, usdc_escrow, yes_escrow) that requires a fresh audit pass.
 

@@ -83,11 +83,11 @@
 
   <h1>BellMarkets — System Design</h1>
   <p class="subtitle">Architecture · decisions · trade-offs · risks · lessons · technical challenges</p>
-  <p class="meta">Cory Vandenberg · GauntletAI "Meridian" · Submission 2026-05-25 · Program: 599h7VznYR4CxyrG5nQbhR13qtRuwPcbnNr5QqbkS7uV (Solana devnet, deploy_index=8)</p>
+  <p class="meta">Cory Vandenberg · GauntletAI "Meridian" · Submission 2026-05-25 · Program: 599h7VznYR4CxyrG5nQbhR13qtRuwPcbnNr5QqbkS7uV (Solana devnet, deploy_index=9)</p>
 
   <h2>1. What we built (in one paragraph)</h2>
   <p>
-    BellMarkets is a non-custodial Solana dApp for binary outcome contracts on daily MAG7 stock closes. Each contract asks <em>"Will [STOCK] close above [PRICE] today?"</em> — two SPL tokens per contract (YES + NO) trade against bUSDC on an <strong>in-program order book</strong> that lives inside the Anchor program. At 4:00 PM ET, the program reads Pyth's MAG7 equity feed; winners redeem $1 bUSDC per winning token. <strong>YES payout + NO payout = $1.00 exactly</strong> — the load-bearing invariant. Three runtime surfaces: an Anchor program (the authority + matcher), a Trigger.dev automation service (orchestration only, no signing authority), and a Next.js trading terminal at <code>bell-markets.vercel.app</code>. <strong>27 instructions, 7 account types, 57 error variants, 8 deploys, 6.671 SOL spent.</strong>
+    BellMarkets is a non-custodial Solana dApp for binary outcome contracts on daily MAG7 stock closes. Each contract asks <em>"Will [STOCK] close above [PRICE] today?"</em> — two SPL tokens per contract (YES + NO) trade against bUSDC on an <strong>in-program order book</strong> that lives inside the Anchor program. At 4:00 PM ET, the program reads Pyth's MAG7 equity feed; winners redeem $1 bUSDC per winning token. <strong>YES payout + NO payout = $1.00 exactly</strong> — the load-bearing invariant. Three runtime surfaces: an Anchor program (the authority + matcher), a Trigger.dev automation service (orchestration only, no signing authority), and a Next.js trading terminal at <code>bell-markets.vercel.app</code>. <strong>28 instructions, 7 account types, 57 error variants, 9 deploys, 6.683 SOL spent.</strong> Full lifecycle (create → mint → trade → settle → redeem) verified on-chain on submission day.
   </p>
 
   <h2>2. Architecture at a glance</h2>
@@ -107,7 +107,7 @@
               ▼                                                ▼
 ┌─ programs/bell-markets (Anchor 0.31.1) ───┐    ┌─ Neon Postgres ────────┐
 │                                            │    │  users  oauth_accounts │
-│  27 ix · 7 accounts · 57 errors            │    │  notification_prefs    │
+│  28 ix · 7 accounts · 57 errors            │    │  notification_prefs    │
 │                                            │    │  push_subscriptions    │
 │  Trading:     mint_pair · redeem · redeem_pair  │  briefings             │
 │  In-prog CLOB: init_order_book · grow_order_book │ leaderboard           │
@@ -230,8 +230,8 @@
     <p>~0.122 SOL/market not recoverable today. At 1,470 markets/month (49/day × 30 days), that's ~187 SOL/month = ~$30K/month at $160 SOL. Economically unsustainable for mainnet. v1.1 design recovers 95.2% — must ship before any mainnet deploy.</p>
   </div>
   <div class="card risk">
-    <h3><span class="badge red">P1</span> &nbsp; Pyth MAG7 devnet feed coverage</h3>
-    <p>Pyth maintains MAG7 equity feeds but devnet coverage during market hours is inconsistent per ticker. For demo, settlement falls back to admin-override with a time-delayed gate where a feed is unavailable. On mainnet, the same code path uses live feeds with no admin fallback. Drew audits per-ticker status in <code>docs/pyth-feed-status.md</code> post-submission.</p>
+    <h3><span class="badge red">P1</span> &nbsp; Pyth devnet feed staleness (audited)</h3>
+    <p><strong>Audit landed on submission day (<code>docs/pyth-feed-status.md</code>).</strong> Headline: Pyth v2 push feeds on devnet last published ~660 days ago (SOL/USD agg_pub_slot=322,338,250 vs current=464,963,388 → 142M slots delta). <code>settle_market</code> reverts <code>PythStale (6009)</code> on devnet for every tested feed. All MAG7 equity pubkeys probed: <code>AccountNotFound</code> (Pyth devnet is crypto-only). Operational settle path on devnet is <code>admin_settle</code> only — proven on-chain (tx <code>5BFRyVW1…fXepU</code>). Hermes HTTP equity feeds DO publish MAG7 prices (network-agnostic) and power the off-chain briefings pipeline. <strong>v1.5 fix:</strong> Pyth Pull migration — same code path on mainnet uses live feeds with no admin fallback.</p>
   </div>
   <div class="card risk">
     <h3><span class="badge amber">P1</span> &nbsp; <code>force_redeem</code> doesn't cover Invalid markets (DR-005 v2 gap)</h3>
@@ -316,8 +316,8 @@
       <p><code>tests/contracts/test_order_book_invariants.ts</code> — 3 invariants × on-chain assertion: (a) vault invariant (trading is escrow-only, never touches usdc_vault) · (b) escrow reconciliation (usdc_escrow == Σ ceil(price·size); yes_escrow == Σ size) · (c) four-path smoke (Buy YES / Sell YES / atomic Buy NO / atomic Sell NO).</p>
     </div>
     <div class="card win">
-      <h4>E2E trade verified on-chain (2026-05-25)</h4>
-      <p>Limit BID $0.55 × 50 YES crossed the resting $0.55 ask. Every delta matched expected mechanics: asksLen 3→2, yes_escrow telescoped −50, admin received 50 YES, vault invariant intact. Solscan: <code>5rTS2SBo…1VCe</code>.</p>
+      <h4>Full lifecycle verified on-chain (2026-05-25)</h4>
+      <p><strong>Trade:</strong> limit BID $0.55 × 50 YES crossed the resting $0.55 ask (tx <code>5rTS2SBo…1VCe</code>; asksLen 3→2, yes_escrow telescoped −50, admin received 50 YES, vault invariant intact). <strong>Settle:</strong> <code>admin_settle(Yes)</code> after compressed-time setup (tx <code>5BFRyVW1…fXepU</code>; outcome immutably written). <strong>Redeem:</strong> 100,000,000 atomic YES burned → 100,000,000 atomic bUSDC paid out (tx <code>XhAgMQTp…16tX3</code>; $1 invariant preserved end-to-end).</p>
     </div>
     <div class="card win">
       <h4>Sonnet adversarial audit cycles (Drew)</h4>

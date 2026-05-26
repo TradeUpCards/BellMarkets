@@ -2,7 +2,7 @@
 
 > **Scope:** SOL costs to operate BellMarkets — what the protocol spends to function, where the rent goes, what's recoverable, what's stranded.
 >
-> **Status:** As of submission (2026-05-25), deploy_index=8. All devnet numbers verified on-chain. Mainnet projections use the same lamports-per-byte formula (rent is identical across clusters; the cluster only changes the $ value of SOL).
+> **Status:** As of submission (2026-05-25), deploy_index=9. All devnet numbers verified on-chain. Mainnet projections use the same lamports-per-byte formula (rent is identical across clusters; the cluster only changes the $ value of SOL).
 >
 > **Why this matters:** The cost-per-market burn rate is the load-bearing economic argument for the v1.1 rent-recovery instructions (`force_cancel_order` + `close_order_book`). Without them, ~187 SOL/month leaks at production scale.
 
@@ -21,10 +21,11 @@ Source: `migrations/audit_log.jsonl` (8 entries through 2026-05-25).
 | 5 | 2026-05-23 | upgrade | 741.2 | 2.179 | 5.294 | DR-008 + DR-010 + DR-011 expansion (+312 KB; required 2 SOL pre-deploy top-up). |
 | 6 | 2026-05-24 | upgrade | 741.8 | 0.008 | 5.306 | DR-015 leaderboard multi-metric (no schema change). |
 | 7 | 2026-05-25 | upgrade | 915.5 | 1.243 | 6.549 | **DR-020 in-program CLOB pivot.** +178 KB. Adds 6 ixs + OrderBook account. |
-| 8 | 2026-05-25 | upgrade | 931.9 | 0.122 | **6.671** | Path B (`reinit_rewards_pools` for bUSDC migration) + Sonnet-audit defense-in-depth fixes. |
+| 8 | 2026-05-25 | upgrade | 931.9 | 0.122 | 6.671 | Path B (`reinit_rewards_pools` for bUSDC migration) + Sonnet-audit defense-in-depth fixes. |
+| 9 | 2026-05-25 | upgrade | 932.9 | 0.012 | **6.683** | Compressed-time settle patches + `update_admin_override_delay_secs` admin ix (28th) + admin `create_strike_market` expiry-gate elided. Powers the on-chain settle+redeem demo evidence. |
 
-**Total program deploy cost to submission:** 6.671 SOL.
-**Upgrade-authority remaining:** ~8.329 SOL of 15 SOL provisioned (10 SOL initial + 5 SOL pre-deploy-7 top-up).
+**Total program deploy cost to submission:** 6.683 SOL across 9 deploys.
+**Upgrade-authority remaining:** ~8.317 SOL of 15 SOL provisioned (10 SOL initial + 5 SOL pre-deploy-7 top-up).
 
 ### Mainnet projection — deploy
 - **Initial mainnet deploy at submission binary size (~932 KB):** ~6.64 SOL (one-time ProgramData rent + tx fees). At $160/SOL ≈ **$1,062**.
@@ -170,7 +171,7 @@ Break-even per market = $0.98 in fees collected. At DR-008's locked fee model (2
 ┌────────────────────────────────────────────────────────────────┐
 │                Per-market rent: 0.127619 SOL                   │
 ├────────────────────────────────────────────────────────────────┤
-│  Today (deploy_index=8 / submission):                          │
+│  Today (deploy_index=9 / submission):                          │
 │  ████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
 │  Recoverable: 0.002 SOL (1.6%)                                 │
 │                                                                 │
@@ -198,4 +199,4 @@ Break-even per market = $0.98 in fees collected. At DR-008's locked fee model (2
 
 ---
 
-> **Owner:** Drew (quality + pre-mainnet readiness) + Tate (gating). **Last verified:** 2026-05-25 against deploy_index=8 + seeded META $610 market.
+> **Owner:** Drew (quality + pre-mainnet readiness) + Tate (gating). **Last verified:** 2026-05-25 against deploy_index=9 + seeded META $610 market.

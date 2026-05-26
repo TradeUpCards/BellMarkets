@@ -106,11 +106,11 @@
   <h2>Build at a glance</h2>
   <div class="stat-row">
     <div class="stat"><div class="num">5</div><div class="lbl">build days</div></div>
-    <div class="stat"><div class="num">8</div><div class="lbl">on-chain deploys</div></div>
+    <div class="stat"><div class="num">9</div><div class="lbl">on-chain deploys</div></div>
     <div class="stat"><div class="num">20</div><div class="lbl">decision records</div></div>
-    <div class="stat"><div class="num">27</div><div class="lbl">program instructions</div></div>
+    <div class="stat"><div class="num">28</div><div class="lbl">program instructions</div></div>
     <div class="stat"><div class="num">4</div><div class="lbl">named lead workstreams</div></div>
-    <div class="stat"><div class="num">6.671</div><div class="lbl">SOL spent on deploys</div></div>
+    <div class="stat"><div class="num">6.683</div><div class="lbl">SOL spent on deploys</div></div>
   </div>
 
   <h2>How I built it: a directed multi-agent Claude Code workflow</h2>
@@ -121,7 +121,7 @@
   <div class="leads">
     <div class="lead-card">
       <h4>Aria · Onchain</h4>
-      <p>Rust / Anchor. The program at <code>599h7Vzn…</code>. 27 instructions, 7 account types, 57 error variants. Owns the in-program CLOB matcher, settle/redeem invariants, vendored Pyth parser.</p>
+      <p>Rust / Anchor. The program at <code>599h7Vzn…</code> (deploy_index=9). 28 instructions, 7 account types, 57 error variants. Owns the in-program CLOB matcher, settle/redeem invariants, vendored Pyth parser.</p>
     </div>
     <div class="lead-card">
       <h4>Bram · Automation</h4>
@@ -138,7 +138,7 @@
   </div>
 
   <blockquote>
-    The leads aren't humans I delegated to — they're Claude Code sessions I directed in parallel. The output (27 ixs of Rust, ~3K lines of TypeScript across automation and frontend, 100+ invariant tests, 8 on-chain deploys) is mine to defend. The workflow is what made it possible in five days.
+    The leads aren't humans I delegated to — they're Claude Code sessions I directed in parallel. The output (28 ixs of Rust, ~3K lines of TypeScript across automation and frontend, 140+ invariant tests, 9 on-chain deploys) is mine to defend. The workflow is what made it possible in five days.
   </blockquote>
 
   <h2>Day 0 — Sun 2026-05-21: Repo setup + constitution lock</h2>
@@ -237,6 +237,15 @@
       <li>Cleo wired live <code>useAllMarkets</code> / <code>useOrderBook</code> / <code>useTokenBalance</code> into the landing-page probability matrix + trade-view strike rail (replaced static fixtures).</li>
       <li>Bram extended <code>seed-demo-liquidity</code> to multi-strike (ATM ± 3%) and ran for all 7 MAG7 tickers.</li>
       <li>Brief V2 polish + cost-analysis doc + demo-readiness plan + pre-mainnet-readiness §"v2 gap #8" (OrderBook rent recovery design) + Tier-1 doc sweep (BRAINLIFT, specs/architecture, ARCHITECTURE, hard-rules, bell-markets-spec all updated for DR-020).</li>
+    </ul>
+    <h3>Late evening: Aria ships deploy_index=9 — full lifecycle proven</h3>
+    <ul>
+      <li><strong>deploy_index=9 LIVE</strong> (tx <code>3sbBrRvF…uu3TY</code>, 0.012 SOL · cumulative <strong>6.683 SOL across 9 deploys</strong>). 28 ix surface (was 27). 143/143 cargo tests pass; zero stack-offset warnings.</li>
+      <li><strong>New admin ix:</strong> <code>update_admin_override_delay_secs</code> — shrinks the 1hr admin-override gate to enable compressed-time settle simulation (used for demo evidence; production stays at 1hr).</li>
+      <li><strong>Modified admin ix:</strong> <code>create_strike_market</code> admin path elides the <code>expiry_is_market_close_time</code> check; user-funded <code>user_create_strike_market</code> path keeps it (security-preserving — only admin can create off-grid expiries for tests).</li>
+      <li><strong>Settlement leg proven on-chain:</strong> <code>admin_settle(Yes)</code> after delay=0 — tx <code>5BFRyVW1…fXepU</code>. Outcome immutably written.</li>
+      <li><strong>Redemption leg proven on-chain:</strong> 100,000,000 atomic YES burned → 100,000,000 atomic bUSDC paid out — tx <code>XhAgMQTp…16tX3</code>. <strong>$1 invariant preserved end-to-end.</strong></li>
+      <li><strong>Pyth devnet audit:</strong> v2 push feeds last published ~660 days ago (SOL/USD agg_pub_slot=322,338,250 vs current=464,963,388 → 142M slots delta). <code>settle_market</code> reverts <code>PythStale (6009)</code> for every tested feed. All MAG7 equity pubkeys probed: <code>AccountNotFound</code> (Pyth devnet is crypto-only). Hermes HTTP equity feeds DO publish MAG7 prices (network-agnostic) and power Bram's off-chain briefings. Documented in <code>docs/pyth-feed-status.md</code>.</li>
       <li><strong>Submission target:</strong> 7:00 PM ET.</li>
     </ul>
   </div>

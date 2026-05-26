@@ -2,7 +2,7 @@
 
 > Single source of truth for AI coding assistants. Read this before writing code. If you'd contradict something here, stop and ask.
 >
-> **Status:** v2 — refreshed 2026-05-25 post-DR-020 + post-deploy_index=8 (submission day). Day-0 (2026-05-21) version is preserved in git history. Detailed architecture lives in `specs/architecture.md`. Locked design decisions live in `constitution/decisions.md` (DR-001…DR-020). Where this doc and the DR file disagree, the DR file wins — it's the audit trail.
+> **Status:** v2 — refreshed 2026-05-25 post-DR-020 + post-deploy_index=9 (submission day). Day-0 (2026-05-21) version is preserved in git history. Detailed architecture lives in `specs/architecture.md`. Locked design decisions live in `constitution/decisions.md` (DR-001…DR-020). Where this doc and the DR file disagree, the DR file wins — it's the audit trail.
 
 ---
 
@@ -20,12 +20,13 @@ Gauntlet cohort project — partner-evaluated build demonstrating the full lifec
 - **Team:** validating on-chain invariants and the cron-failure recovery path during dev.
 
 ### Stage of build (2026-05-25, submission day)
-- **Anchor program:** deployed to devnet at `599h7VznYR4CxyrG5nQbhR13qtRuwPcbnNr5QqbkS7uV` (deploy_index=8). 27 instructions, 7 account types, 57 error variants.
+- **Anchor program:** deployed to devnet at `599h7VznYR4CxyrG5nQbhR13qtRuwPcbnNr5QqbkS7uV` (deploy_index=9). 28 instructions, 7 account types, 57 error variants. Cumulative deploy spend: 6.683 SOL across 9 deploys.
 - **bUSDC self-controlled demo mint:** `5vq2oahKFnnjStK1Ctqwdxdt44rtKuKHmPga9iZKtBZp`.
-- **In-program CLOB:** live. Matcher verified end-to-end on-chain (META $610, 6 resting orders, 1 crossing trade — all invariants held).
+- **Full lifecycle verified on-chain:** Trade leg (tx `5rTS2SBo…1VCe`: limit BID $0.55 × 50 YES crossed the resting $0.55 ask; all invariants held) + settle leg (`admin_settle` after compressed-time setup, tx `5BFRyVW1…fXepU`) + redeem leg (100M atomic YES → 100M atomic bUSDC, tx `XhAgMQTp…16tX3`). **The $1 invariant is preserved end-to-end.**
+- **Pyth devnet audit:** v2 push feeds are ~660 days stale; `settle_market` reverts `PythStale (6009)` for all tested feeds on devnet; operational settle path is `admin_settle` only on devnet (see `docs/pyth-feed-status.md`). Mainnet uses real feeds with no admin fallback.
 - **Frontend:** deployed on Vercel; trade page hooks (`useAllMarkets`, `useOrderBook`, `usePosition`) wired to live chain state.
 - **Automation:** Trigger.dev jobs defined for create-markets (~8am ET) + post-close phases (4:05pm ET settle + grid-evolution).
-- **Documentation:** brief V2 + pre-mainnet-readiness + decisions log + this brainlift updated.
+- **Documentation:** brief V2 + pre-mainnet-readiness + decisions log + cost analysis + this brainlift updated.
 
 ### Deadlines
 - **Final submission:** Mon 2026-05-25 7:00 PM ET (hard cohort deliverable). ← TODAY
@@ -151,14 +152,14 @@ Four buttons: Buy YES, Buy NO, Sell YES, Sell NO. Each = one wallet-signed trans
 
 ### Things to flag for human review (not auto-block)
 - Adding any new dependency beyond the locked stack — name a one-line "why" first.
-- Touching the `vault` PDA seeds, `OrderBook` schema, or `StrikeMarket` account schema after deploy_index=8.
+- Touching the `vault` PDA seeds, `OrderBook` schema, or `StrikeMarket` account schema after deploy_index=9.
 - Any change to `place_order`, `cancel_order`, `match_orders`, `settle_market`, `mint_pair`, or `redeem` — pause for property-test coverage review.
 - Any cross-workstream PR (e.g., `programs/` + `apps/web/`) — both owning leads must sign off.
 - Any deviation from a Spiky POV — write a new DR before implementing.
 
 ---
 
-> **Created:** 2026-05-21 (v1) → refreshed 2026-05-25 (v2, post-DR-020 + post-deploy_index=8)
+> **Created:** 2026-05-21 (v1) → refreshed 2026-05-25 (v2, post-DR-020 + post-deploy_index=9)
 > **Template:** brainlift v1 (from `claude-code-project-template` v0.3.0+)
 > **Owner:** Cory Vandenberg (Tate)
 > **Update cadence:** Same-session edit for items that change during work. End-of-week sweep.

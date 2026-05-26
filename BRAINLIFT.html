@@ -86,7 +86,7 @@
 
   <h1>BellMarkets — Brain Lift</h1>
   <p class="subtitle">The 1-page constitution. Single source of truth for AI coding assistants. Read before writing code.</p>
-  <p class="meta">v2 (post-DR-020 + post-deploy_index=8) · Refreshed 2026-05-25 · Cory Vandenberg (Tate)</p>
+  <p class="meta">v2 (post-DR-020 + post-deploy_index=9) · Refreshed 2026-05-25 · Cory Vandenberg (Tate)</p>
 
   <blockquote>
     Where this doc and <code>constitution/decisions.md</code> disagree, the DR file wins — it's the audit trail. The Day-0 (2026-05-21) version of this brainlift is preserved in git history.
@@ -113,10 +113,11 @@
 
   <h3>Stage of build — 2026-05-25 (submission day)</h3>
   <ul>
-    <li><strong>Anchor program:</strong> deployed to devnet at <code>599h7VznYR4CxyrG5nQbhR13qtRuwPcbnNr5QqbkS7uV</code> (deploy_index=8). 27 ixs, 7 account types, 57 error variants.</li>
+    <li><strong>Anchor program:</strong> deployed to devnet at <code>599h7VznYR4CxyrG5nQbhR13qtRuwPcbnNr5QqbkS7uV</code> (deploy_index=9). 28 ixs, 7 account types, 57 error variants. <strong>9 cumulative deploys · 6.683 SOL spent.</strong></li>
     <li><strong>bUSDC self-controlled demo mint:</strong> <code>5vq2oahKFnnjStK1Ctqwdxdt44rtKuKHmPga9iZKtBZp</code>.</li>
-    <li><strong>In-program CLOB:</strong> live. Matcher verified end-to-end on-chain (META $610, 6 resting orders, 1 crossing trade — all invariants held).</li>
-    <li><strong>Frontend:</strong> deployed at bell-markets.vercel.app; trade hooks wired to live chain state.</li>
+    <li><strong>Full lifecycle verified on-chain:</strong> trade (limit BID $0.55 × 50 YES crossed; tx <code>5rTS2SBo…1VCe</code>) + settle (<code>admin_settle</code> after compressed-time setup; tx <code>5BFRyVW1…fXepU</code>) + redeem (100M atomic YES → 100M atomic bUSDC; tx <code>XhAgMQTp…16tX3</code>). <strong>$1 invariant preserved end-to-end.</strong></li>
+    <li><strong>Pyth devnet posture:</strong> v2 push feeds are ~660 days stale; <code>settle_market</code> reverts <code>PythStale (6009)</code> on devnet for all tested feeds; operational settle path on devnet is <code>admin_settle</code> only (see <code>docs/pyth-feed-status.md</code>). Mainnet uses live feeds, no admin fallback.</li>
+    <li><strong>Frontend:</strong> live at <a href="https://bell-markets.vercel.app">bell-markets.vercel.app</a>; trade hooks wired to live chain state.</li>
     <li><strong>Automation:</strong> Trigger.dev jobs defined for create-markets + post-close phases.</li>
   </ul>
 
@@ -237,7 +238,7 @@
   <h3>Things to flag for human review (not auto-block)</h3>
   <ul>
     <li>Adding any new dependency beyond the locked stack — name a one-line "why" first.</li>
-    <li>Touching the <code>vault</code> PDA seeds, <code>OrderBook</code> schema, or <code>StrikeMarket</code> account schema after deploy_index=8.</li>
+    <li>Touching the <code>vault</code> PDA seeds, <code>OrderBook</code> schema, or <code>StrikeMarket</code> account schema after deploy_index=9.</li>
     <li>Any change to <code>place_order</code>, <code>cancel_order</code>, <code>match_orders</code>, <code>settle_market</code>, <code>mint_pair</code>, or <code>redeem</code> — pause for property-test coverage review.</li>
     <li>Any cross-workstream PR (e.g., <code>programs/</code> + <code>apps/web/</code>) — both owning leads must sign off.</li>
     <li>Any deviation from a Spiky POV — write a new DR before implementing.</li>

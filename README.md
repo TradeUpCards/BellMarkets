@@ -5,9 +5,12 @@ A non-custodial Solana dApp for trading binary outcome contracts on daily MAG7 s
 > Gauntlet project codename: **Meridian**. Cohort 5 submission. See `.project/bell-markets/docs/prd/` for the original PRD.
 
 🌐 **Live demo:** [bell-markets.vercel.app](https://bell-markets.vercel.app)
-📜 **Program:** [`599h7VznYR4CxyrG5nQbhR13qtRuwPcbnNr5QqbkS7uV`](https://solscan.io/account/599h7VznYR4CxyrG5nQbhR13qtRuwPcbnNr5QqbkS7uV?cluster=devnet) on Solana devnet (`deploy_index=8`)
+📜 **Program:** [`599h7VznYR4CxyrG5nQbhR13qtRuwPcbnNr5QqbkS7uV`](https://solscan.io/account/599h7VznYR4CxyrG5nQbhR13qtRuwPcbnNr5QqbkS7uV?cluster=devnet) on Solana devnet (`deploy_index=9`)
 💵 **bUSDC:** Self-controlled demo mint [`5vq2oahKFnnjStK1Ctqwdxdt44rtKuKHmPga9iZKtBZp`](https://solscan.io/account/5vq2oahKFnnjStK1Ctqwdxdt44rtKuKHmPga9iZKtBZp?cluster=devnet)
-🧾 **E2E trade verified on-chain (2026-05-25):** [Solscan tx `5rTS2SBo…1VCe`](https://solscan.io/tx/5rTS2SBoo1phuTaL4DhCQoBLNj4nJxSZBfbVvHC7Vzogw7sMh6h9hegTobNbBpKhKpbhFyZErygdUxCZceJr1VCe?cluster=devnet) — limit BID $0.55 × 50 YES crossed the resting $0.55 ask. Every invariant held (vault intact, escrow telescoped, asksLen 3→2, taker received 50 YES).
+🧾 **Full lifecycle verified on-chain (2026-05-25):**
+   - **Trade:** [Solscan tx `5rTS2SBo…1VCe`](https://solscan.io/tx/5rTS2SBoo1phuTaL4DhCQoBLNj4nJxSZBfbVvHC7Vzogw7sMh6h9hegTobNbBpKhKpbhFyZErygdUxCZceJr1VCe?cluster=devnet) — limit BID $0.55 × 50 YES crossed the resting $0.55 ask. Vault intact, escrow telescoped, asksLen 3→2, taker received 50 YES.
+   - **Settle:** [Solscan tx `5BFRyVW1…fXepU`](https://solscan.io/tx/5BFRyVW1tZnxErs69VaCRHpzrEMTaJqGWmkMJcQYUi5asXjNh6DA2kKzu3PWKjyvMfqAeH5keMmVrSMFxwyfXepU?cluster=devnet) — `admin_settle(Yes)` after compressed-time setup. Outcome immutably written.
+   - **Redeem:** [Solscan tx `XhAgMQTp…16tX3`](https://solscan.io/tx/XhAgMQTpGr6wyHAKFbyTf3uMKfwBeyZw86pZXRFbkxonDbo6QaeyFuVFy6nRhtvT36DTFLUeKVH2f5sp5X16tX3?cluster=devnet) — 100,000,000 atomic YES burned → 100,000,000 atomic bUSDC paid out. **$1 invariant preserved end-to-end.**
 
 ---
 
@@ -49,7 +52,7 @@ Two SPL tokens per contract — **YES** and **NO** — trade against bUSDC on an
             │                                      │
             ▼ writes (signed by user)              ▼ reads (public)
 ┌─ programs/bell-markets (Anchor 0.31.1) ─────────────────────────┐
-│  27 instructions / 7 account types / 57 error variants          │
+│  28 instructions / 7 account types / 57 error variants          │
 │                                                                  │
 │  Trade primitives:  mint_pair · redeem · redeem_pair             │
 │  In-program CLOB:   init_order_book · grow_order_book · place_order │
@@ -162,8 +165,9 @@ Web-based admin operations at `/admin` (wallet-gated by `MarketConfig.admin`):
 
 ## Deployment
 
-- **Devnet:** deploy_index=8 LIVE at `599h7Vzn…` (8 cumulative deploys, 6.671 SOL spent — see `migrations/audit_log.jsonl`)
+- **Devnet:** deploy_index=9 LIVE at `599h7Vzn…` (9 cumulative deploys, 6.683 SOL spent — see `migrations/audit_log.jsonl`)
 - **Vercel:** LIVE at [bell-markets.vercel.app](https://bell-markets.vercel.app) — Helius RPC kept server-side via `/api/solana-rpc` proxy (Hard NO #13). See `docs/deployment/vercel.md` for setup.
+- **Pyth devnet posture:** Pyth v2 push feeds on devnet are ~660 days stale (audit finding in [`docs/pyth-feed-status.md`](./docs/pyth-feed-status.md)). On devnet, `settle_market` reverts `PythStale (6009)` for all tested feeds; operational settle path is `admin_settle` only. Hermes HTTP equity feeds DO publish MAG7 prices and are used by the off-chain briefings pipeline (network-agnostic). v1.5 fix: Pyth Pull migration.
 - **Mainnet:** roadmapped — see `docs/architecture/pre-mainnet-readiness.md` for the audit + readiness gate. v1.1 rent-recovery (`force_cancel_order` + `close_order_book`) is a hard precondition; full design in `specs/deferred.md`.
 
 ---
@@ -191,7 +195,7 @@ Full list: `constitution/hard-rules.md`.
 ├── vercel.json                      # Vercel monorepo build config
 ├── constitution/                    # Hard rules + 20 Decision Records
 ├── specs/                           # Architecture, project spec, coordination
-├── programs/bell-markets/           # Anchor program (27 ix, 7 accts, 57 errors)
+├── programs/bell-markets/           # Anchor program (28 ix, 7 accts, 57 errors)
 ├── services/automation/             # Cron service, indexer, AI briefings
 ├── apps/web/                        # Next.js frontend + /admin console
 ├── packages/ui/                     # Shared React components
