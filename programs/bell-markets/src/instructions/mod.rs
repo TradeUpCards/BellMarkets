@@ -25,6 +25,7 @@ pub mod cancel_order;
 pub mod match_orders;
 pub mod update_usdc_mint;
 pub mod reinit_rewards_pools;
+pub mod update_admin_override_delay_secs;
 
 pub use initialize_config::*;
 pub use create_strike_market::*;
@@ -53,3 +54,4 @@ pub use cancel_order::*;
 pub use match_orders::*;
 pub use update_usdc_mint::*;
 pub use reinit_rewards_pools::*;
+pub use update_admin_override_delay_secs::*;

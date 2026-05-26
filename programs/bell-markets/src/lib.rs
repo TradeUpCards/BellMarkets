@@ -269,4 +269,11 @@ pub mod bell_markets {
     pub fn reinit_rewards_pools(ctx: Context<ReinitRewardsPools>) -> Result<()> {
         instructions::reinit_rewards_pools::handler(ctx)
     }
+
+    pub fn update_admin_override_delay_secs(
+        ctx: Context<UpdateAdminOverrideDelaySecs>,
+        new_secs: i64,
+    ) -> Result<()> {
+        instructions::update_admin_override_delay_secs::handler(ctx, new_secs)
+    }
 }
