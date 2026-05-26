@@ -26,6 +26,15 @@ import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey, Transaction } from "@solana/web3.js";
 
 import { LeftRail } from "@/components/v8/left-rail";
+import {
+  DEMO_STRIKE_MARKETS,
+  liveStrikesForTicker,
+  marketToTicker,
+} from "@/lib/demo-strikes";
+import { useTokenBalance } from "@/hooks/use-token-balance";
+import { queryKeys } from "@/lib/queries/keys";
+
+const USDC_DECIMALS = 6n;
 import { useUserConfig } from "@/hooks/use-user-config";
 import { useBellProSubscription } from "@/hooks/use-bell-pro-subscription";
 import { useMarketConfig } from "@/hooks/use-market-config";
@@ -52,16 +61,11 @@ type Outcome = "yes" | "no";
 type OrderType = "market" | "limit";
 type Unit = "usdc" | "contracts";
 
-const STRIKES = [620, 640, 660, 680, 700, 720, 740];
-const STRIKE_PROBS: Record<number, number> = {
-  620: 92,
-  640: 84,
-  660: 71,
-  680: 50,
-  700: 28,
-  720: 14,
-  740: 6,
-};
+// Fallback strike range — used when the active ticker isn't one of Bram's
+// seeded demo tickers. For seeded tickers (META/NVDA/AAPL) the strike list
+// is derived live from `useAllMarkets()` filtered by ticker so every pill
+// click lands on a real on-chain market.
+const FALLBACK_STRIKES = [620, 640, 660, 680, 700, 720, 740];
 
 const FEE_BPS_DEFAULT = 200; // 2% — matches DR-008 default until admin flip.
 const SLIP_RATIO_HINT = 0.012;
@@ -69,7 +73,12 @@ const PRICE_YES_ASK = 0.520;
 const PRICE_YES_BID = 0.500;
 const PRICE_NO_ASK = 0.480;
 const PRICE_NO_BID = 0.460;
-const USDC_AVAIL_FALLBACK = 123.45;
+/**
+ * Display fallback for the "available bUSDC" badge when the user hasn't
+ * connected a wallet yet (or hasn't created their ATA). Once connected,
+ * `useTokenBalance(usdcAta)` overwrites with the real balance.
+ */
+const USDC_AVAIL_FALLBACK = 0;
 
 function fmtUsd(n: number, decimals = 2): string {
   return "$" + n.toFixed(decimals);
@@ -124,6 +133,48 @@ export function TradeView({ ticker, strike }: TradeViewParams) {
       }) ?? null
     );
   }, [allMarkets, strikeNum]);
+
+  // Live strike list for the strike-pill picker + dropdown — derived from
+  // useAllMarkets() filtered by the ticker's seeded markets (PDA-based
+  // resolver). Falls back to the mockup range when the ticker isn't a
+  // seeded demo ticker.
+  const STRIKES = useMemo<number[]>(() => {
+    if (!allMarkets) return liveStrikesForTicker(tickerUpper) ?? FALLBACK_STRIKES;
+    const seededForTicker = allMarkets
+      .filter((m) => marketToTicker(m.pda.toBase58()) === tickerUpper)
+      .map((m) => {
+        const raw = BigInt(m.data.strikePrice.toString());
+        const e8 = 100_000_000n;
+        const e6 = 1_000_000n;
+        const div = raw >= e8 ? e8 : e6;
+        return Math.round(Number(raw) / Number(div));
+      })
+      .sort((a, b) => a - b);
+    if (seededForTicker.length > 0) return seededForTicker;
+    // Ticker has a known live strike from demo-strikes.md but the matching
+    // on-chain account hasn't reached us yet → seed with the demo value so
+    // the strike-pill picker doesn't flash empty.
+    return liveStrikesForTicker(tickerUpper) ?? FALLBACK_STRIKES;
+  }, [allMarkets, tickerUpper]);
+
+  // Per-strike probability for the strike-pill labels — derived from the
+  // order book midpoint of each live market for the active ticker. Pre-
+  // computed on the parent so the pill render below doesn't need a hook
+  // per cell (those cells aren't subscribed to the book individually).
+  const seededByStrike = useMemo<Map<number, { pda: PublicKey }>>(() => {
+    const m = new Map<number, { pda: PublicKey }>();
+    if (!allMarkets) return m;
+    for (const mkt of allMarkets) {
+      if (marketToTicker(mkt.pda.toBase58()) !== tickerUpper) continue;
+      const raw = BigInt(mkt.data.strikePrice.toString());
+      const e8 = 100_000_000n;
+      const e6 = 1_000_000n;
+      const div = raw >= e8 ? e8 : e6;
+      const strike = Math.round(Number(raw) / Number(div));
+      m.set(strike, { pda: mkt.pda });
+    }
+    return m;
+  }, [allMarkets, tickerUpper]);
 
   // Live YES + NO balances. Cost basis is still 0 — needs Bram's tx-history
   // indexer to compute (DR-010 indexer scope). Showing real contract counts +
@@ -212,7 +263,28 @@ export function TradeView({ ticker, strike }: TradeViewParams) {
       : liveNoBid ?? PRICE_NO_BID;
   const feeBps = userConfigDerived.projectedFeeBps || FEE_BPS_DEFAULT;
   const feeRatio = feeBps / 10_000;
-  const usdcAvail = USDC_AVAIL_FALLBACK; // TODO: useTokenBalance(usdcAta)
+  // Live bUSDC balance — useTokenBalance subscribes to the user's ATA
+  // for the active MarketConfig.usdc_mint. Updates via WebSocket as the
+  // user trades; falls back to USDC_AVAIL_FALLBACK (0) when wallet not
+  // connected or ATA doesn't exist yet.
+  const usdcMintForBalance = marketConfig?.usdcMint ?? null;
+  const usdcTokenKey = useMemo(
+    () => [
+      ...queryKeys.all,
+      "usdc-balance",
+      wallet.publicKey?.toBase58() ?? "anon",
+      usdcMintForBalance?.toBase58() ?? "none",
+    ] as readonly unknown[],
+    [wallet.publicKey, usdcMintForBalance],
+  );
+  const { data: usdcBalance } = useTokenBalance(
+    usdcMintForBalance,
+    wallet.publicKey ?? null,
+    usdcTokenKey,
+  );
+  const usdcAvail = usdcBalance?.amount
+    ? Number(usdcBalance.amount) / Number(10n ** USDC_DECIMALS)
+    : USDC_AVAIL_FALLBACK;
 
   const sellEmpty = side === "sell" && pos.contracts === 0;
 
@@ -605,6 +677,7 @@ export function TradeView({ ticker, strike }: TradeViewParams) {
               const itm = s < strikeNum;
               const otm = s > strikeNum;
               const active = s === strikeNum;
+              const seeded = seededByStrike.get(s);
               return (
                 <Link
                   key={s}
@@ -613,7 +686,11 @@ export function TradeView({ ticker, strike }: TradeViewParams) {
                   aria-current={active ? "page" : undefined}
                 >
                   <span className="px">${s}</span>
-                  <span className="prob">{STRIKE_PROBS[s] ?? 50}%</span>
+                  {seeded ? (
+                    <StrikePillProb marketPda={seeded.pda} />
+                  ) : (
+                    <span className="prob">—</span>
+                  )}
                 </Link>
               );
             })}
@@ -626,11 +703,16 @@ export function TradeView({ ticker, strike }: TradeViewParams) {
               window.location.href = `/trade/${tickerUpper}/${e.target.value}`;
             }}
           >
-            {STRIKES.map((s) => (
-              <option key={s} value={s}>
-                ${s} · {STRIKE_PROBS[s] ?? 50}% YES{s === strikeNum ? " (ATM)" : ""}
-              </option>
-            ))}
+            {STRIKES.map((s) => {
+              const seeded = seededByStrike.has(s);
+              return (
+                <option key={s} value={s}>
+                  ${s}
+                  {seeded ? "" : " (no live market)"}
+                  {s === strikeNum ? " · ATM" : ""}
+                </option>
+              );
+            })}
           </select>
         </div>
       </div>
@@ -644,7 +726,12 @@ export function TradeView({ ticker, strike }: TradeViewParams) {
         <main>
           <div className="trade-grid">
             <div className="left-col">
-              <ChartCard ticker={tickerUpper} strike={strikeNum} />
+              <ChartCard
+                ticker={tickerUpper}
+                strike={strikeNum}
+                yesAsk={liveYesAsk}
+                yesBid={liveYesBid}
+              />
 
               <div className="info-grid-2">
                 <PositionCard pos={position.yes} outcome="yes" />
@@ -1111,22 +1198,80 @@ export function TradeView({ ticker, strike }: TradeViewParams) {
 // page-specific variant is the "Filter matrix" section, which the trade
 // page omits via the default `showFilters=false`.)
 
-function ChartCard({ ticker, strike }: { ticker: string; strike: number }) {
+/**
+ * Live probability text inside a strike pill — subscribes to the strike's
+ * order book and renders the YES midpoint as a percentage. One subscription
+ * per pill; the parent doesn't pay the hook cost.
+ */
+function StrikePillProb({ marketPda }: { marketPda: PublicKey }) {
+  const { data: snap } = useOrderBook(marketPda);
+  const bestBid = snap?.book?.bids[0]?.price;
+  const bestAsk = snap?.book?.asks[0]?.price;
+  const mid =
+    bestBid !== undefined && bestAsk !== undefined
+      ? (bestBid + bestAsk) / 2
+      : bestAsk ?? bestBid;
+  if (mid === undefined) return <span className="prob">—</span>;
+  return <span className="prob">{Math.round(mid * 100)}%</span>;
+}
+
+interface ChartCardProps {
+  ticker: string;
+  strike: number;
+  /** Best YES ask from the live order book (dollars). */
+  yesAsk?: number;
+  /** Best YES bid from the live order book (dollars). */
+  yesBid?: number;
+}
+
+function ChartCard({ ticker, strike, yesAsk, yesBid }: ChartCardProps) {
+  // Live-derived YES last/mid price + spread. Falls back to the mockup
+  // $0.520 only when the order book is empty / pre-init — paired with the
+  // disable matrix that will block submits in that state anyway.
+  const FALLBACK_PRICE = 0.52;
+  const last =
+    yesAsk !== undefined && yesBid !== undefined
+      ? (yesAsk + yesBid) / 2
+      : yesAsk ?? yesBid ?? FALLBACK_PRICE;
+  // Delta vs the strike's $0.50 fair-coin midpoint — honest approximation
+  // since we don't yet store an "open" price. Will be replaced by a real
+  // open/close once the indexer surfaces price history.
+  const REFERENCE_PRICE = 0.5;
+  const deltaAbs = last - REFERENCE_PRICE;
+  const deltaPct = (deltaAbs / REFERENCE_PRICE) * 100;
+  const deltaUp = deltaAbs >= 0;
+  const spreadAbs =
+    yesAsk !== undefined && yesBid !== undefined ? yesAsk - yesBid : undefined;
+  const spreadPct =
+    spreadAbs !== undefined && yesBid && yesBid > 0
+      ? (spreadAbs / yesBid) * 100
+      : undefined;
+  const bestBA =
+    yesBid !== undefined && yesAsk !== undefined
+      ? `${yesBid.toFixed(3)}/${yesAsk.toFixed(3)}`
+      : "—";
   return (
     <div className="chart-card">
       <div className="chart-h compact">
         <div className="chart-headline">
-          <div className="chart-price mono">$0.520</div>
-          <span className="chart-delta up mono">+$0.04 · +8.3%</span>
+          <div className="chart-price mono">${last.toFixed(3)}</div>
+          <span className={`chart-delta ${deltaUp ? "up" : "down"} mono`}>
+            {deltaUp ? "+" : "−"}${Math.abs(deltaAbs).toFixed(3)} ·{" "}
+            {deltaUp ? "+" : "−"}
+            {Math.abs(deltaPct).toFixed(1)}%
+          </span>
         </div>
-        <div className="chart-quick-stats">
+        <div className="chart-quick-stats" data-mock>
+          {/* O/H/L/VWAP still mock-fixture until Bram's indexer surfaces
+              price history. Spread + B/A are live-derived from the order
+              book when available; fall back to "—" when book is empty. */}
           {[
             ["O", "0.480"],
             ["H", "0.545"],
             ["L", "0.460"],
             ["VWAP", "0.504"],
-            ["Spread", "7.7%"],
-            ["B/A", "0.500/0.540"],
+            ["Spread", spreadPct !== undefined ? `${spreadPct.toFixed(1)}%` : "—"],
+            ["B/A", bestBA],
           ].map(([k, v]) => (
             <div key={k as string}>
               <span className="lbl">{k}</span>

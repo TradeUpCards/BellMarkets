@@ -15,12 +15,13 @@
 import type { CSSProperties } from "react";
 import Link from "next/link";
 
-// ── Demo strike overrides (Bram's Path B seed on devnet) ──────────────────
-const DEMO_LIVE_STRIKE: Record<string, number> = {
-  META: 610,
-  NVDA: 215,
-  AAPL: 309,
-};
+// Canonical demo-strike map — single source of truth across LeftRail,
+// landing matrix, trade-page strike pills, and header nav. See
+// `apps/web/src/lib/demo-strikes.ts`.
+import {
+  DEMO_LIVE_STRIKE,
+  DEMO_STRIKE_MARKETS,
+} from "@/lib/demo-strikes";
 
 interface RailStrike {
   px: number;
@@ -38,92 +39,50 @@ interface RailTicker {
   strikes: RailStrike[];
 }
 
-const RAIL_TICKERS: RailTicker[] = [
-  {
-    sym: "META", mark: "M", spot: "$679.84", chg: "+0.32%", chgUp: true, vol: "$42K",
-    strikes: [
-      { px: 620, label: "$620", prob: 92, kind: "itm" },
-      { px: 640, label: "$640", prob: 84, kind: "itm" },
-      { px: 660, label: "$660", prob: 71, kind: "itm" },
-      { px: 680, label: "$680 ATM", prob: 50, kind: "atm" },
-      { px: 700, label: "$700", prob: 28, kind: "otm" },
-      { px: 720, label: "$720", prob: 14, kind: "otm" },
-      { px: 740, label: "$740", prob: 6, kind: "otm" },
-    ],
-  },
-  {
-    sym: "NVDA", mark: "N", spot: "$1,342.71", chg: "+1.39%", chgUp: true, vol: "$62K",
-    strikes: [
-      { px: 1220, label: "$1,220", prob: 96, kind: "itm" },
-      { px: 1260, label: "$1,260", prob: 88, kind: "itm" },
-      { px: 1300, label: "$1,300", prob: 73, kind: "itm" },
-      { px: 1340, label: "$1,340 ATM", prob: 50, kind: "atm" },
-      { px: 1380, label: "$1,380", prob: 27, kind: "otm" },
-      { px: 1420, label: "$1,420", prob: 12, kind: "otm" },
-      { px: 1460, label: "$1,460", prob: 4, kind: "otm" },
-    ],
-  },
-  {
-    sym: "AAPL", mark: "A", spot: "$229.84", chg: "+0.54%", chgUp: true, vol: "$29K",
-    strikes: [
-      { px: 210, label: "$210", prob: 94, kind: "itm" },
-      { px: 220, label: "$220", prob: 82, kind: "itm" },
-      { px: 225, label: "$225", prob: 68, kind: "itm" },
-      { px: 230, label: "$230 ATM", prob: 50, kind: "atm" },
-      { px: 235, label: "$235", prob: 32, kind: "otm" },
-      { px: 240, label: "$240", prob: 18, kind: "otm" },
-      { px: 250, label: "$250", prob: 5, kind: "otm" },
-    ],
-  },
-  {
-    sym: "MSFT", mark: "M", spot: "$441.62", chg: "+0.73%", chgUp: true, vol: "$20K",
-    strikes: [
-      { px: 420, label: "$420", prob: 91, kind: "itm" },
-      { px: 430, label: "$430", prob: 78, kind: "itm" },
-      { px: 435, label: "$435", prob: 65, kind: "itm" },
-      { px: 440, label: "$440 ATM", prob: 50, kind: "atm" },
-      { px: 445, label: "$445", prob: 35, kind: "otm" },
-      { px: 455, label: "$455", prob: 17, kind: "otm" },
-      { px: 465, label: "$465", prob: 7, kind: "otm" },
-    ],
-  },
-  {
-    sym: "GOOGL", mark: "G", spot: "$184.27", chg: "−0.50%", chgUp: false, vol: "$12K",
-    strikes: [
-      { px: 170, label: "$170", prob: 93, kind: "itm" },
-      { px: 175, label: "$175", prob: 81, kind: "itm" },
-      { px: 180, label: "$180", prob: 66, kind: "itm" },
-      { px: 185, label: "$185 ATM", prob: 50, kind: "atm" },
-      { px: 190, label: "$190", prob: 30, kind: "otm" },
-      { px: 195, label: "$195", prob: 15, kind: "otm" },
-      { px: 200, label: "$200", prob: 5, kind: "otm" },
-    ],
-  },
-  {
-    sym: "AMZN", mark: "A", spot: "$201.13", chg: "+0.20%", chgUp: true, vol: "$16K",
-    strikes: [
-      { px: 185, label: "$185", prob: 92, kind: "itm" },
-      { px: 190, label: "$190", prob: 80, kind: "itm" },
-      { px: 195, label: "$195", prob: 66, kind: "itm" },
-      { px: 200, label: "$200 ATM", prob: 50, kind: "atm" },
-      { px: 205, label: "$205", prob: 32, kind: "otm" },
-      { px: 210, label: "$210", prob: 17, kind: "otm" },
-      { px: 220, label: "$220", prob: 6, kind: "otm" },
-    ],
-  },
-  {
-    sym: "TSLA", mark: "T", spot: "$261.04", chg: "−0.70%", chgUp: false, vol: "$24K",
-    strikes: [
-      { px: 240, label: "$240", prob: 91, kind: "itm" },
-      { px: 250, label: "$250", prob: 79, kind: "itm" },
-      { px: 255, label: "$255", prob: 65, kind: "itm" },
-      { px: 260, label: "$260 ATM", prob: 50, kind: "atm" },
-      { px: 265, label: "$265", prob: 35, kind: "otm" },
-      { px: 275, label: "$275", prob: 19, kind: "otm" },
-      { px: 285, label: "$285", prob: 7, kind: "otm" },
-    ],
-  },
-];
+/**
+ * Derive the rail accordion data from `DEMO_STRIKE_MARKETS` so every
+ * strike click routes to a live on-chain market (Bram's seeded 3 strikes
+ * per ticker: -3% / 0% / +3%). When Bram adds more strikes to the
+ * registry, this list grows automatically — no per-ticker hand-coding.
+ *
+ * Strike `kind` (itm / atm / otm) drives the heatmap CSS class. Spot is
+ * the latest seed value Bram published; chg + vol are placeholders until
+ * Bram's indexer surfaces price + volume history (post-v1).
+ */
+const TICKER_MARKS: Record<string, string> = {
+  META: "M", NVDA: "N", AAPL: "A", MSFT: "M", GOOGL: "G", AMZN: "A", TSLA: "T",
+};
+
+const RAIL_TICKERS: RailTicker[] = (() => {
+  const byTicker = new Map<string, typeof DEMO_STRIKE_MARKETS>();
+  for (const m of DEMO_STRIKE_MARKETS) {
+    const arr = byTicker.get(m.ticker) ?? [];
+    arr.push(m);
+    byTicker.set(m.ticker, arr);
+  }
+  return Array.from(byTicker.entries()).map(([ticker, markets]) => {
+    const sorted = [...markets].sort((a, b) => a.strike - b.strike);
+    const spot = sorted[0]?.spot ?? 0;
+    const atm = DEMO_LIVE_STRIKE[ticker] ?? sorted[Math.floor(sorted.length / 2)]?.strike ?? 0;
+    return {
+      sym: ticker,
+      mark: TICKER_MARKS[ticker] ?? ticker.slice(0, 1),
+      spot: `$${spot.toFixed(2)}`,
+      // chg + vol are placeholders until Bram's indexer surfaces real data.
+      chg: "+0.00%",
+      chgUp: true,
+      vol: "—",
+      strikes: sorted.map((m) => {
+        const kind = m.strike < atm ? "itm" : m.strike > atm ? "otm" : "atm";
+        const label = kind === "atm" ? `$${m.strike} ATM` : `$${m.strike}`;
+        // Prob 50% is the honest pre-book heuristic (we don't poll order
+        // books from the rail — that'd be 21 subscriptions for a nav
+        // surface). Live midpoint shows on the trade page strike pills.
+        return { px: m.strike, label, prob: 50, kind };
+      }),
+    };
+  });
+})();
 
 const RAIL_POSITIONS = [
   { market: "META.680.YES", side: "5 contracts · entry $0.62", pnl: "−$0.50", down: true },
