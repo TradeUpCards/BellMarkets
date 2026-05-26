@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>BellMarkets — Brain Lift</title>
+<style>
+  :root {
+    --bg: #0a0d14;
+    --panel: #0f141e;
+    --panel-2: #141b27;
+    --border: rgba(255,255,255,0.08);
+    --text: #e6e9ef;
+    --text-dim: #9aa3b2;
+    --text-mute: #6b7280;
+    --accent: #22d3ee;
+    --green: #10b981;
+    --red: #ef4444;
+    --amber: #f59e0b;
+    --violet: #8b5cf6;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14.5px; line-height: 1.6; margin: 0; }
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 36px 24px 80px; }
+  h1 { font-size: 30px; font-weight: 700; margin: 0 0 6px; letter-spacing: -0.02em; }
+  .subtitle { color: var(--text-dim); font-size: 15px; margin: 0 0 28px; }
+  .meta { color: var(--text-mute); font-size: 13px; margin-bottom: 28px; font-family: var(--mono); }
+  h2 { font-size: 20px; font-weight: 600; margin: 36px 0 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 16px; font-weight: 600; margin: 20px 0 8px; color: var(--accent); }
+  h4 { font-size: 14px; font-weight: 600; margin: 16px 0 6px; color: var(--text); }
+  code { background: var(--panel-2); padding: 1px 6px; border-radius: 3px; color: #c2cad6; font-family: var(--mono); font-size: 0.92em; }
+  p { margin: 8px 0; }
+  ul, ol { margin: 6px 0 12px; padding-left: 22px; }
+  li { margin: 3px 0; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0 18px; font-size: 13.5px; }
+  th, td { padding: 8px 10px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+  th { color: var(--text-dim); font-weight: 600; background: var(--panel); }
+  blockquote {
+    margin: 12px 0;
+    padding: 10px 16px;
+    border-left: 3px solid var(--accent);
+    color: var(--text-dim);
+    background: var(--panel-2);
+    border-radius: 0 6px 6px 0;
+  }
+  .pov {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 14px 0;
+    border-left: 4px solid var(--violet);
+  }
+  .pov h3 { margin-top: 0; }
+  .pov .tradeoff { color: var(--amber); font-weight: 600; }
+  .rule-list {
+    display: grid;
+    grid-template-columns: 50px 1fr;
+    gap: 8px 16px;
+    margin: 12px 0;
+    padding: 0;
+    list-style: none;
+  }
+  .rule-list li { display: contents; }
+  .rule-list li .num { font-family: var(--mono); color: var(--text-mute); font-size: 12px; text-align: right; padding-top: 4px; }
+  .rule-list li .body { padding: 4px 0; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
+  .badge {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .badge.amber { background: rgba(245,158,11,0.12); color: var(--amber); border: 1px solid var(--amber); }
+  .badge.green { background: rgba(16,185,129,0.12); color: var(--green); border: 1px solid var(--green); }
+  .badge.red { background: rgba(239,68,68,0.12); color: var(--red); border: 1px solid var(--red); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>BellMarkets — Brain Lift</h1>
+  <p class="subtitle">The 1-page constitution. Single source of truth for AI coding assistants. Read before writing code.</p>
+  <p class="meta">v2 (post-DR-020 + post-deploy_index=8) · Refreshed 2026-05-25 · Cory Vandenberg (Tate)</p>
+
+  <blockquote>
+    Where this doc and <code>constitution/decisions.md</code> disagree, the DR file wins — it's the audit trail. The Day-0 (2026-05-21) version of this brainlift is preserved in git history.
+  </blockquote>
+
+  <h2>1. Context</h2>
+
+  <h3>What this is</h3>
+  <p>
+    BellMarkets is the team's implementation of the Gauntlet "Meridian" PRD: a non-custodial Solana dApp where users trade YES/NO binary outcome tokens against bUSDC for <em>"Will [STOCK] close above [PRICE] today?"</em> on the MAG7. Settlement is an on-chain Pyth read shortly after 4:00 PM ET. The order book is <strong>in-program</strong> (per DR-020 — pivoted from Phoenix integration). Daily lifecycle is orchestrated by an off-chain TypeScript service on Trigger.dev.
+  </p>
+
+  <h3>Why it exists</h3>
+  <p>
+    Gauntlet cohort project — partner-evaluated build demonstrating the full lifecycle (<em>create → mint → trade → settle → redeem</em>) end-to-end on Solana devnet, with defensible architecture and named trade-offs. Hard final: <strong>Mon 2026-05-25 7:00 PM ET</strong>. Effective build window: ~4 days.
+  </p>
+
+  <h3>Who uses it</h3>
+  <ul>
+    <li><strong>Demo users:</strong> retail-style traders on Solana devnet during the demo window; Phantom/Backpack/Solflare wallet, no KYC.</li>
+    <li><strong>Evaluators:</strong> Gauntlet reviewers running the lifecycle from the repo + reviewing on-chain via Solscan.</li>
+    <li><strong>Team:</strong> validating on-chain invariants and the cron-failure recovery path during dev.</li>
+  </ul>
+
+  <h3>Stage of build — 2026-05-25 (submission day)</h3>
+  <ul>
+    <li><strong>Anchor program:</strong> deployed to devnet at <code>599h7VznYR4CxyrG5nQbhR13qtRuwPcbnNr5QqbkS7uV</code> (deploy_index=8). 27 ixs, 7 account types, 57 error variants.</li>
+    <li><strong>bUSDC self-controlled demo mint:</strong> <code>5vq2oahKFnnjStK1Ctqwdxdt44rtKuKHmPga9iZKtBZp</code>.</li>
+    <li><strong>In-program CLOB:</strong> live. Matcher verified end-to-end on-chain (META $610, 6 resting orders, 1 crossing trade — all invariants held).</li>
+    <li><strong>Frontend:</strong> deployed at bell-markets.vercel.app; trade hooks wired to live chain state.</li>
+    <li><strong>Automation:</strong> Trigger.dev jobs defined for create-markets + post-close phases.</li>
+  </ul>
+
+  <h3>Deadlines</h3>
+  <ul>
+    <li><strong>Final submission:</strong> Mon 2026-05-25 7:00 PM ET (hard cohort deliverable) ← <span class="badge red">TODAY</span></li>
+    <li><strong>Stretch:</strong> mainnet-beta post-submission, gated on v1.1 rent-recovery instructions (<code>force_cancel_order</code> + <code>close_order_book</code>, per <code>specs/deferred.md</code>).</li>
+  </ul>
+
+  <h3>Out of scope (deliberate)</h3>
+  <ul>
+    <li>No mainnet, no real funds (PRD hard rule)</li>
+    <li>No KYC, no custody, no off-ramp</li>
+    <li>No mobile / no i18n / no multi-tenant</li>
+    <li><strong>Off-chain database is product surface, not protocol authority.</strong> Solana is canonical for funds (DR-003 amended); a Neon Postgres serves users, OAuth, AI briefings, notification prefs, leaderboard reads.</li>
+    <li>No fallback CLOB if the in-program matcher has a bug — admin <code>pause</code> is the safety valve</li>
+    <li>No fallback oracle if Pyth fails (DR-003) — admin override (<code>admin_settle</code>) on 1hr time delay is the recovery</li>
+    <li>No automated rent recovery for OrderBook + escrows post-settle in v1 — deferred to v1.1 as pre-mainnet precondition</li>
+  </ul>
+
+  <h2>2. Spiky Points of View</h2>
+  <p>Disagreeing with one means redesigning the project, not patching it. Each POV has a Decision Record.</p>
+
+  <div class="pov">
+    <h3>POV 1 — Build the matching engine in-program</h3>
+    <p>We run a price-time-priority CLOB inside the Anchor program. <code>place_order</code> is the entry point; the matcher crosses on placement (three-phase plan/settle/apply) and rests the remainder if any. <code>cancel_order</code> is owner-only. <code>match_orders</code> is a permissionless crank. Adopted Keith Mazanec's parallel-cohort reference design with adversarial review pre-applied.</p>
+    <p><span class="tradeoff">Trade-off:</span> One novel audit surface (gated for mainnet on a formal third-party audit), in exchange for: no Phoenix devnet bootstrap dependency, smaller audit surface concentrated in one program, escrow telescoping without dust, stronger "we built it" interview narrative. <span class="badge amber">DR-020</span> supersedes <span class="badge violet">DR-001</span>.</p>
+  </div>
+
+  <div class="pov">
+    <h3>POV 2 — On-chain owns the rules; off-chain owns the schedule</h3>
+    <p><code>settle_market</code> is callable by <em>anyone</em>. The Anchor program enforces all timing rules + Pyth staleness + Pyth confidence + the time-delayed admin override. Automation is a convenience caller — first to crank wins — not an authority. Admin override (<code>admin_settle</code>) is on-chain time-delayed (≥1hr) and used only when Pyth fails.</p>
+    <p><span class="tradeoff">Trade-off:</span> ~half a day of extra on-chain timing-logic work + benign race-condition wasted fees, in exchange for cheaper mainnet ops (~5–10×), better scaling (load distributes to user demand), stronger demo defense ("our cron can die and the system still works"), engineering symmetry with the in-program matcher's permissionless-crank philosophy. <span class="badge violet">DR-002</span></p>
+  </div>
+
+  <div class="pov">
+    <h3>POV 3 — Buy NO is a first-class atomic operation; UI never exposes mint-and-sell</h3>
+    <p>Four buttons: Buy YES, Buy NO, Sell YES, Sell NO. Each = one wallet-signed transaction. Buy NO bundles <code>mint_pair + place_order(SELL_YES, IOC)</code> atomically (user keeps the NO, effective cost = <code>$1 − YES_sale_price</code>); Sell NO is the inverse. Users never see a "mint pair" button, never see a YES token they don't want.</p>
+    <p><span class="tradeoff">Trade-off:</span> More frontend complexity (bundled atomic transactions, position-aware button states, four-button mental model) in exchange for UX that matches user intent rather than protocol internals. <span class="badge violet">DR-019 amendment:</span> Limit-side NO trades are disabled (NO is market-only) because a resting Limit NO would strand fees on cancel.</p>
+  </div>
+
+  <h2>3. The Knowledge Tree</h2>
+
+  <h3>Tech stack</h3>
+  <table>
+    <tr><th>Layer</th><th>Choice</th></tr>
+    <tr><td>Solana CLI</td><td><code>3.1.14</code> (Anza/agave)</td></tr>
+    <tr><td>Anchor CLI</td><td><code>0.31.1</code> (Solana 3.x sBPF v3 compat)</td></tr>
+    <tr><td>Rust (host)</td><td><code>1.95</code> stable</td></tr>
+    <tr><td>Onchain language</td><td>Rust + Anchor on Solana devnet (mainnet gated on v1.1)</td></tr>
+    <tr><td><strong>CLOB</strong></td><td><strong>In-program</strong> (DR-020). Bounded zero-copy <code>OrderBook</code> PDA, 128 orders/side, three-phase matching. Reference: <code>docs/architecture/reference-clob-{design,decisions,spec}.md</code>.</td></tr>
+    <tr><td>Oracle</td><td>Pyth Network (DR-003) — vendored 30-line parser at <code>programs/bell-markets/src/oracle.rs</code>. Do NOT use <code>pyth-sdk-solana</code>.</td></tr>
+    <tr><td>RPC</td><td>Helius via server-side proxy at <code>apps/web/app/api/solana-rpc/route.ts</code> (key out of NEXT_PUBLIC_)</td></tr>
+    <tr><td>Frontend</td><td>Next.js 14.2.18 (App Router) + React 18 + TS strict</td></tr>
+    <tr><td>Anchor JS client</td><td><code>@coral-xyz/anchor</code> 0.30.1 (deliberate mismatch with CLI 0.31.1 per DR-004)</td></tr>
+    <tr><td>Wallet</td><td><code>@solana/wallet-adapter-react</code> (Phantom / Backpack / Solflare)</td></tr>
+    <tr><td>Realtime</td><td><code>connection.onAccountChange</code> — no polling (Hard YES #9)</td></tr>
+    <tr><td>State/data</td><td>TanStack Query + Zustand</td></tr>
+    <tr><td>Styling</td><td>Tailwind CSS + shadcn/ui</td></tr>
+    <tr><td>Database</td><td>Neon Postgres (DR-003 amended). Product surface only. NOT canonical for funds.</td></tr>
+    <tr><td>Automation</td><td>Trigger.dev v4 at <code>services/automation/</code></td></tr>
+    <tr><td>AI</td><td>Anthropic Claude Sonnet (Bell Pro daily briefings)</td></tr>
+    <tr><td>Package manager</td><td><strong>pnpm always</strong> (never npm/yarn)</td></tr>
+    <tr><td>Testing</td><td>mocha + chai + ts-mocha (Anchor) · Vitest (automation) · Jest (frontend) · cargo test --lib (Rust property tests)</td></tr>
+    <tr><td>Deploy</td><td>Solana devnet (program) · Vercel (frontend) · Trigger.dev cloud (cron) · Neon (DB)</td></tr>
+  </table>
+
+  <h3>Critical files</h3>
+  <ul>
+    <li><code>programs/bell-markets/src/instructions/place_order.rs</code> — DR-020 load-bearing; three-phase matching; vault invariant.</li>
+    <li><code>programs/bell-markets/src/instructions/cancel_order.rs</code> — escrow refund correctness; allowed when paused/settled.</li>
+    <li><code>programs/bell-markets/src/instructions/settle_market.rs</code> — $1 invariant load-bearing; permissionless; Pyth-validated.</li>
+    <li><code>programs/bell-markets/src/instructions/mint_pair.rs</code> — vault-balance invariant load-bearing.</li>
+    <li><code>programs/bell-markets/src/instructions/redeem.rs</code> — payout invariant load-bearing.</li>
+    <li><code>programs/bell-markets/src/matching.rs</code> — sorted-insert + remove-shift; bid_cost_ceil helper.</li>
+    <li><code>programs/bell-markets/src/state.rs</code> — <code>OrderBook::LEN = 16,448 B</code>; <code>ORDERBOOK_N = 128</code>.</li>
+    <li><code>programs/bell-markets/src/oracle.rs</code> — Pyth parser; staleness + confidence thresholds.</li>
+    <li><code>services/automation/src/jobs/morning.ts</code> — daily liveness.</li>
+    <li><code>apps/web/src/lib/tx/build-buy-no.ts</code> (+ <code>build-sell-no.ts</code>) — POV-3 atomicity.</li>
+    <li><code>apps/web/app/api/solana-rpc/route.ts</code> — Helius proxy.</li>
+  </ul>
+
+  <h2>4. Guardrails</h2>
+
+  <h3>Hard NOs <span class="badge red">enforced</span></h3>
+  <ol class="rule-list">
+    <li><span class="num">1.</span><span class="body">Never use mainnet or real funds for the core submission (PRD).</span></li>
+    <li><span class="num">2.</span><span class="body">Never commit secrets / private keys / mnemonics / API keys / RPC keys to git. <code>.env</code> only; <code>keys/</code> directory gitignored.</span></li>
+    <li><span class="num">3.</span><span class="body">Never use <code>npm install</code> or <code>yarn add</code> — pnpm always. Delete any <code>package-lock.json</code> / <code>yarn.lock</code> that sneaks in.</span></li>
+    <li><span class="num">4.</span><span class="body"><strong>The matcher is in-program now (DR-020).</strong> Reject PRs that try to swap it for Phoenix or another CLOB without a new DR superseding DR-020.</span></li>
+    <li><span class="num">5.</span><span class="body">Never give <code>settle_market</code> a special-signer requirement (DR-002).</span></li>
+    <li><span class="num">6.</span><span class="body">Never add a fallback oracle (DR-003). Pyth or admin override only.</span></li>
+    <li><span class="num">7.</span><span class="body">Never leak the mint-and-sell mechanic to the trade UI (POV-3). Buy NO / Sell NO are atomic single-tx operations from the user's perspective.</span></li>
+    <li><span class="num">8.</span><span class="body">Never violate the $1 USDC invariant — <code>yes_payout + no_payout = $1.00</code> exactly. Fees route through <code>fee_collector</code>, never out of <code>usdc_vault</code>.</span></li>
+    <li><span class="num">9.</span><span class="body">Never commit files under <code>.project/</code> or <code>.claude/</code> — OneDrive-mirrored, gitignored by construction.</span></li>
+    <li><span class="num">10.</span><span class="body">Never <code>git push --force</code> to <code>main</code> without explicit user request.</span></li>
+    <li><span class="num">11.</span><span class="body">Never dump raw oracle / RPC / wallet logs (>20 lines) into handoffs, session recaps, or commit messages.</span></li>
+    <li><span class="num">12.</span><span class="body">Never use live stock prices in unit / integration tests — synthetic / mocked Pyth feeds only.</span></li>
+    <li><span class="num">13.</span><span class="body">The Helius API key NEVER appears in <code>NEXT_PUBLIC_*</code>. Server-side proxy only. A leaked key is a leaked credential, full stop.</span></li>
+  </ol>
+
+  <h3>Hard YESes <span class="badge green">enforced</span></h3>
+  <ol class="rule-list">
+    <li><span class="num">1.</span><span class="body"><strong>The $1 USDC invariant is verified on-chain.</strong> <code>mint_pair</code> debits exact amount + mints exact amount of YES + NO; <code>redeem_pair</code> is the inverse; <code>redeem</code> post-settle pays $1 to the winning side; vault holds exactly <code>pairs_outstanding × $1</code>. Drew's invariant test suite + Aria's Rust property tests cover this.</span></li>
+    <li><span class="num">2.</span><span class="body">The full lifecycle is demoable end-to-end on devnet. Create → mint → trade → settle → redeem. Verified 2026-05-25.</span></li>
+    <li><span class="num">3.</span><span class="body">pnpm always — every script / CI / README / <code>package.json</code> references pnpm. Permanent user preference.</span></li>
+    <li><span class="num">4.</span><span class="body">Every PR runs: <code>anchor test</code> + <code>pnpm test</code> + <code>pnpm typecheck</code> + <code>pnpm lint</code>. CI fails the merge if any fail.</span></li>
+    <li><span class="num">5.</span><span class="body">The demo includes the cron-failure path — settle from a non-cron wallet. Load-bearing evidence for DR-002.</span></li>
+    <li><span class="num">6.</span><span class="body"><code>settle_market</code> validates Pyth staleness AND confidence; both thresholds configurable; outcome immutable once written.</span></li>
+    <li><span class="num">7.</span><span class="body"><code>admin_settle</code> has an on-chain time-delay gate (≥1hr after settlement window).</span></li>
+    <li><span class="num">8.</span><span class="body">Position-exclusivity is a frontend guardrail — UI prevents Buy YES while holding NO (and vice versa). Benign if bypassed (user redeems pair for $1).</span></li>
+    <li><span class="num">9.</span><span class="body">Order book + portfolio views update via WebSocket (<code>onAccountChange</code>). Reconnect-on-disconnect handled.</span></li>
+    <li><span class="num">10.</span><span class="body">Frontend uses <code>@solana/wallet-adapter-react</code> for all signing — no in-app keystore, no env-var private keys for "test flows."</span></li>
+    <li><span class="num">11.</span><span class="body">Every Spiky POV has a Decision Record in <code>constitution/decisions.md</code> with the trade-off line spelled out.</span></li>
+    <li><span class="num">12.</span><span class="body">All matcher CPI transfers are PDA-signed with <code>strike_market</code> as authority — never the user. Maker payout ATAs validated for ownership + mint before the CPI fires.</span></li>
+  </ol>
+
+  <h3>Things to flag for human review (not auto-block)</h3>
+  <ul>
+    <li>Adding any new dependency beyond the locked stack — name a one-line "why" first.</li>
+    <li>Touching the <code>vault</code> PDA seeds, <code>OrderBook</code> schema, or <code>StrikeMarket</code> account schema after deploy_index=8.</li>
+    <li>Any change to <code>place_order</code>, <code>cancel_order</code>, <code>match_orders</code>, <code>settle_market</code>, <code>mint_pair</code>, or <code>redeem</code> — pause for property-test coverage review.</li>
+    <li>Any cross-workstream PR (e.g., <code>programs/</code> + <code>apps/web/</code>) — both owning leads must sign off.</li>
+    <li>Any deviation from a Spiky POV — write a new DR before implementing.</li>
+  </ul>
+
+  <hr />
+  <p class="meta">
+    Created: 2026-05-21 (v1) → refreshed 2026-05-25 (v2) · Template: brainlift v1 (from <code>claude-code-project-template</code> v0.3.0+) · Owner: Cory Vandenberg (Tate)
+  </p>
+
+</div>
+</body>
+</html>

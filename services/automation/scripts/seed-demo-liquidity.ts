@@ -70,6 +70,7 @@ type CliArgs = {
 function parseArgs(): CliArgs {
   let tickers: Ticker[] = ["META"];
   let skipPlaceOrders = false;
+  let expiryDaysOffset = 2; // T+36h default → "day after tomorrow at 4pm ET"
   for (let i = 2; i < process.argv.length; i++) {
     const arg = process.argv[i];
     if (arg === "--tickers" && i + 1 < process.argv.length) {
@@ -78,12 +79,15 @@ function parseArgs(): CliArgs {
       i++;
     } else if (arg === "--skip-place-orders") {
       skipPlaceOrders = true;
+    } else if (arg === "--expiry-days" && i + 1 < process.argv.length) {
+      expiryDaysOffset = parseInt(process.argv[i + 1]!, 10);
+      i++;
     }
   }
-  // Expiry: T+36h, rounded to 4pm ET of the day after tomorrow. Bounded by
-  // MAX_EXPIRY_HORIZON_SECS (7 days). Plenty of demo runway.
+  // Expiry: T+(expiryDaysOffset * 24h - 12h), rounded to 4pm ET of that day.
+  // Bounded by MAX_EXPIRY_HORIZON_SECS (7 days). Plenty of demo runway.
   const now = new Date();
-  const twoDaysOut = new Date(now.getTime() + 36 * 60 * 60 * 1000);
+  const twoDaysOut = new Date(now.getTime() + (expiryDaysOffset * 24 - 12) * 60 * 60 * 1000);
   const expiryUnix = Math.floor(
     Date.UTC(
       twoDaysOut.getUTCFullYear(),

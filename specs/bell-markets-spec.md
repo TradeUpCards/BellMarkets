@@ -39,16 +39,16 @@ A user connects a Solana wallet (Phantom, Backpack, Solflare). They see a list o
 **Trigger:** user clicks "Buy Yes" on a strike's trade panel.
 
 **Steps:**
-1. User connects wallet (if not already) and sees their USDC balance.
-2. User browses active contracts, selects a strike (e.g., "META > $680").
-3. UI displays current Yes/No prices, implied probability, and book depth.
-4. User chooses market or limit, enters USDC amount, clicks "Buy Yes."
-5. Frontend assembles ONE transaction: Phoenix `place_order` (buy Yes against the ask side of the book).
+1. User connects wallet (if not already) and sees their bUSDC balance.
+2. User browses active contracts, selects a strike (e.g., "META > $610").
+3. UI displays current YES/NO prices (NO derived from YES via complementary identity), implied probability, and book depth from the on-chain OrderBook PDA.
+4. User chooses market or limit, enters bUSDC amount, clicks "Buy YES."
+5. Frontend assembles ONE transaction: `place_order(SIDE_BID, price, size, is_market)` against the on-chain in-program CLOB. The tx includes maker payout ATAs in `remaining_accounts` (one per planned fill, per `place_order.rs` contract).
 6. Wallet prompts user to sign.
-7. On-chain: Phoenix matches the order, transfers USDC from user → maker, transfers Yes tokens from maker → user.
-8. Frontend's `onAccountChange` subscription fires; UI updates: Yes balance ↑, USDC balance ↓, position view refreshes.
+7. On-chain: matcher runs three-phase (plan fills → settle CPI per fill, PDA-signed → apply book updates). bUSDC moves from user/escrow to maker; YES tokens move from yes_escrow → user.
+8. Frontend's `onAccountChange` subscription fires on the OrderBook PDA; UI updates: YES balance ↑, bUSDC balance ↓, position view refreshes.
 
-**Success criteria:** Yes tokens appear in user's wallet within 1–2 seconds. No intermediate "minting pair" step is shown.
+**Success criteria:** YES tokens appear in user's wallet within 1–2 seconds. No intermediate "minting pair" step is shown. Vault invariant intact (trading is escrow-only, never touches usdc_vault).
 
 **Failure modes:**
 - Wallet declines → UI shows a non-blocking toast; nothing changes on-chain.
@@ -60,44 +60,44 @@ A user connects a Solana wallet (Phantom, Backpack, Solflare). They see a list o
 **Trigger:** user clicks "Buy No" on a strike's trade panel.
 
 **Steps:**
-1. User selects strike, sees Yes/No prices, picks market/limit, enters USDC amount, clicks "Buy No."
-2. Frontend assembles ONE transaction: `[mint_pair (deposit $1 USDC, receive 1 Yes + 1 No), Phoenix place_sell_order (sell the just-minted Yes at best bid)]` — bundled atomically.
+1. User selects strike, sees YES/NO prices (NO = $1 − YES at midpoint), picks market (DR-019: NO is market-only in v1), enters bUSDC amount, clicks "Buy NO."
+2. Frontend assembles ONE transaction: `[mint_pair(amount), place_order(SIDE_ASK, ignored_price, amount, is_market=true)]` — bundled atomically. The place_order leg is IOC (fill-or-cancel).
 3. Wallet prompts ONCE for signature.
-4. On-chain: program mints the pair, Phoenix sells the Yes; user ends up with the No token only. Effective cost = `$1 - yes_sale_price`.
-5. UI updates: No balance ↑, USDC balance ↓ by net cost, position view refreshes.
+4. On-chain: `mint_pair` debits bUSDC + mints equal YES + NO; `place_order` immediately sells the just-minted YES against the best bid. User ends up with the NO token only. Effective cost = `$1 − yes_sale_price`.
+5. UI updates: NO balance ↑, bUSDC balance ↓ by net cost, position view refreshes.
 
-**Success criteria:** ONE signature, ONE transaction, ZERO visible "mint pair" UI step (POV-3). The transient intermediate state (holding both Yes and No mid-transaction) is never displayed.
+**Success criteria:** ONE signature, ONE transaction, ZERO visible "mint pair" UI step (POV-3). The transient intermediate state (holding both YES and NO mid-transaction) is never displayed.
 
 **Failure modes:**
-- Yes sale doesn't fill → entire bundled tx fails atomically; user is back to original state. UI shows "Couldn't find a buyer at your price — try a wider limit."
-- User already holds Yes tokens → UI shows "Close your Yes position first" (Hard YES #8).
+- YES sale doesn't fill (no bid at acceptable price) → entire bundled tx fails atomically; user is back to original state. UI shows "Couldn't find a buyer — book is thin."
+- User already holds YES tokens for this strike → UI shows "Close your YES position first" (Hard YES #8).
 
 ### 3.3 Sell Yes (exit bullish)
 
 **Trigger:** user clicks "Sell Yes" from their portfolio.
 
 **Steps:**
-1. User opens `/portfolio`, sees their Yes position for a strike, clicks "Sell Yes."
-2. UI shows current Yes bid prices, lets user pick market or limit.
-3. Frontend assembles ONE transaction: Phoenix `place_sell_order` (sell Yes against the bid side).
+1. User opens `/portfolio`, sees their YES position for a strike, clicks "Sell YES."
+2. UI shows current YES bid prices from the on-chain OrderBook, lets user pick market or limit.
+3. Frontend assembles ONE transaction: `place_order(SIDE_ASK, price, size, is_market)`. YES tokens debited from user → yes_escrow; matcher runs three-phase to cross against resting bids; bUSDC paid from usdc_escrow → user via PDA signer.
 4. Wallet signs.
-5. On-chain: Phoenix matches, transfers Yes from user → taker, USDC from taker → user.
-6. UI updates: Yes balance ↓, USDC balance ↑, P&L row shows realized.
+5. On-chain: matcher executes; YES → taker (or rests if limit); bUSDC → user.
+6. UI updates: YES balance ↓, bUSDC balance ↑, P&L row shows realized.
 
-**Success criteria:** USDC arrives in wallet within 1–2s. Realized P&L = `sale_price - entry_price` per token.
+**Success criteria:** bUSDC arrives in wallet within 1–2s. Realized P&L = `sale_price − entry_price` per token. Vault invariant intact (escrow-only, never vault).
 
 ### 3.4 Sell No (exit bearish, first-class operation)
 
 **Trigger:** user clicks "Sell No" from their portfolio.
 
 **Steps:**
-1. User clicks "Sell No" on a No position.
-2. Frontend assembles ONE transaction: `[Phoenix place_buy_order (buy Yes at the ask side), redeem_pair (burn the Yes + No pair, receive $1 USDC)]` — bundled atomically.
+1. User clicks "Sell NO" on a NO position.
+2. Frontend assembles ONE transaction: `[place_order(SIDE_BID, ignored_price, size, is_market=true), redeem_pair(size)]` — bundled atomically. The place_order leg is IOC.
 3. Wallet signs ONCE.
-4. On-chain: Yes purchased, then immediately paired with held No and redeemed for $1. Net effect: user receives `$1 - yes_buy_price` more USDC.
-5. UI updates: No balance ↓, USDC balance ↑, P&L row shows realized.
+4. On-chain: YES bought via matcher (escrow flows); held NO is immediately paired with the just-bought YES and redeemed for $1 bUSDC per pair. Net effect: user receives `$1 − yes_buy_price` more bUSDC.
+5. UI updates: NO balance ↓, bUSDC balance ↑, P&L row shows realized.
 
-**Success criteria:** ONE signature. The buy-Yes mechanic is invisible to the user (POV-3).
+**Success criteria:** ONE signature. The buy-YES mechanic is invisible to the user (POV-3).
 
 ### 3.5 Settlement (operator + user)
 
@@ -150,15 +150,18 @@ A user connects a Solana wallet (Phantom, Backpack, Solflare). They see a list o
 ## 4. Daily lifecycle (operational state machine)
 
 ```
-8:00 AM ET     Automation reads previous-close from Pyth HTTP API
-8:30 AM ET     Automation calls create_strike_market for each unique strike (7 stocks × ~5 strikes after dedup = ~35 markets)
-9:00 AM ET     Markets visible on /markets page; minting enabled
-9:30 AM ET     US market open; Phoenix order books accept orders; live trading begins
-4:00 PM ET     US market close
-4:05 PM ET     Automation polls Pyth, calls settle_market for each open market
+Post-close (prev trading day, 4:05 PM ET)
+              Automation's grid-phase1-anchor cron settles expiring markets
+              AND creates next day's strike grid (7 tickers × 7 strikes = 49 markets)
+              Each new market goes through init_order_book + grow_order_book
+              (or user-funded via user_create_strike_market — DR-005)
+4:00 PM ET    US market close
+~4:05 PM ET   Automation polls Pyth, calls settle_market for each open market
               [if automation down → any user can call settle_market from /portfolio]
-4:05 PM ET +   Redemption enabled; winners claim USDC
+~4:05 PM ET+  Redemption enabled; winners claim bUSDC
               [unredeemed tokens remain redeemable indefinitely]
+After-hours   grid-phase2-ah-check polls every 30 min for wild-swing strike expansion
+Pre-market    grid-phase3-pm-check polls every 30 min for wild-swing strike expansion
 ```
 
 ### Per-market state machine
@@ -172,8 +175,8 @@ Created → Mintable → Tradable → SettlementPending → Settled → (Redeeme
 | State | Triggered by | Transitions |
 |---|---|---|
 | **Created** | `create_strike_market` (admin) | → Mintable on completion |
-| **Mintable** | After creation | Users can `mint_pair`; Yes/No tokens trade on Phoenix |
-| **Tradable** | Same as Mintable in practice; modeled separately because trading also needs Phoenix's `market_open` flag | → SettlementPending at `settlement_window` |
+| **Mintable** | After creation | Users can `mint_pair`; YES/NO tokens trade on the in-program CLOB |
+| **Tradable** | After `grow_order_book` sets `strike_market.order_book` (trading gate) | → SettlementPending at `settlement_window` |
 | **SettlementPending** | `block_time >= settlement_window` | `settle_market` callable by anyone (DR-002) |
 | **Settled** | `settle_market` writes outcome | Immutable; redeem enabled |
 | **Admin override** | `admin_settle` after `settlement_window + 1h` (Hard YES #7) | Same end state as Settled |
@@ -184,10 +187,10 @@ Created → Mintable → Tradable → SettlementPending → Settled → (Redeeme
 ## 5. Edge cases + known constraints
 
 - **Strike collision after rounding:** for low-priced stocks (e.g., a hypothetical $230 stock at ±3% rounded to $10), multiple strike levels can dedupe to the same value. Resolution: dedup at strike-calc time; result is fewer than the nominal 7 strikes for that stock (e.g., 5 strikes for AAPL example in PRD). UI shows actual unique strikes.
-- **Phoenix book is empty for a strike:** Buy Yes market order has no asks to take → tx fails cleanly; UI tells user "no liquidity at this strike, try a limit." Buy No (which requires a Yes sale) similarly fails.
-- **User refreshes mid-flow:** position view reads on-chain state; refresh shows authoritative current state. No persistent off-chain state to get out of sync.
+- **OrderBook is empty for a strike:** Buy YES market order has no asks to take → tx fails cleanly; UI tells user "no liquidity at this strike, try a limit." Buy NO (which requires a YES sale via IOC) similarly fails.
+- **User refreshes mid-flow:** position view reads on-chain state via `useAllMarkets` + `useOrderBook` + `usePosition`; refresh shows authoritative current state. Neon DB serves product surface only; if it disagrees with chain, chain wins.
 - **Browser tab close mid-tx:** wallet's signed tx may still land; on next session, position view will reflect the actual on-chain state.
-- **Concurrent buy-no by two users:** both bundle `mint_pair + sell_yes`. Both succeed (independent pairs); race only matters if Phoenix book is too thin to absorb both sales — then one or both Phoenix `place_order` calls fail, atomically reverting the bundled tx.
+- **Concurrent buy-NO by two users:** both bundle `mint_pair + place_order(SELL_YES, IOC)`. Both succeed (independent pairs minted); race only matters if the OrderBook's bid side is too thin to absorb both IOC sales — then one or both `place_order` calls return zero-fill IOC, atomically reverting the bundled tx and refunding the user's bUSDC.
 - **Pyth feed missing for a ticker (config error):** `create_strike_market` rejects the call with a clear error; admin fixes config before retrying.
 - **Settlement at exactly `block_time == settlement_window`:** allowed (PRD says "at-or-after").
 - **At-strike close (close == strike):** Yes wins (PRD's at-or-above rule).
@@ -199,13 +202,14 @@ Created → Mintable → Tradable → SettlementPending → Settled → (Redeeme
 - Mobile app — desktop browser only (see `specs/deferred.md` "mobile app")
 - i18n / multi-language UI — English only
 - Multi-tenant admin or operator dashboards beyond pause/unpause (see deferred)
-- Persistent off-chain DB / caching layer that becomes source of truth (see `hard-rules.md` §3.3)
+- Off-chain DB as source of truth for funds (DB serves product surface only; chain is canonical for funds — see `hard-rules.md` §3.3 amended)
 - KYC, off-ramp, fiat on-ramp (see `hard-rules.md` §3.1)
 - Non-MAG7 stocks, margin, perpetuals, leveraged tokens, cross-strike netting (see `hard-rules.md` §3.2)
-- Mainnet deployment for the core submission (stretch goal only — see deferred)
-- Fallback CLOB if Phoenix is down (DR-001 trade-off — see deferred)
-- Fallback oracle if Pyth is down (DR-003 trade-off — see deferred)
-- Custom on-chain matching engine (DR-001 — see deferred)
+- Mainnet deployment for the core submission (stretch goal — v1.1 rent-recovery is hard precondition)
+- Phoenix CLOB integration (DR-020 superseded DR-001; deferred to v2 secondary-venue candidate)
+- Fallback oracle if Pyth is down (DR-003 trade-off — admin override on 1hr time delay is recovery)
+- Limit-side NO trades (DR-019 — NO market-only in v1; resting Limit NO would strand fees on cancel)
+- Post-settle rent recovery for OrderBook + escrows (v1.1; ~95% of per-market rent recoverable — see `specs/deferred.md`)
 - Self-funding settle bounty (future feature — see deferred)
 
 Cross-reference `specs/deferred.md` for the full rationale on each.

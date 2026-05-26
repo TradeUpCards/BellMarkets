@@ -1,0 +1,995 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>BellMarkets — Trade Mechanics Explainer</title>
+<style>
+  :root {
+    --bg: #0a0d14;
+    --panel: #0f141e;
+    --panel-2: #141b27;
+    --border: rgba(255,255,255,0.08);
+    --border-strong: rgba(255,255,255,0.16);
+    --text: #e6e9ef;
+    --text-dim: #9aa3b2;
+    --text-mute: #6b7280;
+    --accent: #22d3ee;
+    --green: #10b981;
+    --green-soft: rgba(16,185,129,0.15);
+    --red: #ef4444;
+    --red-soft: rgba(239,68,68,0.15);
+    --amber: #f59e0b;
+    --amber-soft: rgba(245,158,11,0.15);
+    --violet: #8b5cf6;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.55;
+    margin: 0;
+    padding: 0;
+  }
+  .wrap {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+  }
+  h1 {
+    font-size: 32px;
+    font-weight: 700;
+    margin: 0 0 8px;
+    letter-spacing: -0.02em;
+  }
+  .subtitle {
+    color: var(--text-dim);
+    font-size: 16px;
+    margin: 0 0 32px;
+  }
+  h2 {
+    font-size: 22px;
+    font-weight: 600;
+    margin: 48px 0 12px;
+    letter-spacing: -0.01em;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  h3 {
+    font-size: 17px;
+    font-weight: 600;
+    margin: 28px 0 10px;
+    color: var(--text);
+  }
+  p { margin: 0 0 12px; }
+  code, .mono { font-family: var(--mono); font-size: 0.92em; }
+  code {
+    background: var(--panel-2);
+    padding: 1px 6px;
+    border-radius: 3px;
+    color: #c2cad6;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .verdict {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+    margin: 24px 0 0;
+  }
+  .v-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .v-card .v-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-mute);
+    margin-bottom: 4px;
+  }
+  .v-card .v-status {
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 4px;
+  }
+  .v-card.green { border-left: 3px solid var(--green); }
+  .v-card.green .v-status { color: var(--green); }
+  .v-card.amber { border-left: 3px solid var(--amber); }
+  .v-card.amber .v-status { color: var(--amber); }
+  .v-card.red { border-left: 3px solid var(--red); }
+  .v-card.red .v-status { color: var(--red); }
+  .v-card .v-note { font-size: 12px; color: var(--text-dim); }
+
+  .callout {
+    background: var(--panel);
+    border-left: 3px solid var(--accent);
+    padding: 14px 16px;
+    margin: 16px 0;
+    border-radius: 6px;
+  }
+  .callout.green { border-left-color: var(--green); }
+  .callout.amber { border-left-color: var(--amber); }
+  .callout.red   { border-left-color: var(--red); }
+  .callout .c-title {
+    font-weight: 600;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--accent);
+    margin-bottom: 6px;
+  }
+  .callout.green .c-title { color: var(--green); }
+  .callout.amber .c-title { color: var(--amber); }
+  .callout.red .c-title { color: var(--red); }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0 20px;
+    background: var(--panel);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  th, td {
+    text-align: left;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+    vertical-align: top;
+  }
+  th {
+    background: var(--panel-2);
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-dim);
+  }
+  tr:last-child td { border-bottom: none; }
+  td.mono, th.mono { font-family: var(--mono); font-size: 13px; }
+
+  .flow {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    margin: 16px 0;
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.7;
+    overflow-x: auto;
+  }
+  .flow .step {
+    display: grid;
+    grid-template-columns: 30px 1fr;
+    gap: 12px;
+    align-items: start;
+    padding: 6px 0;
+  }
+  .flow .step .num {
+    color: var(--accent);
+    font-weight: 700;
+  }
+  .flow .arrow {
+    color: var(--text-mute);
+    padding-left: 42px;
+    font-size: 11px;
+  }
+  .flow .result {
+    background: var(--green-soft);
+    border: 1px solid var(--green);
+    border-radius: 4px;
+    padding: 8px 12px;
+    margin-top: 12px;
+    color: #6ee7b7;
+  }
+  .flow .warn {
+    background: var(--amber-soft);
+    border: 1px solid var(--amber);
+    border-radius: 4px;
+    padding: 8px 12px;
+    margin-top: 12px;
+    color: #fcd34d;
+  }
+
+  .diagram {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 18px;
+    margin: 16px 0;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: var(--text);
+    white-space: pre;
+    overflow-x: auto;
+  }
+
+  .combo-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin: 16px 0;
+  }
+  @media (max-width: 760px) {
+    .combo-grid { grid-template-columns: 1fr; }
+  }
+  .combo {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+  }
+  .combo h4 {
+    margin: 0 0 8px;
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .combo .tag {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-weight: 600;
+  }
+  .combo .tag.yes { background: var(--green-soft); color: var(--green); }
+  .combo .tag.no  { background: var(--red-soft); color: var(--red); }
+  .combo .tag.buy { background: rgba(34,211,238,0.15); color: var(--accent); }
+  .combo .tag.sell{ background: rgba(139,92,246,0.15); color: var(--violet); }
+  .combo .ix {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-dim);
+    background: var(--panel-2);
+    padding: 8px 10px;
+    border-radius: 4px;
+    margin: 6px 0;
+  }
+  .combo .ix .step-tag {
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .combo .ex {
+    background: var(--panel-2);
+    border-left: 2px solid var(--accent);
+    padding: 8px 10px;
+    margin: 8px 0 0;
+    font-size: 12.5px;
+    font-family: var(--mono);
+  }
+  .combo .ex .label { color: var(--text-mute); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px; display:block; }
+
+  .pill {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .pill.green { background: var(--green-soft); color: var(--green); }
+  .pill.amber { background: var(--amber-soft); color: var(--amber); }
+  .pill.red   { background: var(--red-soft); color: var(--red); }
+  .pill.gray  { background: rgba(255,255,255,0.06); color: var(--text-dim); }
+
+  ul { margin: 6px 0 12px; padding-left: 22px; }
+  ul li { margin: 4px 0; }
+
+  .toc {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin: 24px 0 0;
+  }
+  .toc h3 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-mute); }
+  .toc ol { margin: 0; padding-left: 22px; font-size: 14px; }
+  .toc ol li { margin: 3px 0; }
+
+  hr { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>BellMarkets — Trade Mechanics Explainer</h1>
+<p class="subtitle">How transactions, tokens, USDC, and fees actually flow on-chain. Architectural review against the PRD. Updated 2026-05-24.</p>
+
+<div class="verdict">
+  <div class="v-card green">
+    <div class="v-label">PRD Alignment</div>
+    <div class="v-status">✓ Correct</div>
+    <div class="v-note">One Phoenix YES/USDC market per strike; NO is the complement, not a separate book.</div>
+  </div>
+  <div class="v-card green">
+    <div class="v-label">Atomic Trade Flows</div>
+    <div class="v-status">✓ Correct</div>
+    <div class="v-note">Buy-NO and Sell-NO bundle mint/redeem with Phoenix swap; 1 signature, 1 atomic tx (POV-3).</div>
+  </div>
+  <div class="v-card green">
+    <div class="v-label">Fee Model</div>
+    <div class="v-status">✓ Correct</div>
+    <div class="v-note">Mint-only fee at <code>mint_pair</code> entry. No fees on Phoenix today (DR-008 / DR-009).</div>
+  </div>
+  <div class="v-card amber">
+    <div class="v-label">UI "Both" View</div>
+    <div class="v-status">⚠ Mock-only gap</div>
+    <div class="v-note">OrderBookCard mock fixtures show YES + NO as independent prices. Should be derived (NO = 1 − YES). Plumbing is correct; only the static fixtures lie.</div>
+  </div>
+  <div class="v-card amber">
+    <div class="v-label">Bootstrapping (no MM)</div>
+    <div class="v-status">⚠ Manual until first trader</div>
+    <div class="v-note">First trader must post a limit order or use mint_pair + limit sell to seed the book. No auto-MM in v1.</div>
+  </div>
+  <div class="v-card green">
+    <div class="v-label">Cancel Behavior (v1)</div>
+    <div class="v-status">✓ Clean</div>
+    <div class="v-note">Buy-NO / Sell-NO are <strong>market-only (IOC)</strong> in v1 — fills or reverts, no resting state. Buy/Sell YES use Phoenix limits with no upfront fee. Cancels never strand fees.</div>
+  </div>
+</div>
+
+<div class="toc">
+  <h3>Contents</h3>
+  <ol>
+    <li><a href="#model">The conceptual model — one book, two tokens</a></li>
+    <li><a href="#primitives">Mint &amp; redeem primitives (where USDC enters &amp; exits)</a></li>
+    <li><a href="#combos">The 4 trade combinations (Buy/Sell × YES/NO) with worked examples</a></li>
+    <li><a href="#bootstrap">Bootstrapping a market without a market maker</a></li>
+    <li><a href="#lifecycle">Order lifecycle on Phoenix (place / fill / cancel)</a></li>
+    <li><a href="#fees">Fees — when, where, and what happens on cancel</a></li>
+    <li><a href="#settle">Settlement &amp; redemption</a></li>
+    <li><a href="#ui">UI honesty check — is the "both books" view wrong?</a></li>
+    <li><a href="#notbuilt">What we have NOT built (and why)</a></li>
+    <li><a href="#scenarios">Worked scenarios — full lifecycle of 6 example trades</a></li>
+  </ol>
+</div>
+
+<hr/>
+
+<h2 id="model">1. The conceptual model — one book, two tokens</h2>
+
+<p>Every strike has <strong>one</strong> on-chain order book — a Phoenix v1 CLOB market with <code>base = YES token</code> and <code>quote = USDC</code>. The NO token is not a separate book; its price is implicit in the YES price:</p>
+
+<div class="callout green">
+  <div class="c-title">Pricing identity</div>
+  <p style="margin:0;"><strong>Price(NO) = $1 − Price(YES)</strong> &nbsp;— because at settle, one of them pays $1 and the other pays $0. A user holding 1 YES + 1 NO holds exactly $1 of claim, regardless of outcome.</p>
+</div>
+
+<div class="diagram">
+   ┌──────────────────────────────────────────────────────────────────────┐
+   │                  StrikeMarket PDA (BellMarkets program)              │
+   │                                                                      │
+   │   ┌─────────────┐   ┌─────────────┐   ┌────────────────────────┐     │
+   │   │ YES mint    │   │ NO mint     │   │ USDC vault             │     │
+   │   │ (SPL)       │   │ (SPL)       │   │ (SPL token account)    │     │
+   │   │             │   │             │   │ authority = StrikeMkt  │     │
+   │   └─────────────┘   └─────────────┘   └────────────────────────┘     │
+   │           │                 │                       │                │
+   └───────────┼─────────────────┼───────────────────────┼────────────────┘
+               │                 │                       │
+               └─────┬───────────┘                       │
+                     │                                   │
+                     ▼                                   │
+            ┌──────────────────────────┐                 │
+            │   Phoenix YES/USDC       │  ◄──── 1 order  │
+            │   market (single book)   │       book per  │
+            │   base = YES             │       strike    │
+            │   quote = USDC           │                 │
+            └──────────────────────────┘                 │
+                                                         │
+   At settle, vault pays $1 to each winning token.       │
+   Holding 1 YES + 1 NO ≡ holding $1 of claim. ──────────┘
+</div>
+
+<p><strong>Invariant:</strong> for every strike, <code>vault USDC balance ≥ outstanding_pairs × $1</code>. This is enforced by the program — every <code>mint_pair</code> deposits $1 to the vault; every <code>redeem_pair</code> burns 1 YES + 1 NO and withdraws $1; every <code>redeem</code> (post-settle) burns 1 winning token and withdraws $1.</p>
+
+<hr/>
+
+<h2 id="primitives">2. Mint &amp; redeem primitives (where USDC enters &amp; exits)</h2>
+
+<p>Phoenix doesn't know how to create tokens out of thin air. The BellMarkets program does. Two primitive instructions handle the conservation of USDC ↔ tokens:</p>
+
+<h3><code>mint_pair</code> — USDC enters the system</h3>
+
+<div class="flow">
+  <div class="step"><span class="num">1</span><span>User signs tx with <code>amount</code> (number of pairs to mint).</span></div>
+  <div class="step"><span class="num">2</span><span>Program transfers <code>amount × $1 USDC</code> from <code>user_usdc</code> → <code>usdc_vault</code>.</span></div>
+  <div class="step"><span class="num">3</span><span>Program transfers <code>amount × $0.02 USDC</code> from <code>user_usdc</code> → <code>fee_collector_usdc</code> (the 2% DR-008 mint-only fee).</span></div>
+  <div class="step"><span class="num">4</span><span>Program mints <code>amount</code> YES tokens to <code>user_yes_token</code>.</span></div>
+  <div class="step"><span class="num">5</span><span>Program mints <code>amount</code> NO tokens to <code>user_no_token</code>.</span></div>
+  <div class="step"><span class="num">6</span><span>Program increments <code>strike_market.pairs_outstanding</code> by <code>amount</code>.</span></div>
+  <div class="result">After: user paid <code>$1.02</code>, holds <code>1 YES + 1 NO</code>; vault gained <code>$1</code>; fee collector gained <code>$0.02</code>.</div>
+</div>
+
+<h3><code>redeem_pair</code> — USDC exits the system (pre-settle close)</h3>
+
+<div class="flow">
+  <div class="step"><span class="num">1</span><span>User signs tx with <code>amount</code> (number of pairs to burn).</span></div>
+  <div class="step"><span class="num">2</span><span>Program burns <code>amount</code> YES tokens from <code>user_yes_token</code>.</span></div>
+  <div class="step"><span class="num">3</span><span>Program burns <code>amount</code> NO tokens from <code>user_no_token</code>.</span></div>
+  <div class="step"><span class="num">4</span><span>Program transfers <code>amount × $1 USDC</code> from <code>usdc_vault</code> → <code>user_usdc</code>.</span></div>
+  <div class="step"><span class="num">5</span><span>Program decrements <code>strike_market.pairs_outstanding</code> by <code>amount</code>.</span></div>
+  <div class="result">After: user paid 1 YES + 1 NO, got <code>$1</code> USDC back. No fee on the exit (DR-008 — mint-only).</div>
+</div>
+
+<h3><code>redeem</code> — USDC exits the system (post-settle win)</h3>
+
+<div class="flow">
+  <div class="step"><span class="num">1</span><span>Market is settled; <code>strike_market.outcome ∈ {Yes, No}</code>.</span></div>
+  <div class="step"><span class="num">2</span><span>User signs tx with <code>amount</code> (number of winning tokens to redeem).</span></div>
+  <div class="step"><span class="num">3</span><span>Program enforces <code>winning_mint == strike_market.{yes|no}_mint</code> based on outcome.</span></div>
+  <div class="step"><span class="num">4</span><span>Program burns <code>amount</code> winning tokens from <code>user_winning_token</code>.</span></div>
+  <div class="step"><span class="num">5</span><span>Program transfers <code>amount × $1 USDC</code> from <code>usdc_vault</code> → <code>user_usdc</code>.</span></div>
+  <div class="result">After: user paid winning tokens, got <code>$1 per token</code> back. Losing tokens are not redeemable — they're worth $0.</div>
+</div>
+
+<hr/>
+
+<h2 id="combos">3. The 4 trade combinations — when each is used &amp; how they work</h2>
+
+<p>Every action a trader can take maps to exactly one of these four flows. The first two go straight to Phoenix. The last two bundle Phoenix with a BellMarkets mint/redeem primitive — but the user signs ONE transaction (POV-3 atomicity).</p>
+
+<div class="combo-grid">
+
+  <div class="combo">
+    <h4><span class="tag buy">BUY</span><span class="tag yes">YES</span></h4>
+    <p style="font-size:13.5px;color:var(--text-dim);margin:4px 0 8px;">"I think the strike resolves YES. I want to bet on it."</p>
+    <div class="ix">
+      <span class="step-tag">Single ix:</span> Phoenix <code>place_order</code> on YES book (buy side)
+    </div>
+    <p style="font-size:13px;margin:6px 0;">USDC flows from user → Phoenix maker. YES tokens flow from maker → user.</p>
+    <div class="ex">
+      <span class="label">Worked example</span>
+      Best ask = $0.55. User wants 100 YES.<br/>
+      → Pays $55 USDC, receives 100 YES.<br/>
+      → If YES wins at settle: redeem 100 YES for $100 (gain $45).<br/>
+      → If NO wins: 100 YES worth $0 (loss $55).
+    </div>
+  </div>
+
+  <div class="combo">
+    <h4><span class="tag sell">SELL</span><span class="tag yes">YES</span></h4>
+    <p style="font-size:13.5px;color:var(--text-dim);margin:4px 0 8px;">"I want to exit my YES position before settle."</p>
+    <div class="ix">
+      <span class="step-tag">Single ix:</span> Phoenix <code>place_order</code> on YES book (sell side)
+    </div>
+    <p style="font-size:13px;margin:6px 0;">YES tokens flow from user → Phoenix taker. USDC flows from taker → user.</p>
+    <div class="ex">
+      <span class="label">Worked example</span>
+      User holds 100 YES bought at $0.55. Best bid = $0.62.<br/>
+      → Sells 100 YES, receives $62 USDC.<br/>
+      → Realized gain: $7 (locked in pre-settle).
+    </div>
+  </div>
+
+  <div class="combo">
+    <h4><span class="tag buy">BUY</span><span class="tag no">NO</span></h4>
+    <p style="font-size:13.5px;color:var(--text-dim);margin:4px 0 8px;">"I think the strike resolves NO. I want to bet against it."</p>
+    <div class="ix">
+      <span class="step-tag">Bundled atomic ix:</span><br/>
+      &nbsp;&nbsp;1. BellMarkets <code>mint_pair(amount)</code> — pay $1×amount, get amount YES + amount NO<br/>
+      &nbsp;&nbsp;2. Phoenix sell <code>amount</code> YES at best bid
+    </div>
+    <p style="font-size:13px;margin:6px 0;">User never sees an intermediate YES balance — both ixs land atomically. Net: user paid <code>$1 − bid + fee</code> for each NO.</p>
+    <div class="ex">
+      <span class="label">Worked example</span>
+      Best YES bid = $0.45. User wants 100 NO.<br/>
+      → mint_pair(100): pays $100 USDC + $2 fee → gets 100 YES + 100 NO<br/>
+      → sell 100 YES at $0.45 → receives $45 USDC<br/>
+      → Net: paid $57, holds 100 NO (effective NO price ≈ $0.57)<br/>
+      → If NO wins: redeem 100 NO for $100 (gain $43).
+    </div>
+  </div>
+
+  <div class="combo">
+    <h4><span class="tag sell">SELL</span><span class="tag no">NO</span></h4>
+    <p style="font-size:13.5px;color:var(--text-dim);margin:4px 0 8px;">"I want to exit my NO position before settle."</p>
+    <div class="ix">
+      <span class="step-tag">Bundled atomic ix:</span><br/>
+      &nbsp;&nbsp;1. Phoenix buy <code>amount</code> YES at best ask<br/>
+      &nbsp;&nbsp;2. BellMarkets <code>redeem_pair(amount)</code> — burn amount YES + amount NO, get $1×amount
+    </div>
+    <p style="font-size:13px;margin:6px 0;">User never sees intermediate YES — atomic. Net: user paid <code>ask</code> on YES, got <code>$1</code> back per pair burned. Effective NO sale price ≈ <code>$1 − ask</code>.</p>
+    <div class="ex">
+      <span class="label">Worked example</span>
+      User holds 100 NO bought at $0.57. Best YES ask = $0.40.<br/>
+      → buy 100 YES at $0.40 → pays $40 USDC, receives 100 YES<br/>
+      → redeem_pair(100) → burns 100 YES + 100 NO → receives $100 USDC<br/>
+      → Net: paid $40, got $100 back, no longer holds NO<br/>
+      → Realized for 100 NO: $60 USDC (vs $57 paid = $3 gain).
+    </div>
+  </div>
+
+</div>
+
+<div class="callout green">
+  <div class="c-title">POV-3 atomicity</div>
+  <p style="margin:0;">Buy-NO and Sell-NO are <strong>one transaction, one signature</strong>. If any leg fails, the whole thing reverts — no orphan YES or NO sitting in the user's wallet. See <code>build-buy-no.ts</code> + <code>build-sell-no.ts</code> in the frontend.</p>
+</div>
+
+<h3>When each combination is selectable in the UI</h3>
+
+<table>
+  <thead><tr><th>Action</th><th>Selectable when…</th><th>Fails when…</th></tr></thead>
+  <tbody>
+    <tr><td>Buy YES</td><td>Always — uses Phoenix book directly. Limit always works (posts a bid).</td><td>Market: no asks on book. Limit: order rests.</td></tr>
+    <tr><td>Sell YES</td><td>User holds <code>≥ amount</code> YES tokens.</td><td>No bids on book (market); limit rests.</td></tr>
+    <tr><td>Buy NO</td><td>Always — atomically mints pair + sells YES. Market: needs bids on YES book. Limit: rests as YES sell.</td><td>No YES bids ≥ user's reservation price.</td></tr>
+    <tr><td>Sell NO</td><td>User holds <code>≥ amount</code> NO tokens.</td><td>No YES asks ≤ user's reservation price.</td></tr>
+  </tbody>
+</table>
+
+<p style="font-size:13px;color:var(--text-dim);">Hard YES #8 (position exclusivity): if user holds NO and tries to Buy YES, UI must require them to close NO first. Same the other way. This prevents accidentally accumulating <code>1 YES + 1 NO</code> positions that always net to $0 (minus fees).</p>
+
+<hr/>
+
+<h2 id="bootstrap">4. Bootstrapping a market without a market maker</h2>
+
+<p>This is the real question Cory asked. The answer is nuanced — there is no atomic complementary-mint on fill in our v1, so the first trader is in an awkward spot:</p>
+
+<div class="callout amber">
+  <div class="c-title">The first-trader problem</div>
+  <p style="margin:0 0 8px;"><strong>An empty YES order book has no bids and no asks.</strong> The first trader who wants to "Buy YES at $0.55" can:</p>
+  <ul style="margin:6px 0 0;">
+    <li><strong>Post a limit Buy YES at $0.55</strong> — rests on the book. No fill happens until someone else shows up to sell.</li>
+    <li><strong>OR call <code>mint_pair</code> directly</strong> — pays $1, gets 1 YES + 1 NO, then sells the side they don't want via a limit order. Same waiting problem on the sell.</li>
+  </ul>
+</div>
+
+<div class="diagram">
+  Time T0 — strike just opened. Phoenix book is empty.
+
+     YES order book                        Vault     User A      User B
+     ─────────────────                     ─────     ──────      ──────
+     ASKS:  (empty)                        $0          $0          $0
+     ─────  (no last)                      0 YES       0 USDC      0 USDC
+     BIDS:  (empty)                        0 NO
+
+  Time T1 — User A posts limit Buy YES @ $0.55 for 100 contracts.
+            User A's order rests on book. No fill yet.
+
+     YES order book                        Vault     User A      User B
+     ─────────────────                     ─────     ──────      ──────
+     ASKS:  (empty)                        $0        $100         $0
+     ─────  (no last)                      0 YES     (waiting)
+     BIDS:  $0.55 × 100  ← User A's bid    0 NO
+
+  Time T2 — User B wants to bet NO. Cleanest path: BUY NO at $0.45.
+            Bundled tx: mint_pair(100) + sell 100 YES.
+            User B's sell-YES order CROSSES User A's buy-YES bid.
+
+     YES order book                        Vault     User A      User B
+     ─────────────────                     ─────     ──────      ──────
+     ASKS:  (empty)                        $100      paid $55     paid $102 - $55 received
+     ─────  last $0.55                     100 YES   100 YES      0 YES (sold)
+     BIDS:  (empty)                        100 NO    (A's)        100 NO (kept)
+
+  Net at T2:
+     - User A holds 100 YES (cost basis $0.55), wallet -$55
+     - User B holds 100 NO (effective cost ≈ $0.57 incl. fee), wallet -$57
+     - Vault holds $100 (from mint_pair); fee_collector holds $2
+     - Phoenix shows last trade @ $0.55 → implied NO last = $0.45
+</div>
+
+<p>Notice: <strong>the first trade requires two opposite-direction users (one bullish, one bearish) to coincidentally show up.</strong> The market doesn't price itself. In practice, market makers (Drift, Polymarket) seed every strike with bid-ask quotes so users always have something to trade against. <strong>BellMarkets v1 ships without an MM</strong> — initial liquidity depends on user discovery and limit-order patience.</p>
+
+<div class="callout amber">
+  <div class="c-title">v1 trade-off (Hard YES discussed in DR-008)</div>
+  <p style="margin:0;">For demo: we either (a) seed a few markets manually using mint_pair + limit orders to make them tradeable on-camera, or (b) demo the Buy-YES mint_pair path (which always works because it doesn't need a counterparty — the vault is the counterparty). Our v8 frontend defaults to Buy-YES as the "always works" demo path.</p>
+</div>
+
+<hr/>
+
+<h2 id="lifecycle">5. Order lifecycle on Phoenix (place / fill / cancel)</h2>
+
+<p>Phoenix v1 is a FIFO matching engine. Orders are price-time-priority. The market account stores the full order book on-chain.</p>
+
+<h3>Place a limit order</h3>
+<div class="flow">
+  <div class="step"><span class="num">1</span><span>User signs <code>place_order(price, size, side)</code> tx.</span></div>
+  <div class="step"><span class="num">2</span><span>Phoenix moves <code>price × size USDC</code> (for a bid) or <code>size YES</code> (for an ask) from user's ATA into the Phoenix market's seat account as collateral.</span></div>
+  <div class="step"><span class="num">3</span><span>If the order crosses the opposite side: immediate fill at the resting order's price (price-time priority). User receives the asset; resting maker receives the collateral.</span></div>
+  <div class="step"><span class="num">4</span><span>If the order does NOT cross: it rests on the book as a maker order. Collateral stays in the Phoenix seat.</span></div>
+  <div class="result">No fees, no Bell Markets-side state change. All state lives in Phoenix's market account.</div>
+</div>
+
+<h3>Cancel a resting order</h3>
+<div class="flow">
+  <div class="step"><span class="num">1</span><span>User signs <code>cancel_order</code> tx.</span></div>
+  <div class="step"><span class="num">2</span><span>Phoenix removes the order from the book and returns the collateral to the user's ATA.</span></div>
+  <div class="result">No fee was taken when the order was placed → nothing to refund. Clean exit.</div>
+</div>
+
+<h3>Market order (immediate fill, no resting)</h3>
+<div class="flow">
+  <div class="step"><span class="num">1</span><span>User signs an <code>IOC</code> (immediate-or-cancel) order at the worst-acceptable price (slippage cap).</span></div>
+  <div class="step"><span class="num">2</span><span>Phoenix walks the book, filling as much as it can up to the slippage cap. Unfilled remainder is cancelled (returned to user).</span></div>
+  <div class="step"><span class="num">3</span><span>User receives whatever filled; any unfilled portion is returned immediately.</span></div>
+  <div class="warn">If the book is too thin and no fills happen: tx succeeds (technically) but user got 0 tokens. UI should warn about thin books before submission. Buy-NO with empty book fails the same way (the YES sell leg has no bids to take).</div>
+</div>
+
+<hr/>
+
+<h2 id="fees">6. Fees — when, where, and what happens on cancel</h2>
+
+<p>This is the part Cory specifically asked about, and the answer is the cleanest piece of our design:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Action</th>
+      <th>Fee charged?</th>
+      <th>When taken</th>
+      <th>Refundable?</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>mint_pair</code></td>
+      <td><span class="pill amber">2% mint fee</span></td>
+      <td>Inside the same tx as the USDC deposit (atomic with the mint)</td>
+      <td>No — but mint isn't cancelable. If you don't want the tokens, you'd <code>redeem_pair</code> them back for $1, eating the 2¢ fee.</td>
+    </tr>
+    <tr>
+      <td><code>redeem_pair</code></td>
+      <td><span class="pill gray">none</span></td>
+      <td>—</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td><code>redeem</code> (post-settle win)</td>
+      <td><span class="pill gray">none</span></td>
+      <td>—</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>Phoenix place / fill / cancel</td>
+      <td><span class="pill gray">none</span> (v1)</td>
+      <td>— (DR-009 Model D would add ~5 bps at fill, v1.5)</td>
+      <td>—</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout green">
+  <div class="c-title">Why cancel is clean — but only because of a deliberate v1 design choice</div>
+  <p style="margin:0 0 8px;">Phoenix doesn't charge a placement fee. BellMarkets only takes the 2% fee inside <code>mint_pair</code>. So <strong>cancelling a Buy YES or Sell YES order requires no refund</strong> — no money left the user, Phoenix just returns the collateral.</p>
+  <p style="margin:0;">For Buy NO / Sell NO, we have a stricter rule: <strong>v1 ships these as market-only (IOC swaps).</strong> If the Phoenix leg can't fill, the entire atomic tx reverts — no mint happens, no fee taken. There is no "open Buy NO order" to cancel. This is what makes cancel-on-NO clean without a refund path.</p>
+</div>
+
+<div class="callout amber">
+  <div class="c-title">Locked v1 design: NO-side trades are market-only (Option 1)</div>
+  <p style="margin:0 0 8px;">A "Limit Buy NO" would have to bundle <code>mint_pair</code> (fee taken) + Phoenix limit Sell YES (rests on book). If the limit doesn't fill and the user cancels, they'd be stranded with the unwanted pair, with the 2¢ fee as sunk cost (only recoverable by calling <code>redeem_pair</code>). This violates the "atomic, can't get stranded" promise of POV-3.</p>
+  <p style="margin:0;"><strong>Decision:</strong> v1 ships Buy NO / Sell NO as market-only. The UI should hide the Limit toggle on NO paths until a v1.5+ decision adds Option 2 (auto-redeem on cancel) or Option 3 (custom matcher with atomic complementary mint).</p>
+</div>
+
+<div class="callout amber">
+  <div class="c-title">Where the v1 fee gap lives (DR-009)</div>
+  <p style="margin:0;">Phoenix v1 doesn't expose a per-third-party <code>fee_recipient</code> for markets we don't own. So <strong>Phoenix-only secondary trades (Sell YES, Buy NO secondary side, Sell NO secondary side) currently pay $0 protocol fees.</strong> The fix is locked in DR-009 amendment 2026-05-24: ~6-8 hr post-submission work to wrap <code>phoenix::InitializeMarket</code> CPI in <code>create_strike_market</code> and set the fee_recipient at market init. Revenue today on devnet = $0, so the gap is theoretical until mainnet + volume.</p>
+</div>
+
+<hr/>
+
+<h2 id="settle">7. Settlement &amp; redemption</h2>
+
+<p>At 4 PM ET on a strike's expiry date, the market settles based on the Pyth oracle close price:</p>
+
+<div class="flow">
+  <div class="step"><span class="num">1</span><span>Cron (Bram's automation) calls <code>settle_market</code> ~4:05 PM ET (after Pyth staleness threshold elapses).</span></div>
+  <div class="step"><span class="num">2</span><span>Anyone can call this — settle is permissionless (DR-002). If cron dies, any user can crank it from the UI.</span></div>
+  <div class="step"><span class="num">3</span><span>Program reads Pyth, validates staleness + confidence, computes outcome: <code>YES if close_price ≥ strike, NO otherwise</code>.</span></div>
+  <div class="step"><span class="num">4</span><span>Program writes <code>strike_market.outcome = Yes | No</code> immutably.</span></div>
+  <div class="step"><span class="num">5</span><span>Users with winning tokens call <code>redeem</code> to claim $1 per token from the vault. Losing tokens are worth $0 (technically still in wallet but no redemption path).</span></div>
+</div>
+
+<p>If Pyth fails persistently (15 min of retries with widening confidence): operator can call <code>admin_settle</code> with a manual price, but only after a 1-hour on-chain delay (Hard YES #7).</p>
+
+<p>If the oracle is unrecoverable: market can be settled as <code>Invalid</code>, which triggers <code>redeem_invalid</code> — every user gets their <code>pairs_outstanding</code> position back as USDC (refund of original deposit, no winner/loser).</p>
+
+<hr/>
+
+<h2 id="ui">8. UI honesty check — is the "both books" view wrong?</h2>
+
+<div class="callout amber">
+  <div class="c-title">Diagnosis: mock fixtures are misleading; plumbing is correct</div>
+</div>
+
+<p>The OrderBookCard in <code>trade-view.tsx</code> has a <code>YES / NO / BOTH</code> view toggle. Today:</p>
+
+<ul>
+  <li><strong>YES view</strong>: hardcoded mock data showing YES book. ✓ correct conceptually (one book, YES side shown).</li>
+  <li><strong>NO view</strong>: hardcoded mock data with independent NO prices. ✗ <strong>conceptually wrong</strong> — there is no separate NO order book; NO prices should be derived as <code>1 − YES price</code> with sides flipped (a YES ask becomes a NO bid).</li>
+  <li><strong>BOTH view</strong>: shows two columns with independent mock prices. Same issue.</li>
+</ul>
+
+<p>The underlying hook (<code>useOrderBook</code>) correctly subscribes to <strong>one Phoenix market PDA</strong>. The plumbing is right. Only the static mock fixtures lie.</p>
+
+<h3>Correct derivation for the NO view</h3>
+
+<table>
+  <thead><tr><th>YES book level</th><th>Derived NO equivalent</th></tr></thead>
+  <tbody>
+    <tr><td>Ask 0.555 × 490</td><td>Bid 0.445 × 490 (someone selling YES @ $0.555 is willing to "buy NO @ $0.445")</td></tr>
+    <tr><td>Bid 0.500 × 560</td><td>Ask 0.500 × 560 (someone buying YES @ $0.500 is willing to "sell NO @ $0.500")</td></tr>
+  </tbody>
+</table>
+
+<p>Sides flip because buying YES at price P is the same trade as selling NO at price <code>1−P</code>. The size (contracts) stays the same.</p>
+
+<div class="callout green">
+  <div class="c-title">Recommended fix (v1.5 — UI polish)</div>
+  <p style="margin:0;">When <code>useOrderBook</code> returns live data, the NO and BOTH views should call a derived helper: <code>noBook = { asks: yesBook.bids.map(invert), bids: yesBook.asks.map(invert) }</code> where <code>invert({price, size}) = {price: 1 - price, size}</code>. Single source of truth: the Phoenix YES market.</p>
+</div>
+
+<hr/>
+
+<h2 id="notbuilt">9. What we have NOT built (and why)</h2>
+
+<h3>Atomic complementary-mint on fill (Polymarket's CTF Exchange pattern)</h3>
+
+<p>Polymarket has a special exchange contract that, when a Buy YES @ $0.60 order meets a Buy NO @ $0.40 order, atomically mints 1 YES + 1 NO from $1 of pooled USDC and gives one to each user. This is "complementary mint on match" — neither user has to mint a pair first.</p>
+
+<p>Phoenix v1 does not support this. Our v1 uses the simpler model: users mint pairs explicitly via <code>mint_pair</code> when they want NO (bundled atomically with the YES sell so it's invisible to the user). The trade-off:</p>
+
+<table>
+  <thead><tr><th>Pattern</th><th>Pros</th><th>Cons</th></tr></thead>
+  <tbody>
+    <tr><td>Our model: explicit <code>mint_pair</code> + Phoenix bundling</td><td>Works on stock Phoenix v1; no custom matcher; transparent vault math; simple audit.</td><td>Always uses vault as counterparty for first trade on a strike; no "purely matched" trades possible.</td></tr>
+    <tr><td>Polymarket CTF model</td><td>Two opposite buyers can match without either having to mint first.</td><td>Requires custom matching engine; complex audit category; only valuable at high liquidity.</td></tr>
+  </tbody>
+</table>
+
+<p>For our use case (binary options on stocks, $1 fixed payout, daily expiry), the explicit-mint model is strictly fine. It's how Polymarket's <em>users</em> behave in practice anyway — most liquidity comes from market makers minting pairs and listing both sides.</p>
+
+<div class="callout amber">
+  <div class="c-title">Future enhancement: custom matcher with atomic complementary-mint (Polymarket CTF Exchange pattern)</div>
+  <p style="margin:0 0 8px;"><strong>What it would unlock:</strong> a "Limit Buy NO" order could meet a "Limit Buy YES" order on the same book and atomically mint a fresh pair to satisfy both — no pre-existing inventory required. This is how Polymarket's CTFExchange + AdapterTrampoline contracts work.</p>
+  <p style="margin:0 0 8px;"><strong>Cost:</strong> custom matching engine (forking Phoenix or building from scratch); audit category jumps from "wrapper around audited Phoenix" to "novel matcher" (~$50-200K audit per DR-009). 2-4 weeks senior eng. Loses Phoenix's integrator network (Jupiter routes through Phoenix, not us).</p>
+  <p style="margin:0;"><strong>When it becomes ROI-positive:</strong> at $1M+ daily volume per DR-009 — fork-Phoenix conversation resumes there. Tracked as Option 4 in <code>specs/clob-strategy.md</code>. v1 explicitly defers per DR-001.</p>
+</div>
+
+<h3>Market maker / automated price seeder</h3>
+
+<p>Not built in v1. Without one, every strike requires a human user to seed the first price via either a limit order or a mint+sell pattern. For demo: we either seed manually pre-demo, or we lead with the Buy-YES path which always works against a fresh strike (via mint_pair if the book is empty — though this would actually require posting a limit and waiting, since mint_pair just gives both tokens). The cleanest demo path: use mint_pair directly to bootstrap a strike, then run the full Buy/Sell cycle on a strike that already has depth.</p>
+
+<h3>DR-009 Model D — Phoenix fee capture</h3>
+
+<p>v1.5 P0 work. Closes the Phoenix-secondary-fee revenue gap. Locked integration plan in DR-009 amendment 2026-05-24. ~6-8 hr cross-lead work post-submission.</p>
+
+<hr/>
+
+<h2 id="scenarios">10. Worked scenarios — full lifecycle of 6 example trades</h2>
+
+<p>Every scenario below is a complete end-to-end story. I track <strong>every actor's USDC, YES, NO balance</strong> at every step, plus the vault balance, fee collector, and Phoenix seat collateral. These trace exactly what would happen on-chain.</p>
+
+<p style="font-size:13px;color:var(--text-dim);"><strong>Setup for all scenarios:</strong> Strike "META > $680" expires today 4 PM ET. Just opened — Phoenix book empty, vault empty, no minted pairs.</p>
+
+<!-- ─────────────── SCENARIO 1 ─────────────── -->
+<h3>Scenario 1 — Bob bootstraps liquidity (acts as a market maker)</h3>
+<p style="font-size:13.5px;color:var(--text-dim);"><strong>Lesson:</strong> Without an MM, someone has to mint a pair and post both sides to seed the market. Bob earns the bid-ask spread regardless of outcome (his net token position is flat).</p>
+
+<table>
+  <thead><tr><th style="width:30%;">Step</th><th>Bob's wallet</th><th>Phoenix seat</th><th>Vault</th><th>Fee&nbsp;coll.</th></tr></thead>
+  <tbody>
+    <tr><td>T0 — start</td><td class="mono">$200 / 0 YES / 0 NO</td><td class="mono">—</td><td class="mono">$0</td><td class="mono">$0</td></tr>
+    <tr><td>T1 — calls <code>mint_pair(100)</code></td><td class="mono">$98 / 100 YES / 100 NO</td><td class="mono">—</td><td class="mono">$100</td><td class="mono">$2</td></tr>
+    <tr><td>T2 — posts Phoenix limit Sell YES @ $0.55 × 100</td><td class="mono">$98 / 0 YES / 100 NO</td><td class="mono">100 YES (ask @ 0.55)</td><td class="mono">$100</td><td class="mono">$2</td></tr>
+    <tr><td>T3 — posts Phoenix limit Buy YES @ $0.45 × 100</td><td class="mono">$53 / 0 YES / 100 NO</td><td class="mono">100 YES ask + $45 bid</td><td class="mono">$100</td><td class="mono">$2</td></tr>
+  </tbody>
+</table>
+
+<div class="callout green">
+  <div class="c-title">After T3 — Phoenix book is seeded</div>
+  <p style="margin:0;"><span class="mono">Ask 0.55 × 100 / Last (none) / Bid 0.45 × 100</span> — mid = 0.50, spread = 0.10. Other traders can now interact with the book.</p>
+</div>
+
+<!-- ─────────────── SCENARIO 2 ─────────────── -->
+<h3>Scenario 2 — Alice Buy YES (market) → holds to settle → YES wins</h3>
+<p style="font-size:13.5px;color:var(--text-dim);"><strong>Lesson:</strong> Simplest possible win. Pure Phoenix Buy YES, no mint involved (Alice buys YES tokens from Bob's resting ask). Holds to settle. Redeems for $1 each.</p>
+
+<table>
+  <thead><tr><th style="width:36%;">Step</th><th>Alice's wallet</th><th>Bob's wallet</th><th>Phoenix seat</th><th>Vault</th></tr></thead>
+  <tbody>
+    <tr><td>(starts after S1 T3)</td><td class="mono">$100 / 0 YES / 0 NO</td><td class="mono">$53 / 0 YES / 100 NO</td><td class="mono">100 YES ask + $45 bid (Bob's)</td><td class="mono">$100</td></tr>
+    <tr><td>T4 — Alice <code>buy_yes</code> market 100 @ best ask</td><td class="mono">$45 / 100 YES / 0 NO</td><td class="mono">$108 / 0 YES / 100 NO</td><td class="mono">$45 bid (Bob's, still open)</td><td class="mono">$100</td></tr>
+    <tr><td>T5 — 4 PM ET, settle fires; Pyth close > $680 → outcome YES</td><td class="mono">$45 / 100 YES / 0 NO</td><td class="mono">$108 / 0 YES / 100 NO</td><td class="mono">$45 bid</td><td class="mono">$100</td></tr>
+    <tr><td>T6 — Alice calls <code>redeem(100)</code></td><td class="mono">$145 / 0 YES / 0 NO</td><td class="mono">$108 / 0 YES / 100 NO</td><td class="mono">$45 bid</td><td class="mono">$0</td></tr>
+  </tbody>
+</table>
+
+<div class="callout green">
+  <div class="c-title">Alice's PnL: +$45</div>
+  <p style="margin:0;">Paid $55 for 100 YES, redeemed for $100. Net +$45. No fees on Alice's side (Phoenix v1 has no taker fee; only mint had a fee, which Bob paid at T1).</p>
+</div>
+<div class="callout amber">
+  <div class="c-title">⚠ Vault drained but Bob still holds 100 NO</div>
+  <p style="margin:0;">Bob's 100 NO are now worthless. Vault = $0. Bob can't redeem NO (it lost). His state at end: $108 cash + 100 NO (worthless) + a $45 bid still open on a settled market. <strong>Bob's bid order should be cancelled by him (or the UI prompts him).</strong> Cancelling it returns the $45. His final = $153. PnL = -$47.</p>
+  <p style="margin:8px 0 0;">Note: Bob's PnL is only positive when his MM round-trip completes (both ask AND bid filled — that earns the spread). When only one side fills, he's left holding directional risk. Real MMs cancel & reposition as inventory shifts.</p>
+</div>
+
+<!-- ─────────────── SCENARIO 3 ─────────────── -->
+<h3>Scenario 3 — Charlie Buy NO (atomic, market) → NO wins → exits via redeem</h3>
+<p style="font-size:13.5px;color:var(--text-dim);"><strong>Lesson:</strong> The asymmetric flow. Charlie wants NO exposure. The atomic tx mints both sides and immediately sells the YES on Phoenix. Charlie never sees an intermediate YES balance.</p>
+
+<p>Setup: assume Bob's S1 state but META price <em>looks weak</em>. Charlie thinks META closes below $680.</p>
+
+<table>
+  <thead><tr><th style="width:42%;">Step</th><th>Charlie's wallet</th><th>Bob's wallet</th><th>Phoenix seat</th><th>Vault / Fee</th></tr></thead>
+  <tbody>
+    <tr><td>(starts after S1 T3)</td><td class="mono">$100 / 0 YES / 0 NO</td><td class="mono">$53 / 0 YES / 100 NO</td><td class="mono">100 YES ask + $45 bid</td><td class="mono">$100 / $2</td></tr>
+    <tr><td>T4 — Charlie atomic <code>buy_no(100)</code><br/><span style="font-size:11.5px;color:var(--text-mute);">tx = [mint_pair(100), phoenix.swap(Sell YES @ best bid)]</span></td><td class="mono">$43 / 0 YES / 100 NO</td><td class="mono">$53 / 100 YES / 100 NO</td><td class="mono">100 YES ask (still open)</td><td class="mono">$200 / $4</td></tr>
+    <tr><td>T5 — 4 PM ET, settle; Pyth close &lt; $680 → outcome NO</td><td class="mono">$43 / 0 YES / 100 NO</td><td class="mono">$53 / 100 YES / 100 NO</td><td class="mono">100 YES ask</td><td class="mono">$200 / $4</td></tr>
+    <tr><td>T6 — Charlie calls <code>redeem(100 NO)</code></td><td class="mono">$143 / 0 YES / 100 NO→0</td><td class="mono">$53 / 100 YES / 100 NO</td><td class="mono">100 YES ask</td><td class="mono">$100 / $4</td></tr>
+  </tbody>
+</table>
+
+<div class="callout green">
+  <div class="c-title">Charlie's PnL: +$43</div>
+  <p style="margin:0;">Started with $100. mint_pair cost $102 ($100 + $2 fee). Phoenix sell of his unwanted YES at $0.45 returned $45 → net mint cost $57. Held 100 NO. At settle, redeemed for $100. Final $143. Net +$43.</p>
+</div>
+<div class="callout amber">
+  <div class="c-title">⚠ Bob still has 100 YES in Phoenix ask + 100 NO redeemable</div>
+  <p style="margin:0;">At T4 Bob's bid (the $45) filled — he bought Charlie's 100 YES at $0.45. So Bob now holds 100 YES (in wallet, post Phoenix fill) AND 100 NO. With outcome=NO: Bob's 100 NO can redeem for $100; his 100 YES is worthless. He should also cancel his $0.55 sell-YES ask. After all that, Bob ends at $53 + $100 (NO redemption) = $153. PnL = -$47.</p>
+  <p style="margin:8px 0 0;">In this scenario Bob's bid fill made his inventory worse — he bought YES at $0.45 which turned out worthless. Real MM behavior: pull bids when book sentiment shifts.</p>
+</div>
+
+<!-- ─────────────── SCENARIO 4 ─────────────── -->
+<h3>Scenario 4 — Diana round-trips YES before settle (pure trading, no minting)</h3>
+<p style="font-size:13.5px;color:var(--text-dim);"><strong>Lesson:</strong> A trader who never holds to settle can profit purely from price movement. No mint, no redeem — Phoenix-only round trip. Vault is never touched.</p>
+
+<p>Setup: assume the book has depth from earlier minting (multiple Bobs in real life). Diana spots an opportunity at $0.40 (book has asks at 0.40-0.45), thinks news will move price up.</p>
+
+<table>
+  <thead><tr><th style="width:36%;">Step</th><th>Diana's wallet</th><th>Phoenix book (snapshot)</th><th>Vault impact</th></tr></thead>
+  <tbody>
+    <tr><td>T0 — start</td><td class="mono">$100 / 0 YES / 0 NO</td><td class="mono">Asks: 0.40 × 250 / Bids: 0.35 × 300</td><td class="mono">unchanged</td></tr>
+    <tr><td>T1 — Diana <code>buy_yes</code> market 100 @ 0.40</td><td class="mono">$60 / 100 YES / 0 NO</td><td class="mono">Asks: 0.40 × 150 / Bids: 0.35 × 300</td><td class="mono">unchanged ($0 flow)</td></tr>
+    <tr><td>(news breaks, sentiment shifts)</td><td class="mono">$60 / 100 YES / 0 NO</td><td class="mono">Asks: 0.65 × 200 / Bids: 0.60 × 150</td><td class="mono">unchanged</td></tr>
+    <tr><td>T2 — Diana <code>sell_yes</code> market 100 @ 0.60</td><td class="mono">$120 / 0 YES / 0 NO</td><td class="mono">Asks: 0.65 × 200 / Bids: 0.60 × 50</td><td class="mono">unchanged ($0 flow)</td></tr>
+  </tbody>
+</table>
+
+<div class="callout green">
+  <div class="c-title">Diana's PnL: +$20</div>
+  <p style="margin:0;">Bought 100 YES at $0.40 ($40), sold at $0.60 ($60). Net +$20. <strong>Zero fees paid</strong> (Phoenix v1 has no taker fee; Diana never minted so no mint fee). Vault was never touched — Diana traded existing tokens with other users.</p>
+</div>
+
+<!-- ─────────────── SCENARIO 5 ─────────────── -->
+<h3>Scenario 5 — Edward Buy NO → exits NO via atomic Sell NO before settle</h3>
+<p style="font-size:13.5px;color:var(--text-dim);"><strong>Lesson:</strong> A NO-side trader who exits before settle uses the bundled <code>phoenix.buy_yes + redeem_pair</code> atomic. The vault releases $1 per pair on the redeem leg.</p>
+
+<p>Setup: assume the book has depth. Edward buys NO when book is at $0.50 mid, then exits when price moves against him.</p>
+
+<table>
+  <thead><tr><th style="width:42%;">Step</th><th>Edward's wallet</th><th>Vault</th><th>Fee coll.</th></tr></thead>
+  <tbody>
+    <tr><td>T0 — start</td><td class="mono">$100 / 0 YES / 0 NO</td><td class="mono">$0</td><td class="mono">$0</td></tr>
+    <tr><td>T1 — Edward atomic <code>buy_no(100)</code> when YES bid = $0.50<br/><span style="font-size:11.5px;color:var(--text-mute);">tx = [mint_pair(100), phoenix sell YES @ $0.50]</span></td><td class="mono">$48 / 0 YES / 100 NO<br/><span style="font-size:11px;color:var(--text-mute);">cost detail: -$100 mint -$2 fee +$50 YES sale = -$52</span></td><td class="mono">$100</td><td class="mono">$2</td></tr>
+    <tr><td>(price moves up — YES looks more likely)</td><td class="mono">$48 / 0 YES / 100 NO</td><td class="mono">$100</td><td class="mono">$2</td></tr>
+    <tr><td>T2 — Edward atomic <code>sell_no(100)</code> when YES ask = $0.65<br/><span style="font-size:11.5px;color:var(--text-mute);">tx = [phoenix buy YES @ $0.65, redeem_pair(100)]</span></td><td class="mono">$83 / 0 YES / 0 NO<br/><span style="font-size:11px;color:var(--text-mute);">cost detail: -$65 YES buy +$100 pair redeem = +$35</span></td><td class="mono">$0</td><td class="mono">$2</td></tr>
+  </tbody>
+</table>
+
+<div class="callout amber">
+  <div class="c-title">Edward's PnL: −$17</div>
+  <p style="margin:0;">Started $100, ended $83. Effective NO entry: $0.52 (paid $52 net for 100 NO). Effective NO exit: $0.35 (received $35 net for selling 100 NO equivalent). Loss = $0.17 × 100 = $17. The 2¢ mint fee was paid once at T1; no fee on the exit because <code>redeem_pair</code> has no fee.</p>
+</div>
+<div class="callout green">
+  <div class="c-title">Vault returned to $0 — invariant preserved</div>
+  <p style="margin:0;">Edward minted 1 pair and burned 1 pair. The vault took $1 in and paid $1 out. No leftover obligation. This is how the system stays in conservation: every <code>mint_pair</code> is eventually balanced by a <code>redeem_pair</code> (pre-settle) or two <code>redeem</code>s (post-settle, one winner one loser — but only the winner takes $1).</p>
+</div>
+
+<!-- ─────────────── SCENARIO 6 ─────────────── -->
+<h3>Scenario 6 — Frank holds losing position through settle (no redeem path; tokens worth $0)</h3>
+<p style="font-size:13.5px;color:var(--text-dim);"><strong>Lesson:</strong> Losing tokens have no mechanism to extract value. They just sit in the wallet at $0. The vault has nothing for them.</p>
+
+<table>
+  <thead><tr><th style="width:42%;">Step</th><th>Frank's wallet</th><th>Vault</th></tr></thead>
+  <tbody>
+    <tr><td>T0 — Frank bought 100 YES at $0.55 in Phoenix earlier</td><td class="mono">$45 / 100 YES / 0 NO</td><td class="mono">$100 (from someone's earlier mint)</td></tr>
+    <tr><td>T1 — settle: Pyth close < $680 → outcome NO</td><td class="mono">$45 / 100 YES / 0 NO</td><td class="mono">$100</td></tr>
+    <tr><td>T2 — Frank tries <code>redeem(100 YES)</code></td><td colspan="2" class="mono" style="color:var(--red);">tx reverts: InvalidOutcomeForRedeem (winning_mint mismatch — outcome=NO, mint=YES)</td></tr>
+    <tr><td>T3 — Frank does nothing, lets YES sit</td><td class="mono">$45 / 100 YES (worth $0) / 0 NO</td><td class="mono">$100 (waiting for NO holders to claim)</td></tr>
+  </tbody>
+</table>
+
+<div class="callout amber">
+  <div class="c-title">Frank's PnL: −$55 (the cost basis)</div>
+  <p style="margin:0;">Frank paid $55 for the 100 YES that turned out worthless. He took directional risk and lost. The vault retains $100 — held for the 100 NO holders to redeem. If a NO holder never claims, the vault keeps the dust until admin <code>force_redeem</code> kicks in after the grace period (30 days post-settle by default).</p>
+</div>
+
+<!-- ─────────────── SCENARIO BONUS ─────────────── -->
+<h3>Scenario 7 — Invalid market (KNOWN GAP, v2.5 fix)</h3>
+<p style="font-size:13.5px;color:var(--text-dim);"><strong>Lesson:</strong> If Pyth fails persistently and admin marks the market Invalid, refund logic requires the holder to have BOTH YES + NO. Single-side holders are stranded until v2.5.</p>
+
+<table>
+  <thead><tr><th style="width:42%;">Step</th><th>Gabby's wallet</th><th>Helen's wallet</th></tr></thead>
+  <tbody>
+    <tr><td>Setup — Helen minted 100 pair, sold 100 YES to Gabby @ $0.40</td><td class="mono">$60 / 100 YES / 0 NO</td><td class="mono">$140 / 0 YES / 100 NO</td></tr>
+    <tr><td>T1 — Pyth fails for 1 hr, admin calls <code>admin_settle(forcedOutcome=Invalid)</code></td><td class="mono">unchanged</td><td class="mono">unchanged</td></tr>
+    <tr><td>T2 — Gabby tries <code>redeem_invalid(100)</code></td><td colspan="2" class="mono" style="color:var(--red);">tx reverts: insufficient NO balance (Gabby has 0 NO; redeem_invalid requires equal YES + NO)</td></tr>
+    <tr><td>T3 — Helen tries <code>redeem_invalid(100)</code></td><td colspan="2" class="mono" style="color:var(--red);">tx reverts: insufficient YES balance</td></tr>
+    <tr><td>T4 — neither can solo-redeem. They could OTC-swap (Gabby buys 100 NO from Helen via Phoenix or direct).</td><td colspan="2" class="mono" style="color:var(--text-dim);">Stranded until they re-pair</td></tr>
+  </tbody>
+</table>
+
+<div class="callout red">
+  <div class="c-title">⚠ Known v1 gap — Invalid markets strand split positions</div>
+  <p style="margin:0 0 8px;"><code>redeem_invalid</code> burns equal YES + NO and returns the pair deposit. If trades have decoupled the pair across multiple users, neither can solo-redeem. The vault keeps the funds.</p>
+  <p style="margin:0;"><strong>v2.5 fix (Aria TODO at <code>force_redeem.rs:111</code>):</strong> add <code>force_redeem_invalid</code> admin sweep that pays each holder pro-rata after the grace period. For v1, Invalid outcomes are rare (Pyth has been highly reliable) and the admin override path (<code>admin_settle</code> with a manual price) is preferred to declaring Invalid.</p>
+</div>
+
+<!-- ─────────────── SUMMARY ─────────────── -->
+<h3>Scenario summary — what each path proves</h3>
+<table>
+  <thead><tr><th>Scenario</th><th>Proves</th><th>On-chain ixs used</th></tr></thead>
+  <tbody>
+    <tr><td>1 — Bob bootstraps</td><td>Without an MM, manual mint+post-both-sides is the seed</td><td><code>mint_pair</code> + 2× Phoenix <code>place_order</code></td></tr>
+    <tr><td>2 — Alice wins</td><td>Pure Phoenix Buy YES path → redeem at settle</td><td>Phoenix <code>place_order</code> (market) + <code>redeem</code></td></tr>
+    <tr><td>3 — Charlie wins NO</td><td>Atomic mint+sell-YES bundle for NO entry; redeem winner</td><td><code>mint_pair</code> + Phoenix swap + <code>redeem</code></td></tr>
+    <tr><td>4 — Diana trades</td><td>Pure speculation; no mint, no settle, no vault touch</td><td>Phoenix <code>place_order</code> × 2</td></tr>
+    <tr><td>5 — Edward exits NO</td><td>Atomic buy-YES+redeem_pair bundle for NO exit</td><td>Phoenix swap + <code>redeem_pair</code></td></tr>
+    <tr><td>6 — Frank loses</td><td>Losing tokens have no claim; vault dust to NO holders</td><td>(none — no action)</td></tr>
+    <tr><td>7 — Invalid stranding</td><td>Known gap: split positions can't solo-redeem on Invalid</td><td>Would need <code>force_redeem_invalid</code> (v2.5)</td></tr>
+  </tbody>
+</table>
+
+<div class="callout green">
+  <div class="c-title">All 6 normal-path scenarios execute correctly with what we've built</div>
+  <p style="margin:0;">Scenarios 1-6 all use already-shipped ixs (deploy_index=6, 20-ix surface). The atomic Buy-NO and Sell-NO flows are wired in <code>build-buy-no.ts</code> + <code>build-sell-no.ts</code> with Phoenix <code>swap</code> (IOC). Scenario 7 is the documented v2.5 gap.</p>
+</div>
+
+<hr/>
+
+<h2>Summary verdict</h2>
+
+<div class="callout green">
+  <div class="c-title">What we built right (per PRD)</div>
+  <ul style="margin:0;">
+    <li>One Phoenix YES/USDC market per strike — <code>StrikeMarket.phoenix_market</code> is a single Pubkey field</li>
+    <li>NO is the complement, not a separate book — derived as <code>1 − YES price</code></li>
+    <li>4 trade combinations all implemented as 1 signature / 1 tx — POV-3 atomicity enforced</li>
+    <li>Mint-only fee at <code>mint_pair</code> entry — no fee on cancel, no fee on redeem, no need to refund anything</li>
+    <li>Vault math always conserves: <code>vault USDC ≥ pairs_outstanding × $1</code></li>
+    <li>Cancel is clean — no upfront fees, Phoenix returns collateral on cancel</li>
+    <li>Redeem at settle: winning side gets $1, losing side gets $0</li>
+  </ul>
+</div>
+
+<div class="callout amber">
+  <div class="c-title">What needs adjustment (small)</div>
+  <ul style="margin:0;">
+    <li><strong>OrderBookCard mock fixtures</strong> in the trade page show NO prices as if they were independent. The fix is a 10-line helper that derives the NO view from the YES book. Pure UI polish — plumbing is correct. v1.5.</li>
+    <li><strong>Bootstrapping</strong> — no MM in v1. Manual seeding for the demo, or lead with Buy-YES + mint_pair patterns. Long-term: add an MM bot or rely on user discovery.</li>
+  </ul>
+</div>
+
+<div class="callout green">
+  <div class="c-title">What we deliberately deferred</div>
+  <ul style="margin:0;">
+    <li>Polymarket-style atomic complementary-mint-on-fill — requires custom matcher; v1 uses the simpler explicit-mint model</li>
+    <li>DR-009 Model D Phoenix fee capture — v1.5 P0, 6-8 hr work, gated on $500K+ daily volume not engineering</li>
+    <li>Market maker — v1.5 product decision (auto-seeder bot vs. manual liquidity provision)</li>
+  </ul>
+</div>
+
+<p style="text-align:center;color:var(--text-mute);font-size:12px;margin-top:48px;">
+  Built from source: <code>programs/bell-markets/src/instructions/{mint_pair,redeem,redeem_pair,redeem_invalid,settle_market}.rs</code> · <code>apps/web/src/lib/tx/build-{buy,sell}-{yes,no}.ts</code> · <code>apps/web/src/hooks/use-order-book.ts</code>
+</p>
+
+</div>
+</body>
+</html>

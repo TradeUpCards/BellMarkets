@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>BellMarkets — Build Workflow (Repo Setup → Submission)</title>
+<style>
+  :root {
+    --bg: #0a0d14;
+    --panel: #0f141e;
+    --panel-2: #141b27;
+    --border: rgba(255,255,255,0.08);
+    --text: #e6e9ef;
+    --text-dim: #9aa3b2;
+    --text-mute: #6b7280;
+    --accent: #22d3ee;
+    --green: #10b981;
+    --red: #ef4444;
+    --amber: #f59e0b;
+    --violet: #8b5cf6;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14.5px; line-height: 1.6; margin: 0; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 36px 24px 80px; }
+  h1 { font-size: 30px; font-weight: 700; margin: 0 0 6px; letter-spacing: -0.02em; }
+  .subtitle { color: var(--text-dim); font-size: 15px; margin: 0 0 28px; }
+  .meta { color: var(--text-mute); font-size: 13px; margin-bottom: 28px; font-family: var(--mono); }
+  h2 { font-size: 20px; font-weight: 600; margin: 36px 0 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 16px; font-weight: 600; margin: 18px 0 8px; color: var(--accent); }
+  code { background: var(--panel-2); padding: 1px 6px; border-radius: 3px; color: #c2cad6; font-family: var(--mono); font-size: 0.92em; }
+  .mono { font-family: var(--mono); }
+  p { margin: 8px 0; }
+  ul, ol { margin: 6px 0 12px; padding-left: 22px; }
+  li { margin: 3px 0; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0 18px; font-size: 13.5px; }
+  th, td { padding: 8px 10px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+  th { color: var(--text-dim); font-weight: 600; background: var(--panel); }
+  .day {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 14px 0;
+    border-left: 4px solid var(--accent);
+  }
+  .day h3 { margin-top: 0; }
+  .day.pivot { border-left-color: var(--amber); }
+  .day.ship  { border-left-color: var(--green); }
+  .badge {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .badge.amber { background: rgba(245,158,11,0.12); color: var(--amber); border: 1px solid var(--amber); }
+  .badge.green { background: rgba(16,185,129,0.12); color: var(--green); border: 1px solid var(--green); }
+  .badge.violet { background: rgba(139,92,246,0.12); color: var(--violet); border: 1px solid var(--violet); }
+  .badge.red { background: rgba(239,68,68,0.12); color: var(--red); border: 1px solid var(--red); }
+  blockquote {
+    margin: 12px 0;
+    padding: 10px 16px;
+    border-left: 3px solid var(--text-dim);
+    color: var(--text-dim);
+    background: var(--panel-2);
+    border-radius: 0 6px 6px 0;
+  }
+  .leads {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+    margin: 16px 0;
+  }
+  .lead-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 16px;
+  }
+  .lead-card h4 { margin: 0 0 4px; font-size: 14px; color: var(--accent); }
+  .lead-card p { margin: 0; font-size: 13px; color: var(--text-dim); }
+  hr { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
+  .stat-row { display: flex; gap: 18px; flex-wrap: wrap; margin: 8px 0; }
+  .stat {
+    background: var(--panel-2);
+    border-radius: 6px;
+    padding: 10px 14px;
+    border-left: 3px solid var(--accent);
+    min-width: 140px;
+  }
+  .stat .num { font-family: var(--mono); font-size: 18px; font-weight: 600; color: var(--text); }
+  .stat .lbl { font-size: 11px; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.04em; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>BellMarkets — Build Workflow</h1>
+  <p class="subtitle">From repo bootstrap to submission · Gauntlet "Meridian" cohort 5 · five-day build</p>
+  <p class="meta">Author: Cory Vandenberg · Window: 2026-05-21 → 2026-05-25 7pm ET · Stack: Solana / Anchor / Next.js / Trigger.dev / Neon</p>
+
+  <h2>Build at a glance</h2>
+  <div class="stat-row">
+    <div class="stat"><div class="num">5</div><div class="lbl">build days</div></div>
+    <div class="stat"><div class="num">8</div><div class="lbl">on-chain deploys</div></div>
+    <div class="stat"><div class="num">20</div><div class="lbl">decision records</div></div>
+    <div class="stat"><div class="num">27</div><div class="lbl">program instructions</div></div>
+    <div class="stat"><div class="num">4</div><div class="lbl">named lead workstreams</div></div>
+    <div class="stat"><div class="num">6.671</div><div class="lbl">SOL spent on deploys</div></div>
+  </div>
+
+  <h2>How I built it: a directed multi-agent Claude Code workflow</h2>
+  <p>
+    I architected and shipped BellMarkets as a single human director (Tate role) orchestrating four named Claude Code lead agents — each owning a workstream with explicit file boundaries. The leads ran in separate WSL terminal sessions, each in its own git worktree (<code>BellMarkets-aria</code>, <code>-bram</code>, <code>-cleo</code>, <code>-drew</code>); I supervised in my main session as Tate. Every commit was reviewed by me before merge. This is the workflow this project was built with — and it's the workflow I'd use again.
+  </p>
+
+  <div class="leads">
+    <div class="lead-card">
+      <h4>Aria · Onchain</h4>
+      <p>Rust / Anchor. The program at <code>599h7Vzn…</code>. 27 instructions, 7 account types, 57 error variants. Owns the in-program CLOB matcher, settle/redeem invariants, vendored Pyth parser.</p>
+    </div>
+    <div class="lead-card">
+      <h4>Bram · Automation</h4>
+      <p>Node / TypeScript on Trigger.dev. Morning create-markets, post-close grid evolution, settlement nudger. AI briefings (Claude Sonnet). Neon Postgres for product state.</p>
+    </div>
+    <div class="lead-card">
+      <h4>Cleo · Frontend</h4>
+      <p>Next.js 14 / React 18 / TypeScript / Tailwind. Wallet adapter (Phantom/Backpack/Solflare). v8 trading-terminal design. Live order book, four atomic trade flows, Helius proxy.</p>
+    </div>
+    <div class="lead-card">
+      <h4>Drew · Quality</h4>
+      <p>Invariant tests, chain-simulate integration tests, pre-mainnet-readiness narrative, demo runbook, Sonnet defense-in-depth audits.</p>
+    </div>
+  </div>
+
+  <blockquote>
+    The leads aren't humans I delegated to — they're Claude Code sessions I directed in parallel. The output (27 ixs of Rust, ~3K lines of TypeScript across automation and frontend, 100+ invariant tests, 8 on-chain deploys) is mine to defend. The workflow is what made it possible in five days.
+  </blockquote>
+
+  <h2>Day 0 — Sun 2026-05-21: Repo setup + constitution lock</h2>
+
+  <div class="day">
+    <h3>What happened</h3>
+    <ul>
+      <li>Repo bootstrapped from my own <code>claude-code-project-template</code> v0.3.0+ (the template I maintain across projects).</li>
+      <li>Ran <code>/use-template</code> + <code>/sdd-init</code> + <code>/brainlift</code> skills. Scaffolded <code>constitution/</code> (decisions, hard-rules, file-ownership), <code>specs/</code> (architecture, behavior spec, coordination, deferred), and <code>BRAINLIFT.md</code> (the 1-page constitution).</li>
+      <li>Locked DR-001 (Phoenix CLOB), DR-002 (permissionless <code>settle_market</code>), DR-003 (Pyth oracle).</li>
+      <li>Pre-research interview produced <code>ARCHITECTURE.md</code> — the defense-friendly summary.</li>
+      <li>Dispatched Aria with kickoff at <code>.project/bell-markets/kickoff/aria.md</code>.</li>
+      <li>Bram + Cleo scaffolded their workstreams against a mocked Aria interface — parallelism from hour 0.</li>
+    </ul>
+    <p><span class="badge violet">Artifacts</span> &nbsp; BRAINLIFT.md v1 · constitution/decisions.md (DR-001…003) · specs/architecture.md · specs/bell-markets-spec.md · specs/deferred.md · specs/coordination.md</p>
+  </div>
+
+  <h2>Day 1 — Mon 2026-05-22: Toolchain pinning + cost-shift design</h2>
+
+  <div class="day">
+    <h3>What happened</h3>
+    <ul>
+      <li><strong>DR-004:</strong> Locked Anchor CLI 0.31.1 (Aria) + <code>@coral-xyz/anchor</code> JS 0.30.1 (Bram/Cleo/Drew) — deliberate version mismatch per <code>LESSONS.md</code> Lesson 1 (Borsh-cascade trap if unified). Verified the IDL deserializes cleanly across the split on first <code>anchor build</code>.</li>
+      <li><strong>DR-005:</strong> Pivoted from "platform funds all 49 strike PDAs/day (~$44/day at scale)" to user-funded creation (Meteora DLMM pattern). First trader pays ~$0.90 rent; platform funds zero. Added <code>user_create_strike_market</code> with on-chain deviation + tick-alignment + Pyth-validity gates.</li>
+      <li><strong>DR-006:</strong> Strike-grid evolution moved to <em>post-close anchor</em> instead of morning create — fewer races with market open, cleaner phase windows.</li>
+      <li><strong>Deploy 1 + 2:</strong> 2.486 SOL + 0.300 SOL. First handler bodies live.</li>
+    </ul>
+    <p><span class="badge violet">Artifacts</span> &nbsp; constitution/decisions.md (DR-004…006) · programs/bell-markets/src/instructions/{create_strike_market, user_create_strike_market, update_ticker_config}.rs · TickerConfig PDA</p>
+  </div>
+
+  <h2>Day 2 — Tue 2026-05-23: Fee model + leaderboard surface</h2>
+
+  <div class="day">
+    <h3>What happened</h3>
+    <ul>
+      <li><strong>DR-007:</strong> Expiry pinning — markets expire at exactly 1pm or 4pm ET (half-day vs full-day calendar), not arbitrary user-supplied times. Forces discreteness for the strike-grid scheduler.</li>
+      <li><strong>DR-008:</strong> Fee model v1 locked — 25 bps mint fee, 0 bps trade fee, 50/25/25 split (platform/weekly/monthly rewards), creator rebate to <code>StrikeMarket.creator</code>.</li>
+      <li><strong>Deploy 3 + 4:</strong> 0.170 + 0.159 SOL.</li>
+      <li><strong>Deploy 5:</strong> 2.179 SOL — big jump (+312 KB binary). Bundled DR-005 + DR-007 + DR-008 + DR-010 leaderboard surface + DR-011 earnings-eve expansion. Required a pre-deploy 2-SOL top-up to upgrade authority.</li>
+    </ul>
+    <p><span class="badge violet">Artifacts</span> &nbsp; FeeConfig PDA · DR-008 fee math (creator rebate + tier discount + split routing) · DR-010 LeaderboardCommitments PDA · weekly_pool + monthly_pool token accounts</p>
+  </div>
+
+  <h2>Day 3 — Wed 2026-05-24: Big push on the rewards + verifier surface</h2>
+
+  <div class="day">
+    <h3>What happened</h3>
+    <ul>
+      <li><strong>DR-009:</strong> Fee model amendment — Model D (per-market <code>fee_receiver</code> config on Phoenix's <code>InitializeMarket</code> CPI) was verified independently feasible by Bram (off-chain) and Aria (on-chain primary-source). Plan locked for v1.5 but not v1 (would touch <code>create_strike_market</code> 24hr before submission).</li>
+      <li><strong>DR-015:</strong> Multi-metric distribution — leaderboard partitions <code>claimed_bitmap</code> into 4 disjoint 8-bit segments (profit / win-streak / win-rate / ROI). Off-chain Merkle leaf format changes to 47 bytes with <code>period_id</code> narrowed u64 → u32.</li>
+      <li><strong>Deploy 6:</strong> 0.008 SOL. Logic-only upgrade. <strong>110/110 cargo tests pass.</strong></li>
+      <li>Sonnet defense-in-depth audit cycle on DR-008/DR-015 — caught polished-prose-around-weak-assertions + 2 small fixes.</li>
+    </ul>
+    <p><span class="badge violet">Artifacts</span> &nbsp; constitution/decisions.md DR-009/010/011/015 · merkle.rs verifier · distribute_weekly_rewards + distribute_monthly_rewards ixs</p>
+  </div>
+
+  <h2>Day 4 — Sun 2026-05-24 evening: THE PIVOT</h2>
+
+  <div class="day pivot">
+    <h3><span class="badge amber">DR-020 PIVOT</span> &nbsp; Phoenix → in-program CLOB</h3>
+    <p>
+      <strong>What went wrong:</strong> Phoenix integration on devnet hit a chicken-and-egg bootstrap problem we could not solve inside the build window. Phoenix's <code>InitializeMarket</code> requires the YES base mint to <em>exist</em> at the time it's called — but our program creates the YES mint as part of <code>create_strike_market</code>. The bootstrap order is unworkable without a multi-step admin orchestration we didn't have time to implement and audit.
+    </p>
+    <p>
+      <strong>What I did:</strong> Adopted Keith Mazanec's parallel-cohort in-program CLOB reference design with adversarial review pre-applied. Wholesale, not invented from scratch. 5 new ixs (init_order_book, grow_order_book, place_order, cancel_order, match_orders) + new <code>OrderBook</code> zero-copy account (16,448 B per market) + 2 escrow PDAs per strike. Phoenix code stays dormant in the program (additive, not removed) for Phoenix-as-secondary-venue v2 candidate.
+    </p>
+    <p>
+      <strong>The senior-engineer move:</strong> The interview defense isn't "I built it from scratch." It's "I recognized when not to NIH. Adopting a peer's design with their adversarial review baked in is shorter audit surface, faster review, fewer novel bugs." Documented in <code>docs/architecture/reference-clob-{design,decisions,spec}.md</code>.
+    </p>
+    <ul>
+      <li><strong>DR-016</strong> Token program selection (SPL for tradeable, Token-2022 for platform NFTs, compressed for badges)</li>
+      <li><strong>DR-017</strong> Vault security model — PDA self-authority + finite list of vault destinations</li>
+      <li><strong>DR-018</strong> Fee model v1.5 (amendment of DR-008)</li>
+      <li><strong>DR-019</strong> NO is market-only in v1 (Limit NO would strand fees on cancel)</li>
+      <li><strong>DR-020</strong> The pivot itself — supersedes DR-001, defers DR-009</li>
+    </ul>
+    <p>
+      <strong>Deploy 7:</strong> 1.243 SOL · 759 KB → 937 KB (+178 KB) · 26 ixs · 54 errors · 7 accounts · <strong>135/135 cargo tests pass</strong> · zero stack-offset warnings · Sonnet adversarial-fix audit baked into initial implementation (H-1 maker-account verification, M-2 yes_mint PDA seed, M-4 zero-price reject).
+    </p>
+  </div>
+
+  <h2>Day 5 — Mon 2026-05-25: Submission day</h2>
+
+  <div class="day ship">
+    <h3>Morning: bUSDC migration + Path B</h3>
+    <ul>
+      <li>Existing strikes' usdc_vault was bound to Circle devnet USDC; after <code>update_usdc_mint</code> (DR-020 admin ix) flipped <code>config.usdc_mint</code> to our self-controlled bUSDC, the existing weekly/monthly reward-pool token accounts were stranded against the old mint.</li>
+      <li><strong>Path B</strong> chosen over Path A (revert to Circle USDC): added <code>reinit_rewards_pools</code> admin ix — closes + re-initializes the 2 pool PDAs at the same addresses bound to the new mint. Manual 3-step CPI dance: <code>close_account</code> → <code>create_account</code> → <code>initialize_account3</code> (Anchor's <code>init</code> + <code>close</code> don't compose on the same PDA in a single tx).</li>
+      <li>Bundled with Sonnet audit fixes (1 LOW + 1 NIT — pre-flip checklist for resting bids; <code>ClobMakerNotWritable</code> error variant).</li>
+      <li><strong>Deploy 8:</strong> 0.122 SOL · 27 ixs · <strong>138/138 cargo tests pass</strong> · cumulative deploy spend <strong>6.671 SOL</strong>.</li>
+    </ul>
+    <h3>Afternoon / evening: E2E proof + frontend live data + docs</h3>
+    <ul>
+      <li><strong>Seeded a fresh META $610 market</strong> on devnet (expiry Fri 2026-05-29 4pm ET) — full ladder: 3 bids at $0.40/$0.45/$0.50 × 50 YES, 3 asks at $0.55/$0.60/$0.65 × 50 YES.</li>
+      <li><strong>Verified E2E trade on-chain</strong> — limit BID at $0.55 × 50 YES from admin wallet crossed the resting $0.55 ask. Every delta exactly as expected: asksLen 3→2, yes_escrow telescoped −50 YES, admin received 50 YES, vault invariant intact. Solscan: <code>5rTS2SBo…1VCe</code>.</li>
+      <li>Cleo wired live <code>useAllMarkets</code> / <code>useOrderBook</code> / <code>useTokenBalance</code> into the landing-page probability matrix + trade-view strike rail (replaced static fixtures).</li>
+      <li>Bram extended <code>seed-demo-liquidity</code> to multi-strike (ATM ± 3%) and ran for all 7 MAG7 tickers.</li>
+      <li>Brief V2 polish + cost-analysis doc + demo-readiness plan + pre-mainnet-readiness §"v2 gap #8" (OrderBook rent recovery design) + Tier-1 doc sweep (BRAINLIFT, specs/architecture, ARCHITECTURE, hard-rules, bell-markets-spec all updated for DR-020).</li>
+      <li><strong>Submission target:</strong> 7:00 PM ET.</li>
+    </ul>
+  </div>
+
+  <h2>Toolchain + workflow stack</h2>
+
+  <table>
+    <tr><th>Layer</th><th>Tool</th><th>Why I picked it</th></tr>
+    <tr><td>AI orchestration</td><td>Claude Code (Opus 4.7 + Sonnet 4.6)</td><td>Multi-agent workflow with per-lead agents + Tate director role; Sonnet for adversarial audit cycles (bias-diversification per DR-009 audit discipline)</td></tr>
+    <tr><td>Repo scaffold</td><td>My own <code>claude-code-project-template</code></td><td>v0.3.0+ ships /use-template, /sdd-init, /brainlift, /tate skills; reusable across projects</td></tr>
+    <tr><td>Workstream isolation</td><td>Git worktrees + WSL terminals</td><td>One worktree per lead = no merge conflicts during parallel work; main session = Tate / director</td></tr>
+    <tr><td>Onchain build</td><td>Anchor 0.31.1 / Solana CLI 3.1.14 / Rust 1.95</td><td>LESSONS.md-validated combo for Solana 3.x sBPF v3 compatibility</td></tr>
+    <tr><td>Onchain client</td><td><code>@coral-xyz/anchor</code> 0.30.1</td><td>Ecosystem-tested against wallet-adapter (DR-004 deliberate mismatch)</td></tr>
+    <tr><td>Frontend</td><td>Next.js 14.2.18 (App Router) + React 18 + TS strict</td><td>Pinned per LESSONS.md to a known-stable combo with <code>@solana/wallet-adapter</code></td></tr>
+    <tr><td>Realtime</td><td>Helius <code>onAccountChange</code> via server-side proxy</td><td>WebSocket-driven; key stays out of NEXT_PUBLIC_ (Hard NO #13)</td></tr>
+    <tr><td>Cron / automation</td><td>Trigger.dev v4</td><td>Used on prior project (w3Swap); native cron + retries; clean Vitest integration</td></tr>
+    <tr><td>Database</td><td>Neon Postgres (DR-003 amended)</td><td>Product surface — users, briefings, leaderboard. Chain stays canonical for funds.</td></tr>
+    <tr><td>AI briefings</td><td>Anthropic Sonnet</td><td>Bell Pro daily briefings on /api/briefings/&lt;TICKER&gt;</td></tr>
+    <tr><td>Deploy</td><td>Vercel (web) + Solana devnet (program) + Trigger.dev cloud (cron)</td><td>Each surface ships to its native cloud; no Docker / no custom infra</td></tr>
+    <tr><td>Package manager</td><td>pnpm (workspaces)</td><td>User preference; faster + better monorepo support than npm/yarn</td></tr>
+  </table>
+
+  <h2>The retrospective</h2>
+
+  <h3>What I'd do differently</h3>
+  <ul>
+    <li><strong>Test Phoenix devnet bootstrap on Day 1, not Day 4.</strong> The whole DR-020 pivot would have been a 30-minute investigation on Day 1 instead of an emergency push on Day 4. I assumed integration would work because the SDK existed.</li>
+    <li><strong>Add <code>mint::close_authority</code> to mints at Day 1.</strong> Would unlock v1.2 mint-close rent recovery without a future program upgrade. ~$2K/year stranded that I could've prevented for one line of code.</li>
+    <li><strong>Lock the IDL placement pattern across services on Day 1.</strong> Tonight's seed-script ran into IDL-not-found and IDL-placeholder issues that cost ~30 min of debugging. A single source of truth for the IDL (one file, symlinks elsewhere) would have prevented this.</li>
+    <li><strong>Cost-shifting (DR-005 Meteora pattern) should have been a Day 0 decision.</strong> I had the platform-funded design baked in until Day 2, then refactored. The Day-0 brainlift should have asked "who pays for PDA rent at scale?" — it didn't.</li>
+    <li><strong>Start the demo runbook on Day 1.</strong> Drew's <code>docs/demo/test-runbook.html</code> didn't exist until late. Writing it earlier would have caught UX gaps while there was time to fix them properly instead of patching at the end.</li>
+  </ul>
+
+  <h3>What worked</h3>
+  <ul>
+    <li><strong>The multi-agent Claude Code workflow.</strong> Five days, four parallel workstreams, ~3000 lines of TypeScript + 27 Anchor instructions + 100+ tests + an entire frontend. Single director (me); no human teammates.</li>
+    <li><strong>The constitution/decisions.md discipline.</strong> 20 DRs locked, each with trade-off line. When DR-020 happened, the diff was clean — the superseded DR-001 stays visible, the new DR-020 references it. No silent rewrite of history.</li>
+    <li><strong>The brainlift + SDD scaffolding.</strong> Every Claude Code session re-read the constitution before writing code. Drift was minimal compared to a code-first workflow.</li>
+    <li><strong>Sonnet adversarial audits after each major push.</strong> Caught ~17 substantive findings across 7 cycles. Bias-diversification (different model than the writer) is real and underused.</li>
+    <li><strong>The pivot itself.</strong> 30 hours before submission, I rebuilt the matching layer of the protocol. The submission still ships an E2E trade verified on-chain. That's a workflow story worth telling.</li>
+  </ul>
+
+  <hr />
+  <p class="meta">Built by Cory Vandenberg · GauntletAI Cohort 5 (Meridian) · Repo: github.com/TradeUpCards/BellMarkets · Live: bell-markets.vercel.app · Program: 599h7VznYR4CxyrG5nQbhR13qtRuwPcbnNr5QqbkS7uV (Solana devnet)</p>
+
+</div>
+</body>
+</html>

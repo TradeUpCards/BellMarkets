@@ -183,6 +183,48 @@
 
 ---
 
+### OrderBook + escrow rent recovery (post-settle cleanup)
+
+**Status:** Deferred to v1.1 (post-submission, pre-mainnet — P1 hard precondition for mainnet)
+**Decided in:** This file + `docs/architecture/pre-mainnet-readiness.md` §"v2 gap #8"
+**Decided on:** 2026-05-25
+
+**What we considered:** Adding two new permissionless instructions — `force_cancel_order(side, seq)` (post-settle sweep) + `close_order_book()` (closes OrderBook + both escrows once empty) — so the operator can reclaim ~95% of per-market SOL rent (0.121 of 0.128 SOL/market) after settlement. The StrikeMarket PDA stays as the historical tombstone holding `outcome`, `settle_price`, `settled_at_unix`, and `pairs_outstanding` for late redemptions.
+
+**Why deferred:**
+- ~60-90 min of Aria's critical-path time before the 2026-05-25 7pm ET submission, competing with the Pyth-feed audit + settle/redeem smoke test that are demo-blocking.
+- Devnet SOL is free; the stranded-rent cost is $0 today. The cost is documented and known.
+- Both instructions are extensions of existing patterns (`cancel_order` for the cancel logic, `close_settled_market` for the rent-flow pattern) — low-risk to ship post-submission with fresh test coverage.
+- `close_settled_market.rs:115-116` already documents this as a "future sweep mechanism" — explicit scope decision, not an oversight.
+
+**Trade-off accepted:** ~0.122 SOL/market stranded on devnet (free; doesn't matter). On mainnet at 49 markets/day × 30 days = ~187.7 SOL/month = ~$30K/month stranded — economically unsustainable. **Therefore: ship before mainnet, not before submission.**
+
+**Revisit threshold:** Pre-mainnet (P1 hard precondition). The first mainnet deploy must include `force_cancel_order` + `close_order_book` in the instruction surface. If the mainnet conversation opens before v1.1 ships, treat this as a launch blocker, not a v1.2 polish item.
+
+**Re-evaluation owner:** Aria (program-side implementation) + Bram (cron integration to call the cancel sweep + close in the post-settle phase) + Tate (mainnet-readiness gating).
+
+---
+
+### Mint rent recovery (close YES/NO mints post-redemption)
+
+**Status:** Deferred to v1.2 (post-mainnet polish)
+**Decided in:** This file + `docs/architecture/pre-mainnet-readiness.md` §"v2 gap #8"
+**Decided on:** 2026-05-25
+
+**What we considered:** Adding `mint::close_authority = strike_market` to the Anchor `init` schema in `create_strike_market`, then a small `close_market_mints()` instruction that calls SPL Token's `CloseAccount` on each mint (PDA-signed) once `supply == 0`. Reclaims the remaining ~0.003 SOL/market of stranded mint rent.
+
+**Why deferred:**
+- Requires a program upgrade (schema change to `init`) — every new deploy is a fresh audit cycle. Not worth it for 0.003 SOL/market when the v1.1 OrderBook+escrow close already recovers 95% of per-market rent.
+- The existing mints work fine without `close_authority`; setting it doesn't change runtime behavior, only enables cleanup.
+
+**Trade-off accepted:** 4.8% of per-market rent (~0.006 SOL — StrikeMarket tombstone + two mints) stays permanently locked. At mainnet scale, that's ~$1.50/market or ~$2,100/month at 1,470 markets/month. Material but not load-bearing.
+
+**Revisit threshold:** Bundle into whatever deploy_index ships next after v1.1, OR wait until a mainnet program upgrade is happening for another reason and ride along. Don't deploy specifically for this.
+
+**Re-evaluation owner:** Aria + Tate.
+
+---
+
 > Aim for clarity over completeness. 8 well-documented deferrals beat 20 thin ones. If something genuinely doesn't need deferral context (e.g., "we're not building an iOS native app"), it can live in `specs/bell-markets-spec.md` §6 (Non-goals) as a one-liner instead.
 
 ---

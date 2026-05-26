@@ -56,17 +56,17 @@ Each rule has:
 **Rationale:** v1 scope is exactly the 7 MAG7 tickers and binary same-day expiry. Other instruments invalidate the $1 USDC invariant model and balloon the on-chain surface.
 **Enforcement:** Human review on `programs/bell-markets/src/state/` (ticker enum is fixed at 7 values). Cross-references BRAINLIFT.md §1 "Out of scope."
 
-### §3.3 No persistent off-chain database for the core submission
-**Rationale:** Solana RPC + on-chain state is the source of truth. Adding a database creates a sync surface that can drift from on-chain reality, undermines the non-custodial story, and is an operational burden the 3-day budget doesn't have.
-**Enforcement:** Human review on `services/automation/` — service must be stateless. Any caching layer must be ephemeral (process-local or Redis-with-TTL); never the source of truth.
+### §3.3 Solana is canonical for funds; the database is product surface only (DR-003 amended)
+**Rationale:** Solana RPC + on-chain state is the source of truth for all balances, collateral, settlement, redemption rights, and order-book state. A Neon Postgres serves product surface only — users, OAuth accounts, AI briefings, notification prefs, leaderboard reads, push subscriptions, distributions metadata. The DB can drift, be wiped, or be rebuilt without affecting funds — they remain reconcilable from chain. **Originally this rule said "no DB at all"; amended on 2026-05-24 when Bram added AI briefings + DR-014 OAuth flow.**
+**Enforcement:** Human review on `services/automation/db/migrations/` and any DB-writing route. No DB row may be load-bearing for fund movement, redemption rights, or order-book correctness. Any new table's purpose is documented in the migration file's header.
 
 ---
 
 ## 4. Code Quality & Architectural Invariants
 
-### §4.1 Never write an on-chain matching engine
-**Rationale:** Phoenix is the integrated CLOB per DR-001. Adding price-time-priority code inside the Anchor program duplicates audited logic, expands the bug surface, and contradicts the explicit architectural commitment.
-**Enforcement:** Drew + Tate refuse PRs that add ordering, matching, partial-fill, or self-trade-prevention code inside `programs/`. Cross-references `constitution/decisions.md` DR-001 and BRAINLIFT.md Hard NO #4 + POV-1.
+### §4.1 The matcher is in-program (post-DR-020). Reject swaps to a different CLOB without a new DR superseding DR-020.
+**Rationale:** DR-020 (2026-05-24) supersedes DR-001 — we pivoted to an in-program bounded CLOB after Phoenix devnet bootstrap proved impractical inside the build window. Phoenix CPI code stays dormant in the program (additive, not removed) for Phoenix-as-secondary-venue v2 candidate work per DR-009. Adopted Keith Mazanec's parallel-cohort reference design with adversarial review pre-applied.
+**Enforcement:** Drew + Tate refuse PRs that try to remove the in-program matcher OR swap it for a different CLOB without a new Decision Record superseding DR-020. Cross-references `constitution/decisions.md` DR-020 (active) + DR-001 (superseded) + BRAINLIFT.md POV-1 (v2).
 
 ### §4.2 Never give `settle_market` a special-signer requirement
 **Rationale:** Permissionless settle is the load-bearing design commitment from DR-002. Adding a signer check would convert the convenience-caller automation into an authority, eliminate the cron-failure recovery path, and break the demo's defensibility narrative.
@@ -108,9 +108,9 @@ Each rule has:
 **Rationale:** Per LESSONS.md Lesson 7, these warnings ARE the actual runtime failures — just disguised as warnings during build. Dismissing them led to deploy-but-doesn't-execute programs.
 **Enforcement:** CI build step greps for "Stack offset exceeded" in the `anchor build` output and fails the pipeline if found. Aria does not deploy a binary that emitted these warnings.
 
-### §4.12 Phoenix order-book accounts use `UncheckedAccount<'info>` with manual byte layout
-**Rationale:** Per LESSONS.md Lesson 3 + Pattern 1, Anchor's `Account<T>` and `zero_copy(unsafe)` both fail at runtime for accounts > 1 KB. The only pattern that works is the one Phoenix, Serum, and OpenBook v2 themselves use: `UncheckedAccount` + a 8-byte magic prefix + manual byte offset reads via a `SlabRef<'a> { data: &'a mut [u8] }` wrapper.
-**Enforcement:** Aria's `programs/bell-markets/src/adapters/phoenix.rs` uses this pattern. Drew flags PRs that try to wrap Phoenix accounts in `Account<T>` during review. Reference: `phoenix-v1/src/state/markets/fifo_market.rs` (https://github.com/Ellipsis-Labs/phoenix-v1).
+### §4.12 OrderBook PDA uses Anchor's zero-copy + `AccountLoader` pattern
+**Rationale:** Post-DR-020, the order book is in-program. The `OrderBook` struct is 16,448 B (well over 1 KB); Anchor's `Account<T>` would deserialize it onto the BPF stack and overflow. Solana's `MAX_PERMITTED_DATA_INCREASE` per realloc is 10 KB, so init is two-phase: `init_order_book` allocates 10 KB; `grow_order_book` reallocs to full `OrderBook::LEN` and sets `strike_market.order_book` (the trading gate). Pattern: `#[account(zero_copy)]` + `AccountLoader<'info, OrderBook>` + `load_mut()` / `load()` for mutable/immutable access. The dormant `Phoenix` adapter at `programs/bell-markets/src/adapters/phoenix.rs` retains the original `UncheckedAccount` + manual-byte-layout pattern as a v2 reference; it is not compiled into any current code path.
+**Enforcement:** Aria's `programs/bell-markets/src/state.rs` defines `OrderBook` with `#[account(zero_copy)]`; `programs/bell-markets/src/instructions/{init,grow,place,cancel,match}_order*.rs` use `AccountLoader<'info, OrderBook>`. Drew flags PRs that try to wrap the OrderBook in `Account<T>` during review.
 
 ### §4.13 Pyth on-chain reads use a vendored 30-line parser; do NOT import `pyth-sdk-solana`
 **Rationale:** Per LESSONS.md Lesson 1, `pyth-sdk-solana` causes a Borsh-version cascade against Anchor 0.31. Vendoring a tiny parser at `programs/bell-markets/src/oracle.rs` (validates magic number, reads price/confidence/exponent/publish_slot at known byte offsets, returns a typed `PriceData` struct) avoids the dep conflict entirely. Pyth's binary layout is documented and stable. Cross-references DR-003 implementation note.

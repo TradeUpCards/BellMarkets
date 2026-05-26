@@ -175,6 +175,57 @@ Hard NO #1 prevents creating mainnet keypairs at the cohort-build stage. When ma
 
 Practical impact: at 10K MAU we pay ~$50/year in extra rent (vs. compressed) for tradeable accounts in exchange for zero novel audit surface. The v2 badge work is *additive* — Bubblegum tree + cNFT mint path with no breaking changes to existing accounts.
 
+### v2 gap #8 — OrderBook + escrow rent not recoverable (~0.122 SOL/market stranded)
+
+`close_settled_market` (ix 17) was scoped to the USDC vault only. The bulk of per-market rent — the 16,448-byte OrderBook PDA + two escrow token accounts — has no close path today. Confirmed on-chain (devnet, deploy_index=8, 2026-05-25):
+
+| Account | Size | Rent (SOL) | Closable today? |
+|---|---|---|---|
+| StrikeMarket | 333 B | 0.003209 | ❌ tombstone by design |
+| **OrderBook** | **16,448 B** | **0.115369** | **❌ no close path** |
+| usdc_vault | 165 B | 0.002039 | ✅ via `close_settled_market` |
+| usdc_escrow | 165 B | 0.002039 | ❌ no close path |
+| yes_escrow | 165 B | 0.002039 | ❌ no close path |
+| yes_mint | 82 B | 0.001462 | ❌ no `close_authority` set at mint init |
+| no_mint | 82 B | 0.001462 | ❌ same |
+| **Per-market total** | | **0.127619** | only 0.002039 recoverable today |
+
+Recoverable today: 1.6% (0.002 SOL). Stranded: 98.4% (0.126 SOL). At 49 markets/day × 30 days = 1,470 markets/month, that's **~187.7 SOL/month** of stranded rent (~$30,000/month at $160/SOL mainnet).
+
+**Tombstone-preserving recovery design (v1.1 P1):** the StrikeMarket PDA already serves as the historical tombstone (per `close_settled_market.rs:18-23`) — it holds `outcome`, `settle_price`, `settle_confidence`, `settled_at_unix`, `pairs_outstanding`. Closing the OrderBook + escrows after settlement does not affect the redemption path (`redeem` reads StrikeMarket + usdc_vault only). Two new instructions close the gap:
+
+1. **`force_cancel_order(side, seq)` — permissionless, post-settle only.** Mirrors existing `cancel_order` but drops the `owner == signer` check; gated on `strike_market.outcome != Unsettled`. Refunds the maker's exact remaining escrow to the maker's own ATA, passed in `remaining_accounts` with the same ownership-verification pattern `place_order` already uses for maker payouts. The cron (Aria/Bram) iterates `bids[..bids_len]` + `asks[..asks_len]` and calls this once per stale order in the settlement phase.
+
+2. **`close_order_book()` — permissionless.** Gated on `bids_len == 0 && asks_len == 0 && usdc_escrow.amount == 0 && yes_escrow.amount == 0` (defense-in-depth — the cancel sweep should already drain them). Closes `order_book`, `usdc_escrow`, `yes_escrow` to `fee_collector` (matches existing `close_settled_market` pattern). **Also clears `strike_market.order_book = Pubkey::default()` on close** — this leaves the StrikeMarket tombstone in a self-consistent post-close state where the existing trading-gate (`order_book != Pubkey::default()`) automatically rejects any further `place_order` attempts with `OrderBookNotInitialized`. No new gate logic needed.
+
+**No OrderBook tombstone needed.** The OrderBook contains only working data (resting orders + a sequence counter), is never a historical record (orders are evicted on cancel/fill via swap-remove), and is invisible to every redemption path (`redeem` / `redeem_pair` / `redeem_invalid` / `force_redeem` all read StrikeMarket + usdc_vault only — never the order book). Full trade history is captured via `OrderPlaced` / `OrderMatched` / `OrderCancelled` events emitted on every trade, retained by RPC providers in program logs. Closing the OrderBook loses no on-chain audit value — the events outlive the account.
+
+**Recovery math under the v1.1 design:**
+
+```
+Phase A — immediately post-settle (after cancel sweep + close_order_book):
+  recovered = 0.115369 (OrderBook) + 0.002039 + 0.002039 (both escrows)
+            = 0.119447 SOL
+
+Phase B — when all redemptions complete (existing close_settled_market):
+  recovered = 0.002039 SOL (usdc_vault)
+
+Permanently stranded (tombstone + mints with no close_authority):
+  stranded = 0.003209 (StrikeMarket) + 0.001462 + 0.001462 (mints)
+           = 0.006133 SOL
+
+Net recoverable per market: 0.121486 SOL = 95.2% of total per-market rent
+Stranded: 0.006133 SOL = 4.8% (StrikeMarket tombstone + two mints)
+```
+
+**Late-redemption safety:** `redeem` reads from `StrikeMarket` + `usdc_vault` only — neither `OrderBook` nor escrows are on its account list. Phase A closure happens immediately post-settle and never blocks redemption. Phase B closure waits on `pairs_outstanding == 0`. A user can claim winnings years after settlement; the order book gets cleaned up that night regardless.
+
+**Implementation cost (Aria):** ~60-90 min — both instructions are extensions of existing patterns (`cancel_order` for the cancel logic, `close_settled_market` for the close-and-refund-rent pattern). New deploy_index. Invariant tests under `programs/bell-markets/src/instructions/{force_cancel_order,close_order_book}.rs` mirror the existing `close_settled_dust_attack_griefing` + `close_property_only_specific_triple_passes` patterns.
+
+**Mints (the remaining 4.8% stranded):** YES/NO mints were created with default Anchor `init` (no `close_authority`). SPL Token's `CloseAccount` on a Mint requires both `close_authority` set AND `supply == 0`. Closing the mints requires either: (a) adding `mint::close_authority = strike_market` to the Anchor `init` schema in `create_strike_market` (then a v1.2 instruction can close them via PDA-signed CloseAccount after every redemption settles supply to 0); or (b) `SetAuthority` instructions before `CloseAccount`. Either path requires a program upgrade. **Decision: defer to v1.2.** The 0.003 SOL/market mint rent isn't worth a near-term deploy when the OrderBook recovery already lands 95% of the value.
+
+**Revisit threshold:** v1.1 (post-submission, pre-mainnet). The force_cancel + close_order_book pair is a strict precondition for mainnet — at $30K/month stranded rent on mainnet pricing, the cost-per-market burn rate is the load-bearing operator-economics number. Mint-close is deferred independently to v1.2 as a smaller follow-up.
+
 ### v1.5 promotion — DR-009 amendment closes Phoenix-secondary-trade fee gap (informational, not a v2-gap)
 
 Originally listed as a fee-capture gap in DR-008's accompanying notes ("Phoenix-only secondary trades pay zero protocol fees"). **`constitution/decisions.md` DR-009 amendment 2026-05-24** records that Model D (per-market `fee_receiver` config on `phoenix::InitializeMarket` CPI) was independently verified feasible by Bram (off-chain) AND Aria (on-chain primary-source verification). Locked integration plan: ~6-8 hr cross-lead effort + 1 audit cycle + deploy_index=7. Promoted to **v1.5 P0** (NOT v1 submission — touches `create_strike_market` core flow ~24hr before submission deadline; revenue today = $0 on devnet). Mainnet conversation should cite the amendment so reviewers know the gap is *engineered, not aspirational*.

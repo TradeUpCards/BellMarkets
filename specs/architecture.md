@@ -6,35 +6,38 @@
 > Companion to `BRAINLIFT.md` (the 1-page constitution). This file holds
 > the heavyweight architectural detail (repo layout, type signatures,
 > data model, deployment, dependencies) that doesn't fit in the brainlift.
+>
+> **Status:** Refreshed 2026-05-25 post-DR-020 (Phoenix → in-program CLOB pivot) + post-deploy_index=8. Where this file disagrees with `constitution/decisions.md`, the DR file wins.
 
 ---
 
 ## 1. Overview
 
-BellMarkets is a **non-custodial Solana dApp + off-chain orchestration service + browser frontend** that lets users trade Yes/No binary outcome tokens against USDC for the question *"Will [STOCK] close above [PRICE] today?"* on the MAG7 universe. Settlement is driven by an on-chain Pyth price read at 4:05 PM ET. The on-chain CLOB is Phoenix (per DR-001). Daily lifecycle (morning create-markets job at ~8am ET, settlement nudger at ~4:05pm ET) is orchestrated by an off-chain TypeScript service, but `settle_market` is permissionless so the system functions even if the orchestration service is offline (per DR-002).
+BellMarkets is a **non-custodial Solana dApp + off-chain orchestration service + browser frontend + Neon DB product surface** that lets users trade YES/NO binary outcome tokens against bUSDC for the question *"Will [STOCK] close above [PRICE] today?"* on the MAG7 universe. Settlement is driven by an on-chain Pyth price read shortly after 4:00 PM ET. **The on-chain CLOB is in-program** — a bounded price-time-priority matcher inside the Anchor program (DR-020, supersedes DR-001 after Phoenix devnet bootstrap proved impractical). Daily lifecycle (morning create-markets job at ~8am ET, post-close grid evolution at 4:05pm ET) is orchestrated by an off-chain TypeScript service on Trigger.dev, but `settle_market` is permissionless so the system functions even if the orchestration service is offline (per DR-002). Solana is canonical for funds; Neon Postgres serves product surface (users, OAuth, AI briefings, notification prefs) — per DR-003 amended.
 
 ### System diagram
 
 ```mermaid
 graph TB
     User[Demo user / Phantom wallet] --> Web[Frontend - Next.js app]
-    Operator[Demo operator] --> Auto[Automation service - Node/TS]
+    Operator[Demo operator] --> Auto[Automation service - Trigger.dev]
 
-    Web -->|onAccountChange| RPC[Helius RPC]
+    Web -->|/api/solana-rpc proxy| RPC[Helius RPC]
     Web -->|signed txs| RPC
-    Web -.->|read price feeds| Pyth[Pyth Network]
+    Web -->|briefings + leaderboard reads| DB[Neon Postgres]
+    Web -.->|read price feeds| Pyth[Pyth Hermes API]
 
-    Auto -->|sign admin txs| RPC
-    Auto -->|read previous-close HTTP| PythAPI[Pyth HTTP API]
+    Auto -->|sign txs| RPC
+    Auto -->|read price feeds| PythAPI[Pyth Hermes API]
+    Auto -->|write briefings + user state| DB
 
     RPC --> Solana[Solana devnet]
-    Solana --> Program[BellMarkets Anchor program]
-    Solana --> Phoenix[Phoenix CLOB markets]
+    Solana --> Program[BellMarkets Anchor program - deploy_index=8]
     Solana --> PythAccts[Pyth price accounts on-chain]
 
     Program -->|reads + validates| PythAccts
-    Program -->|mints / settles / redeems| Vault[(USDC vault PDAs)]
-    Program -->|creates + binds| Phoenix
+    Program -->|mints / settles / redeems| Vault[(bUSDC vault PDAs)]
+    Program -->|matches + escrows| Book[(OrderBook + usdc_escrow + yes_escrow PDAs)]
 ```
 
 Three runtime surfaces: frontend (Cleo), automation service (Bram), on-chain program (Aria). Drew owns the integration glue (test paths through all three) and the demo orchestration.
@@ -45,21 +48,37 @@ Three runtime surfaces: frontend (Cleo), automation service (Bram), on-chain pro
 
 ### 2.1 Onchain — BellMarkets Anchor program
 
-**Responsibility:** authoritative state + the load-bearing invariants. Holds USDC vaults, mints Yes/No SPL tokens, enforces the $1 invariant, validates Pyth for settlement, immutably writes outcomes, pays out on redeem. **Does NOT** match trades (Phoenix does that — DR-001), schedule the lifecycle (off-chain — DR-002), or enforce position-exclusivity (frontend — Hard YES #8).
+**Responsibility:** authoritative state + the load-bearing invariants + the **in-program matcher** (DR-020). Holds bUSDC vault + USDC/YES escrows per market, mints YES/NO SPL tokens, enforces the $1 invariant, validates Pyth for settlement, runs price-time-priority matching with three-phase execution (plan/settle/apply), immutably writes outcomes, pays out on redeem. **Does NOT** schedule the lifecycle (off-chain — DR-002) or enforce position-exclusivity (frontend — Hard YES #8).
 
-**Tech:** Rust + Anchor framework (Anchor 0.31.1 / Solana 3.1.14 / Rust 1.95 per LESSONS.md-validated toolchain triple). SPL Token program for Yes/No mints + USDC vault. **Vendored 30-line Pyth price-account parser** at `programs/bell-markets/src/oracle.rs` for on-chain price reads — `pyth-sdk-solana` NOT used (Borsh cascade per `hard-rules.md` §4.13). Phoenix integration via `UncheckedAccount<'info>` + manual byte layout (`hard-rules.md` §4.12); reference: Phoenix's own `phoenix-v1/src/state/markets/fifo_market.rs`. All `Account<T>` fields in instruction `Accounts` structs are `Box<Account<'info, T>>` (`hard-rules.md` §4.10).
+**Tech:** Rust + Anchor framework (Anchor 0.31.1 / Solana 3.1.14 / Rust 1.95 per LESSONS.md-validated toolchain triple). SPL Token program for YES/NO mints + bUSDC vault. **Vendored 30-line Pyth price-account parser** at `programs/bell-markets/src/oracle.rs` for on-chain price reads — `pyth-sdk-solana` NOT used (Borsh cascade per `hard-rules.md` §4.13). `OrderBook` PDA uses Anchor's `zero_copy` + `AccountLoader` pattern for the 16,448-byte fixed-size order book (128 orders/side). All `Account<T>` fields in instruction `Accounts` structs are `Box<Account<'info, T>>` (`hard-rules.md` §4.10). Dormant Phoenix adapter code remains in the program for Phoenix-as-secondary-venue v2 candidate (DR-009 deferred under DR-020).
 
-**Instructions exposed:**
+**Instructions exposed (27 total at deploy_index=8):**
 - `initialize_config` — admin sets up global config (supported tickers, Pyth feed map, admin authority, override delay)
-- `create_strike_market` — admin creates one strike (per-stock, per-day). Initializes Yes/No mints, vault PDA, Phoenix market, ties to a Pyth feed.
-- `add_strike` — admin adds an extra strike for a stock intraday
-- `mint_pair` — anyone deposits $1 USDC → receives 1 Yes + 1 No
-- `settle_market` — **permissionless** (per DR-002 / Hard NO #5). Validates `block_time ≥ settlement_window`, Pyth staleness, Pyth confidence. Writes outcome immutably.
+- `initialize_fee_config` / `update_fee_config` — admin sets up + updates fee bps + distribution weights
+- `initialize_rewards_pools` / `reinit_rewards_pools` — admin sets up the leaderboard reward pools (the reinit ix handles bUSDC mint migration mid-flight)
+- `update_ticker_config` — admin sets per-ticker strike grid + max user-strike deviation + tick size
+- `create_strike_market` — admin creates one strike. Initializes YES/NO mints + bUSDC vault. Does NOT set `order_book` (set by `grow_order_book`).
+- `user_create_strike_market` — user-funded strike PDA creation (DR-005). On-chain deviation + tick-alignment + Pyth staleness checks.
+- `add_strike` — convenience hook
+- `mint_pair` — anyone deposits bUSDC → receives equal YES + NO tokens (DR-008 mint fee + creator-rebate logic applied)
+- `init_order_book` — phase 1 of order-book PDA init (10 KB initial alloc; fits Solana's `MAX_PERMITTED_DATA_INCREASE`)
+- `grow_order_book` — phase 2: realloc to `OrderBook::LEN = 16,448 B`; sets `strike_market.order_book` (the trading gate)
+- `place_order(side, price, size, is_market)` — DR-020 matcher entry point. Three-phase: plan fills → settle CPI per fill (PDA-signed) → apply book updates. Market orders are fill-or-cancel; remaining limit-side rests.
+- `cancel_order(side, seq)` — owner-only. Refunds exact remaining escrow. Allowed even when paused/settled (Keith's L-2 invariant: users must always reclaim escrow).
+- `match_orders` — permissionless crank for crossed-but-unmatched book (normal state is uncrossed; this is the safety crank)
+- `redeem_pair` — burn equal YES + NO → $1 bUSDC per pair (works pre- or post-settle; powers Sell NO atomicity)
+- `redeem` — post-settle Yes/No only. Burn winning tokens → receive $1 bUSDC from vault.
+- `redeem_invalid` — post-Invalid markets only (Pyth-unrecoverable scenarios + admin override)
+- `force_redeem` — admin-only post-settle, grace-period gated, for stuck winning positions
+- `settle_market` — **permissionless** (DR-002). Validates expiry + Pyth staleness + Pyth confidence; writes outcome immutably.
 - `admin_settle` — admin-only fallback. On-chain time-delay gate (≥1hr after settlement window — Hard YES #7).
-- `redeem` — anyone burns winning tokens → receives $1 USDC from vault. Burns losing tokens → receives $0.
+- `close_settled_market` — permissionless. Closes USDC vault (rent → fee_collector). Gated on `pairs_outstanding == 0` + `vault.amount == 0`. **Does not close OrderBook or escrows** — `force_cancel_order` + `close_order_book` are v1.1 deferred (see `specs/deferred.md`).
+- `pause(paused)` — admin emergency stop. Does NOT block `cancel_order`.
+- `update_usdc_mint(new_mint)` — admin one-shot migration (used for bUSDC switchover)
+- `commit_leaderboard_root` / `distribute_weekly_rewards` / `distribute_monthly_rewards` — Merkle-distribution surface for the leaderboard rewards pools
 - `pause` / `unpause` — admin emergency stop on minting + new trades.
 
-**Talks to:** Solana runtime (token program, system program), Pyth price accounts (on-chain account read), Phoenix CLOB program (CPI for market creation).
+**Talks to:** Solana runtime (token program, system program), Pyth price accounts (on-chain account read), own OrderBook PDA via Anchor's zero-copy `AccountLoader`. The dormant Phoenix CPI surface remains in the program for v2 secondary-venue candidate work but is not exercised by any current trade flow.
 
 **Owned by:** Aria. See `constitution/file-ownership.md`.
 
@@ -85,7 +104,7 @@ Three runtime surfaces: frontend (Cleo), automation service (Bram), on-chain pro
 **Pages:**
 - `/` — Landing: product explanation, live prices, connect-wallet CTA
 - `/markets` — grid of 7 MAG7 stocks with live prices and active contract counts
-- `/trade/[ticker]/[strike]` — strike-specific view: order book (Yes + No perspectives of the one Phoenix book), Buy Yes / Buy No / Sell Yes / Sell No panel with position-aware constraints, settlement countdown
+- `/trade/[ticker]/[strike]` — strike-specific view: order book (YES bid/ask ladder; NO is derived from YES via complementary identity `price(NO) = $1 − price(YES)`), Buy YES / Buy NO / Sell YES / Sell NO panel with position-aware constraints, settlement countdown
 - `/portfolio` — active positions, settled outcomes, P&L, redeem buttons
 - `/history` — trade execution log
 
@@ -98,11 +117,11 @@ Three runtime surfaces: frontend (Cleo), automation service (Bram), on-chain pro
 - TanStack Query for RPC caching, dedup, and the WebSocket → cache bridge (`queryClient.setQueryData` from inside the subscription handler)
 - Zustand for ephemeral UI state (open modals, selected strike, panel filters)
 - Tailwind CSS + shadcn/ui components (Radix-based, copy-paste)
-- **No confirmation modal** on trade actions — we deliberately rejected this. The wallet's tx simulation already shows state changes; an extra modal duplicates information without adding any, slows the trade (latency-sensitive UX), and degen traders dislike friction. User education for composite-tx flows (Buy No / Sell No bundling mint_pair + Phoenix order) lives in `docs/USER-GUIDE.md` instead.
+- **No confirmation modal** on trade actions — we deliberately rejected this. The wallet's tx simulation already shows state changes; an extra modal duplicates information without adding any, slows the trade (latency-sensitive UX), and degen traders dislike friction. User education for composite-tx flows (Buy NO / Sell NO bundling `mint_pair + place_order` / `place_order + redeem_pair`) lives in `docs/USER-GUIDE.md` instead.
 
-**Buy No / Sell No atomicity (POV-3):** Each user click → ONE wallet-signed transaction that bundles all required instructions. Buy No = `[mint_pair, place_sell_yes_on_phoenix]` in one tx. Sell No = `[buy_yes_on_phoenix, redeem_pair_for_usdc]` (or similar). The user never sees a "mint pair" button, never sees intermediate Yes balances. Per `hard-rules.md` §4.7.
+**Buy NO / Sell NO atomicity (POV-3):** Each user click → ONE wallet-signed transaction that bundles all required instructions. Buy NO = `[mint_pair, place_order(SELL_YES, IOC)]` in one tx. Sell NO = `[place_order(BUY_YES, IOC), redeem_pair]`. The user never sees a "mint pair" button, never sees intermediate YES balances. Per `hard-rules.md` §4.7. **DR-019 amendment:** Limit-side NO trades are disabled (NO is market-only) because a resting Limit NO would strand fees on cancel.
 
-**Talks to:** Helius RPC (read + WebSocket), user's wallet (signing), the BellMarkets program (via Anchor client), Phoenix SDK (place orders directly).
+**Talks to:** Helius RPC (read + WebSocket) via server-side proxy at `/api/solana-rpc`, user's wallet (signing), the BellMarkets program (via Anchor client + custom tx builders for the four atomic flows), Neon Postgres (read user state + briefings + leaderboard via `/api/*` routes).
 
 **Owned by:** Cleo. See `constitution/file-ownership.md`.
 
@@ -144,7 +163,8 @@ pub struct StrikeMarket {
     pub yes_mint: Pubkey,           // SPL Yes-token mint
     pub no_mint: Pubkey,            // SPL No-token mint
     pub vault: Pubkey,              // program-owned USDC vault PDA
-    pub phoenix_market: Pubkey,     // Phoenix CLOB market for Yes/USDC
+    pub phoenix_market: Pubkey,     // Dormant per DR-020; retained for v2 secondary-venue candidate
+    pub order_book: Pubkey,         // OrderBook PDA — trading gate (set by grow_order_book)
     pub pyth_feed: Pubkey,          // Pyth price account for this ticker
     pub outcome: Option<Outcome>,   // None until settled; Some(...) is immutable
     pub pairs_outstanding: u64,     // count of un-redeemed mint pairs
@@ -193,7 +213,7 @@ export type StrikeMarketView = {
   marketId: PublicKey;
   ticker: string;
   strike: number;              // USDC, human-readable
-  yesBidPrice?: number;        // from Phoenix order book
+  yesBidPrice?: number;        // from on-chain OrderBook PDA (best bid)
   yesAskPrice?: number;
   noBidPrice?: number;         // = 1 - yesAskPrice (implied)
   noAskPrice?: number;         // = 1 - yesBidPrice (implied)
@@ -263,7 +283,7 @@ export async function settleMarketsForDay(markets: PublicKey[]): Promise<Settlem
 ├── apps/web/                     # (Cleo) Next.js frontend
 │   ├── app/                      # App Router: /, /markets, /trade/[ticker]/[strike], /portfolio, /history
 │   ├── components/               # OrderBook, TradePanel, Portfolio, RedeemButton, etc.
-│   └── lib/                      # solana/ (wallet, anchor client, phoenix client), pyth/ (client-side feed read)
+│   └── lib/                      # solana/ (wallet, anchor client, order-book decoder), pyth/ (client-side feed read), tx/ (custom tx builders for the 4 atomic flows)
 ├── packages/ui/                  # shared shadcn components
 ├── tests/
 │   ├── contracts/                # (Aria) Anchor unit tests + property tests for on-chain invariants
@@ -346,7 +366,7 @@ Before the final demo, Tate runs the full demo dry-run including the cron-failur
 | Service | Used for | Failure mode if down | Mitigation |
 |---|---|---|---|
 | **Solana devnet** | Compute + state | Total outage → demo not runnable | Devnet is the submission target; mainnet-beta is the documented stretch alternative |
-| **Phoenix CLOB** | On-chain order book | Phoenix program outage → no trading possible | **No fallback CLOB** by design (`hard-rules.md` §4.1). Acceptable for a devnet demo — flagged in `specs/deferred.md` as a known operational risk for the mainnet stretch. |
+| **In-program CLOB** | On-chain matcher | Matcher bug → trading impacted across all markets | DR-020 mitigations: bounded zero-copy account (no slab corruption), three-phase matching (clean failure boundaries), escrow telescoping (no stranded dust), 100/100 Rust property tests + `tests/contracts/test_order_book_invariants.ts` (vault invariant, escrow reconciliation, four-path smoke). Pre-mainnet: formal third-party audit (highest-risk new surface). Admin `pause` is the circuit-breaker. |
 | **Pyth Network** | Stock prices (HTTP for morning strikes, on-chain accounts for settlement) | Pyth outage at settlement → markets can't settle until Pyth recovers | Admin override path (`admin_settle`, time-delayed per Hard YES #7). **No fallback oracle** (`hard-rules.md` §4.3). |
 | **Helius RPC** | Solana RPC + WebSocket for frontend + automation | Helius outage → frontend can't fetch state; automation can't submit txs | Fallback: any public Solana RPC endpoint (configurable via `NEXT_PUBLIC_RPC_URL` env var). Documented in `docs/SETUP.md` (when created). |
 | **Trigger.dev** | Cron platform — runs the morning create-markets job (~8am ET) and the settlement nudger (~4:05pm ET) | Trigger.dev outage → automation doesn't fire; markets either don't get created (morning) or don't settle automatically (afternoon) | For the afternoon path: permissionless settle (DR-002) means any user can crank `settle_market` themselves — automation is convenience, not authority. For the morning path: operator (Tate) runs the create-markets script manually as recovery. Trigger.dev's free-tier SLA is best-effort; this is acceptable for a devnet demo. |
@@ -356,7 +376,7 @@ Before the final demo, Tate runs the full demo dry-run including the cron-failur
 
 ## 9. Things this architecture deliberately does NOT do
 
-- **No custom on-chain matching engine** — Phoenix is the CLOB. See `specs/deferred.md` "build own CLOB" and DR-001.
+- **Custom on-chain matching engine** — built in-program per DR-020 (supersedes DR-001). Phoenix CPI code stays dormant for v2 secondary-venue candidate (DR-009).
 - **No fallback oracle** — Pyth or admin override. See `specs/deferred.md` "fallback oracle" and DR-003.
 - **No persistent off-chain database** — Solana RPC is the source of truth. See `specs/deferred.md` "off-chain caching DB" and `hard-rules.md` §3.3.
 - **No multi-tenant teacher/admin dashboard** — non-custodial means every user IS a wallet. There's no admin role beyond pause / unpause / admin_settle. See `specs/deferred.md`.

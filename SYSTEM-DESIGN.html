@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>BellMarkets — System Design</title>
+<style>
+  :root {
+    --bg: #0a0d14;
+    --panel: #0f141e;
+    --panel-2: #141b27;
+    --border: rgba(255,255,255,0.08);
+    --text: #e6e9ef;
+    --text-dim: #9aa3b2;
+    --text-mute: #6b7280;
+    --accent: #22d3ee;
+    --green: #10b981;
+    --red: #ef4444;
+    --amber: #f59e0b;
+    --violet: #8b5cf6;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14.5px; line-height: 1.6; margin: 0; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 36px 24px 80px; }
+  h1 { font-size: 30px; font-weight: 700; margin: 0 0 6px; letter-spacing: -0.02em; }
+  .subtitle { color: var(--text-dim); font-size: 15px; margin: 0 0 28px; }
+  .meta { color: var(--text-mute); font-size: 13px; margin-bottom: 28px; font-family: var(--mono); }
+  h2 { font-size: 20px; font-weight: 600; margin: 36px 0 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 16px; font-weight: 600; margin: 20px 0 8px; color: var(--accent); }
+  h4 { font-size: 14px; font-weight: 600; margin: 16px 0 6px; color: var(--text); }
+  code { background: var(--panel-2); padding: 1px 6px; border-radius: 3px; color: #c2cad6; font-family: var(--mono); font-size: 0.92em; }
+  pre { background: var(--panel-2); padding: 12px 14px; border-radius: 6px; overflow-x: auto; font-family: var(--mono); font-size: 12.5px; line-height: 1.5; color: #c2cad6; border: 1px solid var(--border); }
+  .mono { font-family: var(--mono); }
+  p { margin: 8px 0; }
+  ul, ol { margin: 6px 0 12px; padding-left: 22px; }
+  li { margin: 3px 0; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0 18px; font-size: 13.5px; }
+  th, td { padding: 8px 10px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+  th { color: var(--text-dim); font-weight: 600; background: var(--panel); }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 14px 0;
+    border-left: 4px solid var(--accent);
+  }
+  .card.tradeoff { border-left-color: var(--amber); }
+  .card.risk { border-left-color: var(--red); }
+  .card.win { border-left-color: var(--green); }
+  .card.lesson { border-left-color: var(--violet); }
+  .card h3, .card h4 { margin-top: 0; }
+  blockquote {
+    margin: 12px 0;
+    padding: 10px 16px;
+    border-left: 3px solid var(--text-dim);
+    color: var(--text-dim);
+    background: var(--panel-2);
+    border-radius: 0 6px 6px 0;
+  }
+  hr { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 720px) { .grid-2 { grid-template-columns: 1fr; } }
+  .badge {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .badge.amber { background: rgba(245,158,11,0.12); color: var(--amber); border: 1px solid var(--amber); }
+  .badge.green { background: rgba(16,185,129,0.12); color: var(--green); border: 1px solid var(--green); }
+  .badge.red   { background: rgba(239,68,68,0.12); color: var(--red); border: 1px solid var(--red); }
+  .badge.violet { background: rgba(139,92,246,0.12); color: var(--violet); border: 1px solid var(--violet); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>BellMarkets — System Design</h1>
+  <p class="subtitle">Architecture · decisions · trade-offs · risks · lessons · technical challenges</p>
+  <p class="meta">Cory Vandenberg · GauntletAI "Meridian" · Submission 2026-05-25 · Program: 599h7VznYR4CxyrG5nQbhR13qtRuwPcbnNr5QqbkS7uV (Solana devnet, deploy_index=8)</p>
+
+  <h2>1. What we built (in one paragraph)</h2>
+  <p>
+    BellMarkets is a non-custodial Solana dApp for binary outcome contracts on daily MAG7 stock closes. Each contract asks <em>"Will [STOCK] close above [PRICE] today?"</em> — two SPL tokens per contract (YES + NO) trade against bUSDC on an <strong>in-program order book</strong> that lives inside the Anchor program. At 4:00 PM ET, the program reads Pyth's MAG7 equity feed; winners redeem $1 bUSDC per winning token. <strong>YES payout + NO payout = $1.00 exactly</strong> — the load-bearing invariant. Three runtime surfaces: an Anchor program (the authority + matcher), a Trigger.dev automation service (orchestration only, no signing authority), and a Next.js trading terminal at <code>bell-markets.vercel.app</code>. <strong>27 instructions, 7 account types, 57 error variants, 8 deploys, 6.671 SOL spent.</strong>
+  </p>
+
+  <h2>2. Architecture at a glance</h2>
+
+<pre>
+┌─ apps/web (Next.js 14 / React 18) ───────────────────────────────────┐
+│                                                                       │
+│  / · /markets · /trade/[ticker]/[strike] · /portfolio · /history     │
+│  /admin (operator only)                                              │
+│                                                                       │
+│  Wallet:  @solana/wallet-adapter-react  (Phantom / Backpack / Solflare)│
+│  State:   TanStack Query  +  Zustand  +  connection.onAccountChange  │
+│  RPC:     /api/solana-rpc proxy → Helius (key stays server-side)     │
+│  AI:      /api/briefings/[ticker] → Anthropic Sonnet via Bram        │
+└─────────────┬───────────────────────────────────────────────┬─────────┘
+              │ wallet-signed txs                              │ DB reads
+              ▼                                                ▼
+┌─ programs/bell-markets (Anchor 0.31.1) ───┐    ┌─ Neon Postgres ────────┐
+│                                            │    │  users  oauth_accounts │
+│  27 ix · 7 accounts · 57 errors            │    │  notification_prefs    │
+│                                            │    │  push_subscriptions    │
+│  Trading:     mint_pair · redeem · redeem_pair  │  briefings             │
+│  In-prog CLOB: init_order_book · grow_order_book │ leaderboard           │
+│               place_order · cancel_order        │ distributions          │
+│               match_orders                      └─────▲──────────────────┘
+│  Settlement:  settle_market (permissionless)         │
+│               admin_settle (1hr time-delay gate)     │ DB writes
+│  Cleanup:     close_settled_market                   │
+│  Admin:       pause · update_usdc_mint               │
+│               reinit_rewards_pools                   │
+│               update_fee_config · force_redeem       │
+│  Rewards:     commit_leaderboard_root                │
+│               distribute_weekly_rewards              │
+│               distribute_monthly_rewards             │
+│                                                      │
+│  Per-strike PDAs:                                    │
+│    yes_mint · no_mint · usdc_vault                   │
+│    order_book (16,448 B, zero-copy)                  │
+│    usdc_escrow · yes_escrow (CLOB collateral)        │
+│                                            │         │
+│  Oracle: vendored 30-line Pyth parser     │         │
+│  (oracle.rs — NOT pyth-sdk-solana)        │         │
+└──────────────────▲─────────────────────────┘         │
+                   │ ix calls                          │
+                   │                                   │
+┌─ services/automation (Node / TS / Trigger.dev v4) ───┴────────┐
+│  morning create  ·  post-close grid-evolution Phase 1 (4:05 ET)│
+│  half-day Phase 1b (1:05 ET) · AH check · pre-market check    │
+│  AI briefings (Anthropic Sonnet) · weekly+monthly distribute  │
+└────────────────────────────────────────────────────────────────┘
+</pre>
+
+  <p class="mono" style="color: var(--text-mute); font-size: 12px;">
+    Critical property: the chain is canonical for funds; the DB serves product surface only. Wipe the DB and redemption rights are unaffected (DR-003 amended).
+  </p>
+
+  <h2>3. The decisions that shape everything</h2>
+
+  <p>Twenty Decision Records are locked in <code>constitution/decisions.md</code>. The five that dominate the system:</p>
+
+  <table>
+    <tr>
+      <th style="width: 120px;">DR</th>
+      <th>The decision</th>
+      <th>What we pay</th>
+      <th>What we get</th>
+    </tr>
+    <tr>
+      <td><strong>DR-020</strong><br /><span class="badge amber">PIVOT</span></td>
+      <td>In-program CLOB (supersedes DR-001 Phoenix). Adopted Keith Mazanec's parallel-cohort design with adversarial review baked in.</td>
+      <td>One novel audit surface — formal third-party audit gates mainnet</td>
+      <td>No Phoenix bootstrap order-problem; concentrated audit surface; escrow telescoping; senior-engineer "don't NIH" narrative</td>
+    </tr>
+    <tr>
+      <td><strong>DR-002</strong></td>
+      <td><code>settle_market</code> is permissionless — automation is a convenience caller, not authority</td>
+      <td>Half a day of timing-logic; benign race fees</td>
+      <td>System survives cron failure; ~5-10× cheaper mainnet ops; no monitored hot wallet</td>
+    </tr>
+    <tr>
+      <td><strong>DR-003</strong><br />(amended)</td>
+      <td>Pyth oracle (vendored 30-line parser, NOT pyth-sdk-solana). DB serves product surface; chain is canonical for funds.</td>
+      <td>Own 30 lines of Pyth byte parsing; if Pyth changes layout we update them</td>
+      <td>No Borsh-version cascade; native MAG7 equity coverage; native staleness + confidence semantics; DB wipe doesn't affect redemption</td>
+    </tr>
+    <tr>
+      <td><strong>DR-005</strong></td>
+      <td>User-funded strike PDA creation (Meteora DLMM pattern) — first trader pays ~$0.90, platform funds zero</td>
+      <td>$0.90 friction on first trade per strike</td>
+      <td>Zero platform working capital; ~$5,500/year locked rent eliminated; maximally non-custodial; self-balancing strike inventory</td>
+    </tr>
+    <tr>
+      <td><strong>DR-017</strong></td>
+      <td>Vault security model — PDA self-authority on every fund-moving account; finite list of vault destinations; no <code>withdraw_to_admin</code> instruction</td>
+      <td>Slightly more complex CPI signer logic</td>
+      <td>"Where can vault USDC go?" has a finite answer: winning user (redeem), pair-burner (redeem_pair), invalid-market refund (redeem_invalid), fee_collector (mint_pair fee). Period.</td>
+    </tr>
+  </table>
+
+  <h3>The other 15 DRs, briefly</h3>
+  <p>
+    DR-001 Phoenix CLOB (superseded by DR-020) · DR-004 deliberate Anchor CLI 0.31.1 / JS 0.30.1 version mismatch · DR-006 post-close grid evolution · DR-007 expiry pinning (1pm/4pm ET only) · DR-008 fee model v1 (25 bps mint, 50/25/25 split) · DR-009 Phoenix fee Model D (deferred by DR-020) · DR-010 leaderboard verifier · DR-011 earnings-eve strike expansion · DR-013 Founder Pass NFT (Token-2022 deferred to v2) · DR-014 OAuth-link auth flow · DR-015 multi-metric leaderboard partition · DR-016 token program selection · DR-018 fee model v1.5 amendment · DR-019 NO market-only (Limit NO disabled) · DR-020 the pivot.
+  </p>
+
+  <h2>4. Trade-offs accepted (with eyes open)</h2>
+
+  <div class="card tradeoff">
+    <h3>Phoenix dependency → no fallback CLOB</h3>
+    <p>DR-020 puts the matcher in our program. If a bug surfaces post-mainnet, there is no alternative venue — admin <code>pause</code> is the circuit breaker. Pre-mainnet audit is the load-bearing gate.</p>
+  </div>
+  <div class="card tradeoff">
+    <h3>Pyth dependency → no fallback oracle</h3>
+    <p>DR-003 commits to Pyth. If Pyth has an outage at 4pm ET, settlement waits on the 1-hour time-delayed <code>admin_settle</code>. We deliberately rejected Switchboard as a fallback — doubles integration surface for a vanishingly rare failure mode. Pyth confidence + staleness gates are tight enough that we'd rather block than settle on bad data.</p>
+  </div>
+  <div class="card tradeoff">
+    <h3>OrderBook capacity capped at 128 orders/side per market</h3>
+    <p>Adequate for demo + early mainnet; not a deep-liquidity venue. Each market's OrderBook is 16,448 B (the largest single per-market cost). Expansion to 256 or slab-style is a v2 schema change requiring migration planning.</p>
+  </div>
+  <div class="card tradeoff">
+    <h3>Limit NO disabled (DR-019)</h3>
+    <p>NO-side trades are market-only in v1 because a resting Limit NO would strand fees on cancel (the atomic Buy NO = <code>mint_pair + place_order(SELL_YES, IOC)</code>; a Limit NO would have to escrow YES tokens that don't exist yet). Limit YES + 4 atomic flows remain. Limit NO returns when the fee model handles the inverse.</p>
+  </div>
+  <div class="card tradeoff">
+    <h3>v1.1 rent recovery deferred to post-submission</h3>
+    <p>OrderBook PDAs hold ~0.115 SOL of rent each — at scale that's ~187 SOL/month leaking. <code>close_settled_market</code> recovers only the vault (~$0.32/market on mainnet). The full design (<code>force_cancel_order</code> + <code>close_order_book</code>) is documented in <code>specs/deferred.md</code> + <code>docs/architecture/pre-mainnet-readiness.md</code> §"v2 gap #8" as a hard pre-mainnet precondition. Not blocking for submission; blocking for production.</p>
+  </div>
+  <div class="card tradeoff">
+    <h3>SPL Token (legacy), not Token-2022 (DR-016)</h3>
+    <p>YES/NO/USDC use SPL Token, not Token-2022. Vault arithmetic depends on no transfer-fee skew; Phoenix v1 (when integration was the plan) required it; audit surface stays minimal. Token-2022 is planned for v2 platform NFTs (Founder Pass per DR-013) and v2 compressed badges — ~$50/year extra rent at 10K MAU for tradeable accounts is acceptable.</p>
+  </div>
+
+  <h2>5. Risks (mainnet-conversation gates)</h2>
+
+  <div class="card risk">
+    <h3><span class="badge red">P0</span> &nbsp; No formal third-party audit of the in-program matcher</h3>
+    <p>The matcher is novel audit surface (DR-020). Sonnet defense-in-depth audits caught the obvious classes (H-1 maker-account verification, M-2 PDA seed constraint, M-4 zero-price reject) and 138/138 Rust property tests pass. None of that substitutes for a formal audit. Pre-mainnet: third-party audit is non-negotiable.</p>
+  </div>
+  <div class="card risk">
+    <h3><span class="badge red">P0</span> &nbsp; OrderBook + escrow rent stranded at scale</h3>
+    <p>~0.122 SOL/market not recoverable today. At 1,470 markets/month (49/day × 30 days), that's ~187 SOL/month = ~$30K/month at $160 SOL. Economically unsustainable for mainnet. v1.1 design recovers 95.2% — must ship before any mainnet deploy.</p>
+  </div>
+  <div class="card risk">
+    <h3><span class="badge red">P1</span> &nbsp; Pyth MAG7 devnet feed coverage</h3>
+    <p>Pyth maintains MAG7 equity feeds but devnet coverage during market hours is inconsistent per ticker. For demo, settlement falls back to admin-override with a time-delayed gate where a feed is unavailable. On mainnet, the same code path uses live feeds with no admin fallback. Drew audits per-ticker status in <code>docs/pyth-feed-status.md</code> post-submission.</p>
+  </div>
+  <div class="card risk">
+    <h3><span class="badge amber">P1</span> &nbsp; <code>force_redeem</code> doesn't cover Invalid markets (DR-005 v2 gap)</h3>
+    <p>If a market settles Invalid (e.g., Pyth-unrecoverable + admin override didn't fire), <code>force_redeem</code> can't unstick winning positions because it gates on Yes/No outcome. v2 plan: add an <code>force_redeem_invalid</code> path that fires on Invalid + grace.</p>
+  </div>
+  <div class="card risk">
+    <h3><span class="badge amber">P2</span> &nbsp; No mainnet keypair architecture</h3>
+    <p>Hard NO #1 keeps mainnet keypairs out of the cohort-build stage. Pre-mainnet: replicate the w3Swap separation-of-authority pattern — program ID + upgrade authority + platform admin + fee collector keypairs, each with operational signing procedures.</p>
+  </div>
+
+  <h2>6. Technical challenges (and how each was solved)</h2>
+
+  <div class="card">
+    <h3>Phoenix bootstrap dependency loop</h3>
+    <p>
+      <strong>Problem:</strong> Phoenix's <code>InitializeMarket</code> requires the YES base mint to exist at call time. Our program creates the YES mint inside <code>create_strike_market</code>. Bootstrap order: chicken-and-egg.
+    </p>
+    <p>
+      <strong>Solution:</strong> <span class="badge amber">DR-020 PIVOT</span> &nbsp; Built the matcher in-program. Adopted Keith Mazanec's parallel-cohort reference design with adversarial review pre-applied. Wholesale, not invented. 5 new ixs + zero-copy OrderBook + 2 escrow PDAs per strike. 30 hours before submission.
+    </p>
+  </div>
+
+  <div class="card">
+    <h3>BPF stack overflow on heavy Anchor accounts</h3>
+    <p>
+      <strong>Problem:</strong> Anchor's <code>try_accounts</code> deserializes <code>Account&lt;T&gt;</code> fields onto the BPF stack (4 KB per frame). Three or more unboxed heavy accounts (Mint, TokenAccount, MarketConfig, StrikeMarket, UserPosition) silently overflow — program compiles, deploys, fails at runtime with cryptic errors. Source: <code>LESSONS.md</code> Lesson 9.
+    </p>
+    <p>
+      <strong>Solution:</strong> <code>hard-rules.md</code> §4.10 — <code>Box&lt;Account&lt;'info, T&gt;&gt;</code> on every heavy account by default. Drew flags any PR that unboxes during review. CI greps for "Stack offset exceeded" warnings and fails the pipeline (§4.11) — the warning IS the failure mode, just disguised.
+    </p>
+  </div>
+
+  <div class="card">
+    <h3>OrderBook size vs Solana's <code>MAX_PERMITTED_DATA_INCREASE</code></h3>
+    <p>
+      <strong>Problem:</strong> <code>OrderBook::LEN = 16,448 B</code>. Solana caps a single realloc at 10 KB. <code>init_if_needed</code> can't create the account at 16 KB in one shot.
+    </p>
+    <p>
+      <strong>Solution:</strong> Two-phase init. <code>init_order_book</code> allocates 10 KB; <code>grow_order_book</code> reallocs to <code>OrderBook::LEN</code> and writes the bump byte + sets <code>strike_market.order_book</code> (the trading gate). Both ixs are permissionless. <code>place_order</code> won't fire until the trading gate is open.
+    </p>
+  </div>
+
+  <div class="card">
+    <h3>Pyth SDK Borsh-version cascade</h3>
+    <p>
+      <strong>Problem:</strong> <code>pyth-sdk-solana</code> pins a Borsh version incompatible with Anchor 0.31. Importing it breaks the build with a cascade of version conflicts. Documented in <code>LESSONS.md</code> Lesson 1 by a same-project veteran.
+    </p>
+    <p>
+      <strong>Solution:</strong> Vendored a 30-line Pyth price-account parser at <code>programs/bell-markets/src/oracle.rs</code>. Validates magic number, reads price/confidence/exponent/publish_slot at known byte offsets, returns a typed <code>PriceData</code> struct. Pyth's binary layout is documented and stable. <code>hard-rules.md</code> §4.13 enforces: do not add <code>pyth-sdk-solana</code> to <code>Cargo.toml</code>.
+    </p>
+  </div>
+
+  <div class="card">
+    <h3>bUSDC mint migration with stranded reward pools</h3>
+    <p>
+      <strong>Problem:</strong> After <code>update_usdc_mint</code> flipped <code>config.usdc_mint</code> from Circle devnet USDC to our self-controlled bUSDC, existing weekly/monthly reward-pool token accounts were bound to the old mint. <code>mint_pair</code>'s fee-routing CPI hit a <code>has_one</code> mismatch.
+    </p>
+    <p>
+      <strong>Solution:</strong> <strong>Path B</strong> chosen over Path A (revert to Circle USDC). Added <code>reinit_rewards_pools</code> admin ix at deploy_index=8 — closes + re-initializes the 2 pool PDAs at the same addresses bound to the new mint. Manual 3-step CPI dance (<code>close_account</code> → <code>create_account</code> → <code>initialize_account3</code>) because Anchor's <code>init</code> + <code>close</code> don't compose on the same PDA in a single tx. Pre-flight checks: account owner == SPL Token, data.len() >= 165, amount == 0, self-authority.
+    </p>
+  </div>
+
+  <div class="card">
+    <h3>Helius API key client-side exposure risk</h3>
+    <p>
+      <strong>Problem:</strong> Initial wiring exposed the Helius RPC URL via <code>NEXT_PUBLIC_SOLANA_RPC</code> — leaked credential, visible to anyone inspecting the browser bundle.
+    </p>
+    <p>
+      <strong>Solution:</strong> Server-side proxy route at <code>apps/web/app/api/solana-rpc/route.ts</code>. Key stays in Vercel server env (<code>HELIUS_API_KEY_DEVNET</code>). Frontend resolves <code>/api/solana-rpc?network=devnet</code> against <code>window.location.origin</code> in the browser; falls back to <code>clusterApiUrl(devnet)</code> during SSR/SSG. Hard NO #13 codifies: Helius key NEVER appears in <code>NEXT_PUBLIC_*</code>.
+    </p>
+  </div>
+
+  <h2>7. Verification surface</h2>
+
+  <div class="grid-2">
+    <div class="card win">
+      <h4>Rust property tests</h4>
+      <p><strong>138/138 pass</strong> · cargo test --lib · <code>programs/bell-markets/src/instructions/*.rs</code> <code>#[cfg(test)]</code> blocks · close_settled dust-attack griefing + property-only-specific-triple + telescoping invariant + odd-price-rounding + BookFull at N=128 + zero-price reject + frozen-maker rejection + verify_maker_account SPL-owned + ...</p>
+    </div>
+    <div class="card win">
+      <h4>Order book invariant suite (Drew)</h4>
+      <p><code>tests/contracts/test_order_book_invariants.ts</code> — 3 invariants × on-chain assertion: (a) vault invariant (trading is escrow-only, never touches usdc_vault) · (b) escrow reconciliation (usdc_escrow == Σ ceil(price·size); yes_escrow == Σ size) · (c) four-path smoke (Buy YES / Sell YES / atomic Buy NO / atomic Sell NO).</p>
+    </div>
+    <div class="card win">
+      <h4>E2E trade verified on-chain (2026-05-25)</h4>
+      <p>Limit BID $0.55 × 50 YES crossed the resting $0.55 ask. Every delta matched expected mechanics: asksLen 3→2, yes_escrow telescoped −50, admin received 50 YES, vault invariant intact. Solscan: <code>5rTS2SBo…1VCe</code>.</p>
+    </div>
+    <div class="card win">
+      <h4>Sonnet adversarial audit cycles (Drew)</h4>
+      <p>7 independent audit cycles to date · 17 substantive findings caught and shipped · bias-diversification (different model than the writer). Standing discipline: Sonnet audit after each major push (post-Day-3).</p>
+    </div>
+  </div>
+
+  <h2>8. Lessons learned</h2>
+
+  <div class="card lesson">
+    <h3>Test the SDK's preconditions on Day 1, not Day 4</h3>
+    <p>Phoenix bootstrap could have been a 30-minute investigation on Day 1. Assuming the SDK works because it exists is the most expensive shortcut I took.</p>
+  </div>
+  <div class="card lesson">
+    <h3>Adopting a peer's adversarially-reviewed design > inventing from scratch</h3>
+    <p>The DR-020 pivot wasn't "build a matcher" — it was "find a vetted matcher and adopt it." Keith Mazanec's parallel-cohort reference design came with Sonnet adversarial review pre-applied. Shorter audit surface. Faster review. Fewer novel bugs. The interview defense is the senior-engineer move.</p>
+  </div>
+  <div class="card lesson">
+    <h3>The chain is canonical for funds; the DB serves product surface</h3>
+    <p>The Day-0 brainlift said "no DB at all" — a stronger non-custodial narrative but unrealistic for AI briefings + OAuth + leaderboard reads. DR-003 was amended to split the responsibility: funds stay on chain (DB can be wiped without affecting redemption), product features live in Neon. Mainnet-ready posture without the maximalist over-claim.</p>
+  </div>
+  <div class="card lesson">
+    <h3>Permissionless cranks > authority bottlenecks</h3>
+    <p>DR-002 (permissionless settle) generalized post-DR-020 into a pattern: <code>match_orders</code> is permissionless, <code>close_settled_market</code> is permissionless, the v1.1 <code>force_cancel_order</code> + <code>close_order_book</code> will be permissionless. The cron is convenience; users can crank. The system survives operator failure by design, not by retry policy.</p>
+  </div>
+  <div class="card lesson">
+    <h3>Zero-copy is mandatory for large Anchor accounts</h3>
+    <p>The OrderBook is 16 KB. Anchor's regular <code>Account&lt;T&gt;</code> would deserialize it onto the BPF stack and overflow silently. Pattern: <code>#[account(zero_copy)]</code> + <code>AccountLoader&lt;'info, OrderBook&gt;</code> + <code>load_mut()</code> / <code>load()</code>. Never hold a load() across a CPI boundary.</p>
+  </div>
+  <div class="card lesson">
+    <h3>Multi-agent orchestration needs clean file ownership</h3>
+    <p><code>constitution/file-ownership.md</code> declared who owns what before any code was written. Aria owns <code>programs/**</code>; Bram owns <code>services/automation/**</code>; Cleo owns <code>apps/web/**</code>; Drew owns <code>tests/**</code> + audit reports. Cross-workstream PRs required both leads' sign-off. Five days, four parallel workstreams, zero serious merge conflicts.</p>
+  </div>
+
+  <h2>9. What I'd do differently</h2>
+  <ul>
+    <li><strong>Test Phoenix devnet bootstrap on Day 1</strong> — would have saved Day-4 pivot trauma.</li>
+    <li><strong>Add <code>mint::close_authority</code> to mints on Day 1</strong> — would unlock v1.2 mint-close rent recovery without a future program upgrade.</li>
+    <li><strong>Cost-shifting decision (DR-005 Meteora pattern) should be Day 0</strong> — I had platform-funded design baked in until Day 2, then refactored. Day-0 brainlift didn't ask "who pays for PDA rent at scale?".</li>
+    <li><strong>Start the demo runbook on Day 1</strong> — Drew's runbook didn't exist until late. Earlier writing catches UX gaps when there's time to fix them.</li>
+    <li><strong>Lock the IDL placement pattern across services on Day 1</strong> — tonight's seed-script blocked on IDL placeholder issues. One source of truth + symlinks would have prevented it.</li>
+    <li><strong>Build a smaller initial program binary</strong> — Deploy 5 jumped 312 KB and required a 2-SOL top-up. Slicing the leaderboard/distribution work into a separate program (or behind feature flags) would have kept upgrade costs trivial.</li>
+  </ul>
+
+  <h2>10. Next steps (post-submission)</h2>
+
+  <div class="card">
+    <h4>v1.1 (P1 pre-mainnet preconditions)</h4>
+    <ul>
+      <li><code>force_cancel_order(side, seq)</code> — permissionless, post-settle only. Sweeps stale orders. Refunds maker escrow to maker's ATA (verified for ownership + mint via the same <code>verify_maker_account</code> pattern <code>place_order</code> already uses).</li>
+      <li><code>close_order_book()</code> — permissionless. Gated on bids_len + asks_len + escrow balances == 0. Closes OrderBook + both escrows. Clears <code>strike_market.order_book = Pubkey::default()</code> on close (self-consistent post-close state). Recovers <strong>~0.121 SOL per market = 95.2% of per-market rent</strong>.</li>
+      <li>Real Pyth MAG7 feed audit per ticker (Drew → <code>docs/pyth-feed-status.md</code>).</li>
+      <li>Formal third-party audit of the in-program matcher (highest-risk new surface).</li>
+      <li>Mainnet keypair architecture (DR-016 v2 plan: program ID + upgrade authority + platform admin + fee collector keypairs).</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h4>v1.2 (post-mainnet polish)</h4>
+    <ul>
+      <li><code>close_market_mints()</code> — recovers the remaining 4.8% stranded rent (mints). Requires <code>mint::close_authority = strike_market</code> on the Anchor <code>init</code> schema in <code>create_strike_market</code> — a program upgrade. Defer until the next program upgrade fires for an unrelated reason; ride along.</li>
+      <li>Phoenix-as-secondary-venue integration (DR-009 Model D) — Phoenix CPI code is still dormant in the program for this v2 candidate.</li>
+      <li>OrderBook capacity expansion (256 or slab-style) — schema change requiring migration planning.</li>
+      <li>Token-2022 platform NFTs (DR-013 Founder Pass) + compressed badges (Bubblegum, ~1000× cheaper rent than SPL).</li>
+    </ul>
+  </div>
+
+  <hr />
+  <p class="meta">
+    Source-of-truth docs: <code>constitution/decisions.md</code> (20 DRs) · <code>docs/architecture/pre-mainnet-readiness.md</code> (security narrative) · <code>specs/architecture.md</code> (heavyweight detail) · <code>specs/deferred.md</code> (v1.1/v1.2/v2 deferrals with revisit thresholds) · <code>docs/cost-analysis.md</code> (on-chain-verified rent + scaling math) · <code>docs/architecture/reference-clob-{design,decisions,spec}.md</code> (Keith's reference adopted under DR-020)
+  </p>
+
+</div>
+</body>
+</html>
