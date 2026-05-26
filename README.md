@@ -4,9 +4,22 @@ A non-custodial Solana dApp for trading binary outcome contracts on daily MAG7 s
 
 > Gauntlet project codename: **Meridian**. Cohort 5 submission. See `.project/bell-markets/docs/prd/` for the original PRD.
 
-🌐 **Live demo:** *(Vercel URL — pending deploy; see `docs/deployment/vercel.md`)*
-📜 **Program:** `599h7VznYR4CxyrG5nQbhR13qtRuwPcbnNr5QqbkS7uV` on Solana devnet (`deploy_index=8`)
-💵 **USDC:** Self-controlled bUSDC demo mint `5vq2oahKFnnjStK1Ctqwdxdt44rtKuKHmPga9iZKtBZp`
+🌐 **Live demo:** [bell-markets.vercel.app](https://bell-markets.vercel.app)
+📜 **Program:** [`599h7VznYR4CxyrG5nQbhR13qtRuwPcbnNr5QqbkS7uV`](https://solscan.io/account/599h7VznYR4CxyrG5nQbhR13qtRuwPcbnNr5QqbkS7uV?cluster=devnet) on Solana devnet (`deploy_index=8`)
+💵 **bUSDC:** Self-controlled demo mint [`5vq2oahKFnnjStK1Ctqwdxdt44rtKuKHmPga9iZKtBZp`](https://solscan.io/account/5vq2oahKFnnjStK1Ctqwdxdt44rtKuKHmPga9iZKtBZp?cluster=devnet)
+🧾 **E2E trade verified on-chain (2026-05-25):** [Solscan tx `5rTS2SBo…1VCe`](https://solscan.io/tx/5rTS2SBoo1phuTaL4DhCQoBLNj4nJxSZBfbVvHC7Vzogw7sMh6h9hegTobNbBpKhKpbhFyZErygdUxCZceJr1VCe?cluster=devnet) — limit BID $0.55 × 50 YES crossed the resting $0.55 ask. Every invariant held (vault intact, escrow telescoped, asksLen 3→2, taker received 50 YES).
+
+---
+
+## For reviewers
+
+Three HTML one-pagers at the repo root — open in any browser, printable, each self-contained:
+
+- **[`WORKFLOW.html`](./WORKFLOW.html)** — repo bootstrap → submission timeline. Five days, eight deploys, twenty Decision Records, the DR-020 pivot story, and the directed multi-agent Claude Code workflow that built it.
+- **[`SYSTEM-DESIGN.html`](./SYSTEM-DESIGN.html)** — architecture, decisions, trade-offs, risks, lessons learned, six technical challenges with how each was solved.
+- **[`BRAINLIFT.html`](./BRAINLIFT.html)** — single-page constitution (Spiky POVs + Hard NOs + Hard YESes).
+
+Plus [`docs/cost-analysis.md`](./docs/cost-analysis.md) — on-chain-verified per-market rent + scaling math (v1.1 rent-recovery is documented as a hard pre-mainnet precondition in `specs/deferred.md`).
 
 ---
 
@@ -149,9 +162,9 @@ Web-based admin operations at `/admin` (wallet-gated by `MarketConfig.admin`):
 
 ## Deployment
 
-- **Devnet:** deploy_index=8 LIVE — tx `5tykwLrsU9iN657R...`, slot 464756545
-- **Vercel:** see `docs/deployment/vercel.md` for one-time setup + env vars
-- **Mainnet:** roadmapped — see `docs/architecture/pre-mainnet-readiness.md` for the audit + readiness gate
+- **Devnet:** deploy_index=8 LIVE at `599h7Vzn…` (8 cumulative deploys, 6.671 SOL spent — see `migrations/audit_log.jsonl`)
+- **Vercel:** LIVE at [bell-markets.vercel.app](https://bell-markets.vercel.app) — Helius RPC kept server-side via `/api/solana-rpc` proxy (Hard NO #13). See `docs/deployment/vercel.md` for setup.
+- **Mainnet:** roadmapped — see `docs/architecture/pre-mainnet-readiness.md` for the audit + readiness gate. v1.1 rent-recovery (`force_cancel_order` + `close_order_book`) is a hard precondition; full design in `specs/deferred.md`.
 
 ---
 
@@ -203,5 +216,8 @@ Apache 2.0. See `LICENSE`.
 
 ## Author
 
-**Cory Vandenberg** — AI Engineer Fellow, GauntletAI Cohort 5.
+**Cory Vandenberg** — AI Engineer Fellow, GauntletAI Cohort 5 (Meridian).
+
+Built solo using a directed multi-agent Claude Code workflow — four named lead workstreams (Aria · Bram · Cleo · Drew) running in parallel WSL terminal sessions under a single director (Tate). I designed the architecture, locked the 20+ Decision Records that drove the build, and reviewed/merged every commit; the agents executed under my dispatch. See [`WORKFLOW.html`](./WORKFLOW.html) for the full story.
+
 [github.com/TradeUpCards](https://github.com/TradeUpCards) · coryvandenberg@gmail.com
