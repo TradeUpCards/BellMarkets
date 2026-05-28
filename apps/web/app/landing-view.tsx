@@ -42,6 +42,7 @@ import { useOrderBook } from "@/hooks/use-order-book";
 import { LeftRail, TickerAccordion } from "@/components/v8/left-rail";
 import {
   DEFAULT_TRADE_ROUTE,
+  DEMO_LIVE_STRIKE,
   DEMO_STRIKE_MARKETS,
   marketToTicker,
   navStrike,
@@ -430,25 +431,30 @@ function groupLiveMarkets(allMarkets: StrikeMarketWithPda[]): LiveTickerGroup[] 
     arr.push(m);
     byTicker.set(ticker, arr);
   }
-  return DEMO_STRIKE_MARKETS.reduce<LiveTickerGroup[]>((acc, demo) => {
+  // ATM per ticker is the canonical `DEMO_LIVE_STRIKE` (not the first
+  // registry row, which was a bug: the registry sorts by entry order, so
+  // for META the first row is the -3% strike $620, which silently became
+  // the "ATM" highlight target).
+  const seen = new Set<string>();
+  const groups: LiveTickerGroup[] = [];
+  for (const demo of DEMO_STRIKE_MARKETS) {
+    if (seen.has(demo.ticker)) continue;
+    seen.add(demo.ticker);
     const markets = byTicker.get(demo.ticker);
-    if (!markets || markets.length === 0) return acc;
+    if (!markets || markets.length === 0) continue;
     markets.sort(
       (a, b) =>
         strikeToDollars(a.data.strikePrice) -
         strikeToDollars(b.data.strikePrice),
     );
-    // Dedup so we don't double-up if multiple registry entries point at the
-    // same ticker (single ATM strike today, but defensive).
-    if (acc.some((g) => g.ticker === demo.ticker)) return acc;
-    acc.push({
+    groups.push({
       ticker: demo.ticker,
       spot: demo.spot,
       markets,
-      atmStrike: demo.strike,
+      atmStrike: DEMO_LIVE_STRIKE[demo.ticker] ?? demo.strike,
     });
-    return acc;
-  }, []);
+  }
+  return groups;
 }
 
 interface LiveMatrixRowProps {
@@ -456,26 +462,48 @@ interface LiveMatrixRowProps {
 }
 
 const MAX_CELLS_PER_ROW = 7;
+// One slot per column of the heatmap header (matches the grid template).
+// Position each seeded strike by its %-offset from the ATM strike, NOT by
+// list order — otherwise 3 seeded strikes land in cells 0-1-2 (which are
+// the -9% / -6% / -3% columns), regardless of where they actually sit
+// relative to ATM.
+const COLUMN_OFFSETS_PCT = [-9, -6, -3, 0, 3, 6, 9] as const;
+const STRIKE_MATCH_TOLERANCE_DOLLARS = 2;
 
 function LiveMatrixRow({ group }: LiveMatrixRowProps) {
-  // Up to 7 cells per row to match the desktop heatmap grid. Fill from
-  // seeded markets (sorted by strike); pad with EmptyMatrixCell to keep
-  // the column count consistent.
+  // Build a lookup of {strike → market} for this row's seeded markets so
+  // we can probe each column slot independently.
+  const marketByStrike = new Map<number, StrikeMarketWithPda>();
+  for (const m of group.markets) {
+    const strike = Math.round(strikeToDollars(m.data.strikePrice));
+    marketByStrike.set(strike, m);
+  }
   const cells: React.ReactNode[] = [];
-  for (let i = 0; i < MAX_CELLS_PER_ROW; i++) {
-    const m = group.markets[i];
-    if (!m) {
-      cells.push(<EmptyMatrixCell key={`empty-${i}`} strike={null} />);
+  for (const offsetPct of COLUMN_OFFSETS_PCT) {
+    // Target strike for this column = ATM ± offset%, rounded to whole dollars.
+    const target = Math.round(group.atmStrike * (1 + offsetPct / 100));
+    // Find a seeded market within ±$2 of the target. Tolerance handles
+    // small rounding drift between Pyth spot at seed time vs. now.
+    let matchedStrike: number | undefined;
+    let matchedMarket: StrikeMarketWithPda | undefined;
+    for (const [strike, m] of marketByStrike.entries()) {
+      if (Math.abs(strike - target) <= STRIKE_MATCH_TOLERANCE_DOLLARS) {
+        matchedStrike = strike;
+        matchedMarket = m;
+        break;
+      }
+    }
+    if (!matchedMarket || matchedStrike === undefined) {
+      cells.push(<EmptyMatrixCell key={`empty-${offsetPct}`} strike={null} />);
       continue;
     }
-    const strike = Math.round(strikeToDollars(m.data.strikePrice));
     cells.push(
       <LiveMatrixCell
-        key={m.pda.toBase58()}
-        marketPda={m.pda}
-        strike={strike}
+        key={matchedMarket.pda.toBase58()}
+        marketPda={matchedMarket.pda}
+        strike={matchedStrike}
         ticker={group.ticker}
-        isAtm={strike === group.atmStrike}
+        isAtm={offsetPct === 0}
       />,
     );
   }
