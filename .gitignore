@@ -102,3 +102,6 @@ id.json
 
 # Local diagnostic output captures (e.g., seed-demo-liquidity tee logs)
 seed-output*.log
+
+# Local-only interview prep (not for the public repo)
+docs/peak6-brief-update.md
