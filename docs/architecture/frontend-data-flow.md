@@ -157,6 +157,92 @@ If "Insufficient funds" shows even with a funded wallet:
 
 ---
 
+## 5. WebSocket subscriptions vs HTTP polling (demo posture)
+
+### What we hit
+
+`useAccountSubscriptionOrNull` (the underlying hook for `useMarketConfig`,
+`useOrderBook`, `usePosition`, `useTokenBalance`, etc.) was designed
+around `connection.onAccountChange` — WebSocket subscriptions per
+[Hard YES #9](../../constitution/hard-rules.md) ("subscriptions, never
+polling"). The intent: scale-friendly realtime updates that don't
+hammer RPC rate limits.
+
+On the deployed Vercel app, the WebSocket connection attempts
+`wss://bell-markets.vercel.app/api/solana-rpc?network=devnet` and
+fails immediately. Vercel's serverless functions handle HTTP but **do
+not support WebSocket upgrades** — the WS handshake gets a 404 HTML
+page in response, web3.js retries indefinitely, console fills with
+errors, and every subscription-driven hook silently stops receiving
+updates after its initial HTTP fetch.
+
+### Why we can't fix it the obvious way
+
+The clean fix would be to point the WebSocket endpoint directly at
+Helius's `wss://devnet.helius-rpc.com/?api-key=<key>`. That requires
+the key in `NEXT_PUBLIC_*` — which violates
+[Hard NO #13](../../constitution/hard-rules.md) ("Helius API key
+NEVER appears in `NEXT_PUBLIC_*`"). The key would be visible in the
+client JS bundle, exposing it to abuse (rate limit / quota / billing).
+For devnet only the risk is moderate, but the principle scales to
+mainnet where the same class of key would be expensive to leak. We
+hold the line.
+
+### What the demo does instead
+
+**HTTP polling at 5-second intervals** for all subscription-driven
+hooks. `useAccountSubscription` adds `refetchInterval: 5_000` to its
+underlying `useQuery`. Updates lag by up to 5 seconds; visually fine
+for the trade page, order book, and balance display. `useAllMarkets`
+polls at 30 seconds (matrix data changes rarely).
+
+Trade-offs:
+
+  - **Pro:** Works through the existing Helius proxy. Key stays
+    server-side. Zero NEXT_PUBLIC_ key exposure.
+  - **Pro:** Trivially robust against WS reconnect gaps — every poll
+    is independent.
+  - **Con:** 5-second perceived lag on order book updates. Acceptable
+    for a 1-user demo; degrades under heavy concurrent trading.
+  - **Con:** More bandwidth + Helius quota usage than WS. At demo
+    scale (handful of users) this is invisible; at production scale
+    (thousands of concurrent users) it becomes significant.
+
+### v1.1 production fix (path forward)
+
+Stand up a separate WebSocket proxy service outside Vercel. Three
+viable platforms:
+
+  1. **Cloudflare Workers + Durable Objects** — WS support is native;
+     Helius key lives in CF env vars. Globally distributed; cheap.
+  2. **Fly.io** — small Node service holds the WS upgrade + Helius
+     key. Always-on; simple to deploy.
+  3. **Railway / Render** — same shape as Fly.io, slightly different
+     pricing models.
+
+Once a WS proxy exists, drop the `refetchInterval` from
+`useAccountSubscription` and let the WebSocket carry updates.
+Polling stays in as a fallback when the WS isn't connected (already
+exported in `useAccountSubscription` lifecycle docs).
+
+The WS proxy is also the natural place to add Helius Webhooks ->
+SSE relay for any state changes that can't be subscribed to directly.
+
+### Operator quick check
+
+If subscription-dependent UI looks stale:
+
+1. Open DevTools Network tab, filter `solana-rpc`. You should see
+   one POST per hook per 5 seconds. If you see zero traffic, polling
+   isn't running — likely a hook-enabled flag wedged false (`pubkey`
+   never resolves).
+2. Check console for "WebSocket connection to wss://… failed" spam.
+   That's the wallet-adapter's default WS attempt against the proxy
+   URL; it WILL fail on Vercel and is non-blocking. Future cleanup:
+   set a no-op `wsEndpoint` to suppress the retry loop.
+
+---
+
 ## Related docs
 
 - `docs/architecture/pre-mainnet-readiness.md` §"Pyth devnet posture (audited)" — sibling case of "RPC reality vs assumed reality"

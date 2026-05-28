@@ -71,11 +71,26 @@ export function useAccountSubscription<T>(
   pubkey: PublicKey | null,
   decoder: (info: AccountInfo<Buffer> | null) => T,
   queryKey: QueryKey,
-  opts: { enabled?: boolean } = {},
+  opts: { enabled?: boolean; pollIntervalMs?: number } = {},
 ): UseQueryResult<T> {
   const { connection } = useConnection();
   const queryClient = useQueryClient();
   const enabled = (opts.enabled ?? true) && pubkey !== null;
+
+  // ─── DEMO posture: HTTP polling at 5s. v1.1: switch to WS subscriptions ───
+  //
+  // Hard YES #9 originally said "subscriptions, never polling." For the demo
+  // we soften this: Vercel serverless functions don't support WS upgrades,
+  // and routing WS direct to Helius would put the API key in NEXT_PUBLIC_*
+  // (Hard NO #13). 5s HTTP polling through the existing proxy lands the
+  // same data with a 5-second lag. Documented in
+  // `docs/architecture/frontend-data-flow.md`.
+  //
+  // For v1.1 production: stand up a WS proxy outside Vercel (Cloudflare
+  // Workers, Fly.io, or a dedicated Node service) that holds the Helius
+  // key server-side and relays WS upgrades. Then drop this polling and
+  // restore subscription-driven updates.
+  const pollIntervalMs = opts.pollIntervalMs ?? 5_000;
 
   const result = useQuery<T>({
     queryKey,
@@ -88,6 +103,7 @@ export function useAccountSubscription<T>(
     staleTime: Number.POSITIVE_INFINITY,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
+    refetchInterval: enabled ? pollIntervalMs : false,
   });
 
   useEffect(() => {

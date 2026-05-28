@@ -64,7 +64,13 @@ export function useAllMarkets() {
       }
       return decoded;
     },
+    // 60s staleTime + 30s background refresh: matrix data changes when
+    // markets are settled / created, which is rare during a session.
+    // 30s polling catches operator-side seed reruns without spamming
+    // getMultipleAccountsInfo. Per-market detail (book + position) is
+    // polled separately at 5s via useAccountSubscription.
     staleTime: 60_000,
+    refetchInterval: 30_000,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
   });
