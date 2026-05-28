@@ -116,17 +116,11 @@
     display: flex; align-items: center; gap: 10px;
   }
   .logo-mark {
-    width: 28px; height: 28px;
-    background: var(--accent-gradient);
-    border-radius: 5px; position: relative;
+    width: 30px; height: 30px;
+    background: url('/app-icon.png') center/contain no-repeat;
+    border-radius: 6px; position: relative;
     box-shadow: 0 0 18px var(--accent-glow);
     flex-shrink: 0;
-  }
-  .logo-mark::before {
-    content: "BM"; position: absolute; inset: 0;
-    display: flex; align-items: center; justify-content: center;
-    font-family: 'IBM Plex Mono', monospace; font-weight: 700;
-    font-size: 10px; color: var(--accent-fg); letter-spacing: -0.5px;
   }
   .logo .label { color: var(--accent); }
   .nav { display: flex; gap: 24px; font-size: 12px; font-weight: 500; }
