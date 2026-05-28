@@ -32,6 +32,7 @@ import {
   marketToTicker,
 } from "@/lib/demo-strikes";
 import { useTokenBalance } from "@/hooks/use-token-balance";
+import { useSpotPrice } from "@/hooks/use-spot-price";
 import { queryKeys } from "@/lib/queries/keys";
 
 const USDC_DECIMALS = 6n;
@@ -1256,21 +1257,76 @@ interface ChartCardProps {
 }
 
 function ChartCard({ ticker, strike, yesAsk, yesBid }: ChartCardProps) {
-  // Live-derived YES last/mid price + spread. Falls back to the mockup
-  // $0.520 only when the order book is empty / pre-init — paired with the
-  // disable matrix that will block submits in that state anyway.
-  const FALLBACK_PRICE = 0.52;
-  const last =
-    yesAsk !== undefined && yesBid !== undefined
-      ? (yesAsk + yesBid) / 2
-      : yesAsk ?? yesBid ?? FALLBACK_PRICE;
-  // Delta vs the strike's $0.50 fair-coin midpoint — honest approximation
-  // since we don't yet store an "open" price. Will be replaced by a real
-  // open/close once the indexer surfaces price history.
-  const REFERENCE_PRICE = 0.5;
-  const deltaAbs = last - REFERENCE_PRICE;
-  const deltaPct = (deltaAbs / REFERENCE_PRICE) * 100;
+  // Live underlying stock spot via Bram's Pyth Hermes proxy
+  // (commit 447e322). Polls every 5s through useSpotPrice.
+  const { data: spot } = useSpotPrice(ticker);
+
+  // Accumulate spot polls into a rolling history so we can draw a live
+  // line chart. ~60 points × 5s polling = ~5 minutes of context.
+  const MAX_HISTORY = 60;
+  const [history, setHistory] = useState<Array<{ price: number; t: number }>>([]);
+  useEffect(() => {
+    if (!spot?.priceUsd || !spot.publishTime) return;
+    setHistory((prev) => {
+      // Pyth publishes more often than we poll — skip duplicates so the
+      // chart doesn't flatline between publish events.
+      if (prev.length > 0 && prev[prev.length - 1]!.t === spot.publishTime) {
+        return prev;
+      }
+      return [...prev, { price: spot.priceUsd, t: spot.publishTime }].slice(
+        -MAX_HISTORY,
+      );
+    });
+  }, [spot?.priceUsd, spot?.publishTime]);
+
+  // Live headline = current Pyth spot. Delta = move since we opened the page
+  // (first accumulated point). This is honest under "polled live" semantics —
+  // not "since market open" until Bram's indexer surfaces a real open price.
+  const livePrice = spot?.priceUsd ?? history[history.length - 1]?.price ?? 0;
+  const firstPrice = history[0]?.price ?? livePrice;
+  const deltaAbs = livePrice - firstPrice;
+  const deltaPct = firstPrice > 0 ? (deltaAbs / firstPrice) * 100 : 0;
   const deltaUp = deltaAbs >= 0;
+
+  // Y-axis range — fit history + strike with 5% padding so the strike line
+  // is always visible. Falls back to ±5% of strike pre-poll.
+  const prices = history.length > 0 ? history.map((h) => h.price) : [strike];
+  const seriesMin = Math.min(...prices, strike);
+  const seriesMax = Math.max(...prices, strike);
+  const range = Math.max(seriesMax - seriesMin, strike * 0.005);
+  const yMax = seriesMax + range * 0.15;
+  const yMin = seriesMin - range * 0.15;
+  const yRange = yMax - yMin;
+
+  // SVG-coord helpers (viewBox 800×440, y inverted).
+  const priceToY = (p: number): number =>
+    440 - ((p - yMin) / yRange) * 440;
+  const strikeYPct = (priceToY(strike) / 440) * 100;
+
+  const polylinePoints =
+    history.length >= 2
+      ? history
+          .map((h, i) => {
+            const x = (i / (history.length - 1)) * 800;
+            const y = priceToY(h.price);
+            return `${x.toFixed(1)},${y.toFixed(1)}`;
+          })
+          .join(" ")
+      : null;
+  const fillPath =
+    polylinePoints !== null
+      ? `M ${polylinePoints.split(" ").join(" L ")} L 800,440 L 0,440 Z`
+      : null;
+  const lastX =
+    history.length > 0 ? (history.length === 1 ? 400 : 800) : 400;
+  const lastY = history.length > 0 ? priceToY(livePrice) : 220;
+
+  // O/H/L derived from accumulated history. VWAP needs volume — out of scope
+  // for the demo; show "—". Spread + B/A still come from the live order book.
+  const histPrices = history.map((h) => h.price);
+  const o = histPrices[0];
+  const h = histPrices.length > 0 ? Math.max(...histPrices) : undefined;
+  const l = histPrices.length > 0 ? Math.min(...histPrices) : undefined;
   const spreadAbs =
     yesAsk !== undefined && yesBid !== undefined ? yesAsk - yesBid : undefined;
   const spreadPct =
@@ -1281,26 +1337,44 @@ function ChartCard({ ticker, strike, yesAsk, yesBid }: ChartCardProps) {
     yesBid !== undefined && yesAsk !== undefined
       ? `${yesBid.toFixed(3)}/${yesAsk.toFixed(3)}`
       : "—";
+
+  // 7 evenly-spaced Y-axis labels covering [yMin, yMax].
+  const yLabels: Array<{ v: string; current: boolean }> = [];
+  for (let i = 0; i < 7; i++) {
+    const value = yMax - (i / 6) * yRange;
+    yLabels.push({
+      v: value.toFixed(2),
+      current: Math.abs(value - livePrice) < yRange / 14,
+    });
+  }
   return (
     <div className="chart-card">
       <div className="chart-h compact">
         <div className="chart-headline">
-          <div className="chart-price mono">${last.toFixed(3)}</div>
+          <div className="chart-price mono">${livePrice.toFixed(2)}</div>
           <span className={`chart-delta ${deltaUp ? "up" : "down"} mono`}>
-            {deltaUp ? "+" : "−"}${Math.abs(deltaAbs).toFixed(3)} ·{" "}
+            {deltaUp ? "+" : "−"}${Math.abs(deltaAbs).toFixed(2)} ·{" "}
             {deltaUp ? "+" : "−"}
-            {Math.abs(deltaPct).toFixed(1)}%
+            {Math.abs(deltaPct).toFixed(2)}%
+          </span>
+          <span
+            style={{
+              fontSize: 11,
+              color: "var(--text-muted)",
+              marginLeft: 8,
+              fontFamily: "var(--font-mono, 'IBM Plex Mono', monospace)",
+            }}
+          >
+            {ticker} spot · Pyth Hermes · {history.length} pt
+            {history.length === 1 ? "" : "s"}
           </span>
         </div>
-        <div className="chart-quick-stats" data-mock>
-          {/* O/H/L/VWAP still mock-fixture until Bram's indexer surfaces
-              price history. Spread + B/A are live-derived from the order
-              book when available; fall back to "—" when book is empty. */}
+        <div className="chart-quick-stats">
           {[
-            ["O", "0.480"],
-            ["H", "0.545"],
-            ["L", "0.460"],
-            ["VWAP", "0.504"],
+            ["O", o !== undefined ? `$${o.toFixed(2)}` : "—"],
+            ["H", h !== undefined ? `$${h.toFixed(2)}` : "—"],
+            ["L", l !== undefined ? `$${l.toFixed(2)}` : "—"],
+            ["VWAP", "—"],
             ["Spread", spreadPct !== undefined ? `${spreadPct.toFixed(1)}%` : "—"],
             ["B/A", bestBA],
           ].map(([k, v]) => (
