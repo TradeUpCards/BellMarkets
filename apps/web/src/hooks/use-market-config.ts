@@ -18,7 +18,24 @@ import type { MarketConfig } from "@/lib/solana/types";
 export function useMarketConfig() {
   const [pda] = deriveMarketConfigPda();
   const decode = useCallback(
-    (data: Buffer): MarketConfig => decodeMarketConfig(data),
+    (data: Buffer): MarketConfig => {
+      // Same casing normalization as useAllMarkets — Anchor 0.30
+      // BorshAccountsCoder + snake_case IDL returns fields like `usdc_mint`
+      // instead of `usdcMint`. Read either, return camelCase.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const raw = decodeMarketConfig(data) as any;
+      return {
+        admin: raw.admin,
+        usdcMint: raw.usdcMint ?? raw.usdc_mint,
+        treasury: raw.treasury,
+        priceStalenessSecs: raw.priceStalenessSecs ?? raw.price_staleness_secs,
+        priceConfidenceBps: raw.priceConfidenceBps ?? raw.price_confidence_bps,
+        adminOverrideDelaySecs:
+          raw.adminOverrideDelaySecs ?? raw.admin_override_delay_secs,
+        paused: raw.paused,
+        bump: raw.bump,
+      };
+    },
     [],
   );
   return useAccountSubscriptionOrNull<MarketConfig>(
