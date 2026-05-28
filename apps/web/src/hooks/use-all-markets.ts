@@ -4,26 +4,33 @@ import { useQuery } from "@tanstack/react-query";
 import { useConnection } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 
-import {
-  accountDiscriminator,
-  decodeStrikeMarket,
-} from "@/lib/solana/coder";
-import { BELL_MARKETS_PROGRAM_PUBKEY } from "@/lib/solana/config";
+import { decodeStrikeMarket } from "@/lib/solana/coder";
+import { DEMO_STRIKE_MARKETS } from "@/lib/demo-strikes";
 import type { StrikeMarketWithPda } from "@/lib/solana/types";
 import { queryKeys } from "@/lib/queries/keys";
 
 /**
- * Enumerate every StrikeMarket account owned by the BellMarkets program.
+ * Enumerate every live StrikeMarket the demo cares about.
  *
- * No subscription here intentionally: new strikes are created ~once/day by
- * Bram's morning job (admin-only). The page that uses this hook can
- * `invalidate(queryKeys.markets.list())` when it has a reason to believe a
- * new market was created (e.g., user navigated to Markets and we want a
- * fresh snapshot). The per-market detail hook (`useMarketAccount`) handles
- * tick-level updates via subscription.
+ * ## Why `getMultipleAccountsInfo` instead of `getProgramAccounts`
+ *
+ * `getProgramAccounts` is restricted on Helius's standard tier — unindexed
+ * program scans either time out or return 403 / "Method not found". The
+ * call we want ("give me every StrikeMarket account") is the canonical
+ * expensive call Helius locks down.
+ *
+ * The demo doesn't need an unbounded scan: every strike that should
+ * render is already pinned in `lib/demo-strikes.ts` (Bram's seeded grid).
+ * We fetch those by-PDA with `getMultipleAccountsInfo` — one cheap call,
+ * works on every Helius tier, no indexer required.
+ *
+ * Adding a new on-chain market = append to `DEMO_STRIKE_MARKETS`. Removing
+ * one = remove from the registry. The page reflects the registry.
  *
  * `staleTime: 60s` provides a soft cache for back-to-back navigations
- * without becoming a polling loop (no `refetchInterval`).
+ * without becoming a polling loop. Per-market detail updates flow
+ * through the per-market subscription hooks (`useMarketAccount`,
+ * `useOrderBook`).
  */
 export function useAllMarkets() {
   const { connection } = useConnection();
@@ -31,40 +38,24 @@ export function useAllMarkets() {
   return useQuery<StrikeMarketWithPda[]>({
     queryKey: queryKeys.markets.list(),
     queryFn: async () => {
-      const discriminator = accountDiscriminator("StrikeMarket");
-      const accounts = await connection.getProgramAccounts(
-        BELL_MARKETS_PROGRAM_PUBKEY,
-        {
-          commitment: "confirmed",
-          filters: [
-            {
-              memcmp: {
-                offset: 0,
-                bytes: discriminator.toString("base64"),
-                encoding: "base64",
-              },
-            },
-          ],
-        },
-      );
+      const pdaList = DEMO_STRIKE_MARKETS.map((m) => new PublicKey(m.marketPda));
+      if (pdaList.length === 0) return [];
 
-      // DR-020 deploy_index=8: StrikeMarket gained `order_book: Pubkey`,
-      // bumping LEN from 333 → 341 bytes. The 7 legacy META strikes from
-      // deploy_index=6 still exist on chain at the old layout and the borsh
-      // decoder either throws or produces a partial object with undefined
-      // fields. Filter them out so consumers (trade-view, admin, markets-table)
-      // can rely on `m.data.strikePrice` etc. being defined.
+      const infos = await connection.getMultipleAccountsInfo(pdaList, "confirmed");
+
       const decoded: StrikeMarketWithPda[] = [];
-      for (const { pubkey, account } of accounts) {
+      for (let i = 0; i < infos.length; i++) {
+        const info = infos[i];
+        if (!info) continue; // PDA in registry but no account on-chain — skip silently
         try {
-          const data = decodeStrikeMarket(account.data as Buffer);
-          // Defensive: even if borsh succeeds, drop entries where load-bearing
-          // fields are missing (legacy-schema accounts where partial decode
-          // produces undefined BN values).
+          const data = decodeStrikeMarket(info.data as Buffer);
+          // Defensive: same legacy-schema guard as the prior `getProgramAccounts`
+          // path — drop entries where the load-bearing fields didn't decode
+          // (deploy_index ≤ 6 StrikeMarket was 333 B without `order_book`).
           if (!data?.strikePrice || !data.expiryUnix || !data.yesMint) {
             continue;
           }
-          decoded.push({ pda: new PublicKey(pubkey), data });
+          decoded.push({ pda: pdaList[i]!, data });
         } catch {
           // Legacy-schema or malformed; skip silently. Re-emerges as
           // `liveMarket=null` in trade-view → "No on-chain StrikeMarket"
