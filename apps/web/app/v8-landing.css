@@ -692,7 +692,12 @@
     background: var(--panel);
     border: 1px solid var(--border);
     border-radius: 4px;
-    overflow: hidden;
+    /* overflow-x:auto instead of overflow:hidden — lets the matrix scroll
+     * horizontally on narrow viewports rather than silently clipping the
+     * spot/vol columns. The matrix-grid's row width is set by the grid
+     * template; auto allows that to exceed the card width and scroll. */
+    overflow-x: auto;
+    overflow-y: visible;
     margin-bottom: 20px;
   }
   .matrix-h {
@@ -764,7 +769,12 @@
   }
   .matrix-thead {
     grid-column: 1 / -1;
-    display: grid; grid-template-columns: 110px 120px repeat(7, 1fr) 110px 100px;
+    display: grid;
+    /* min-content on the spot/vol/action columns prevents truncation when
+     * the container narrows. Without min-content, those columns shrink
+     * past their content's natural width and the digits get clipped by
+     * the outer .matrix-card { overflow: hidden }. */
+    grid-template-columns: minmax(110px, max-content) minmax(120px, max-content) repeat(7, minmax(60px, 1fr)) minmax(110px, max-content) minmax(100px, max-content);
     background: var(--panel-2);
     border-bottom: 1px solid var(--border);
   }
@@ -781,13 +791,61 @@
 
   .matrix-row {
     grid-column: 1 / -1;
-    display: grid; grid-template-columns: 110px 120px repeat(7, 1fr) 110px 100px;
+    display: grid;
+    grid-template-columns: minmax(110px, max-content) minmax(120px, max-content) repeat(7, minmax(60px, 1fr)) minmax(110px, max-content) minmax(100px, max-content);
     border-bottom: 1px solid var(--border);
     transition: background 150ms;
     cursor: pointer;
   }
   .matrix-row:last-child { border-bottom: none; }
   .matrix-row:hover { background: var(--row-hover); }
+
+  /* Matrix loading state — spinner + animated dots while useAllMarkets
+   * is mid-flight. Overrides the grid template (single full-width cell). */
+  .matrix-row.matrix-loading-row {
+    grid-template-columns: 1fr !important;
+    cursor: default;
+  }
+  .matrix-row.matrix-loading-row:hover { background: transparent; }
+  .matrix-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 32px 20px;
+    color: var(--text-muted);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    letter-spacing: 0.5px;
+  }
+  .matrix-loading-spinner {
+    width: 16px; height: 16px;
+    border: 2px solid var(--border-strong);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: matrix-spinner-rotate 0.8s linear infinite;
+  }
+  @keyframes matrix-spinner-rotate {
+    to { transform: rotate(360deg); }
+  }
+  .matrix-loading-text { display: inline-flex; align-items: center; gap: 2px; }
+  .matrix-loading-dots {
+    display: inline-flex;
+    width: 18px;
+    margin-left: 2px;
+  }
+  .matrix-loading-dots > span {
+    animation: matrix-loading-dot 1.4s infinite ease-in-out both;
+    opacity: 0;
+  }
+  .matrix-loading-dots > span:nth-child(1) { animation-delay: 0s; }
+  .matrix-loading-dots > span:nth-child(2) { animation-delay: 0.2s; }
+  .matrix-loading-dots > span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes matrix-loading-dot {
+    0%, 80%, 100% { opacity: 0; }
+    40% { opacity: 1; }
+  }
+
   .matrix-row > div {
     padding: 16px 12px;
     font-family: 'IBM Plex Mono', monospace; font-size: 14px;

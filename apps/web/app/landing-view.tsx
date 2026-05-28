@@ -774,17 +774,18 @@ export function LandingView() {
             </div>
 
             {liveGroups.length === 0 && (
-              <div
-                className="matrix-row"
-                style={{ padding: "20px", opacity: 0.6, fontSize: 13 }}
-              >
-                <span>
-                  Loading live markets from{" "}
-                  <code style={{ fontFamily: "var(--font-mono)" }}>
-                    program.account.strikeMarket.all()
-                  </code>
-                  …
-                </span>
+              <div className="matrix-row matrix-loading-row">
+                <div className="matrix-loading">
+                  <span className="matrix-loading-spinner" aria-hidden="true" />
+                  <span className="matrix-loading-text">
+                    Loading live markets
+                    <span className="matrix-loading-dots" aria-hidden="true">
+                      <span>.</span>
+                      <span>.</span>
+                      <span>.</span>
+                    </span>
+                  </span>
+                </div>
               </div>
             )}
             {liveGroups.map((group) => (
