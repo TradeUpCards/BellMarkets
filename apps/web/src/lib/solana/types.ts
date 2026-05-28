@@ -12,9 +12,17 @@ export type Outcome =
   | { invalid: Record<string, never> };
 
 export function outcomeTag(o: Outcome): OutcomeTag {
-  if ("unsettled" in o) return "unsettled";
-  if ("yes" in o) return "yes";
-  if ("no" in o) return "no";
+  // Anchor 0.30 BorshAccountsCoder may return enum variant keys at
+  // different casings depending on the IDL format (Unsettled vs unsettled).
+  // Lowercase + key-includes lookup handles both shapes — pre-fix, the
+  // PascalCase form was falling through to "invalid" which then made
+  // `marketSettled = (tag !== "unsettled")` evaluate to TRUE and the
+  // disable matrix gated trading with 'Market settled' on every market.
+  if (!o || typeof o !== "object") return "invalid";
+  const keys = Object.keys(o).map((k) => k.toLowerCase());
+  if (keys.includes("unsettled")) return "unsettled";
+  if (keys.includes("yes")) return "yes";
+  if (keys.includes("no")) return "no";
   return "invalid";
 }
 
