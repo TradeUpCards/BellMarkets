@@ -74,6 +74,9 @@ export const queryKeys = {
 
   socialLinks: (wallet: PublicKey | string | null) =>
     [...queryKeys.all, "social-links", toBase58(wallet)] as const,
+
+  spotPrice: (ticker: string | null) =>
+    [...queryKeys.all, "spot-price", ticker?.toUpperCase() ?? "null"] as const,
 } as const;
 
 export type BellMarketsQueryKey = ReturnType<

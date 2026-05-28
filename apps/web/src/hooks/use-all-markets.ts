@@ -64,11 +64,52 @@ export function useAllMarkets() {
         if (!info) continue; // PDA in registry but no account on-chain — skip silently
         try {
           const data = decodeStrikeMarket(info.data as Buffer);
-          if (!data?.strikePrice || !data.expiryUnix || !data.yesMint) {
+          if (i === 0) {
+            // Dump the keys of the first decoded object so we can see EXACTLY
+            // what field names the BorshAccountsCoder is returning. Removes
+            // the "is it snake_case or camelCase?" guessing for the next
+            // person who hits this.
+            // eslint-disable-next-line no-console
+            console.log(
+              `[useAllMarkets] sample decoded keys for ${pdaList[0]!.toBase58().slice(0, 8)}…:`,
+              data ? Object.keys(data as object) : "(null)",
+            );
+          }
+          // Accept either casing — Anchor 0.30 BorshAccountsCoder behavior
+          // varies by IDL format version; tolerate both rather than crash
+          // the matrix on a guess about which one is current.
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const d = data as any;
+          const strikePrice = d?.strikePrice ?? d?.strike_price;
+          const expiryUnix = d?.expiryUnix ?? d?.expiry_unix;
+          const yesMint = d?.yesMint ?? d?.yes_mint;
+          if (!strikePrice || !expiryUnix || !yesMint) {
             fieldGuards++;
             continue;
           }
-          decoded.push({ pda: pdaList[i]!, data });
+          // Normalize to camelCase shape for downstream consumers (matrix,
+          // trade-view, etc. — all coded against the camelCase StrikeMarket type).
+          const normalized = {
+            ...d,
+            strikePrice,
+            expiryUnix,
+            yesMint,
+            noMint: d?.noMint ?? d?.no_mint,
+            usdcVault: d?.usdcVault ?? d?.usdc_vault,
+            phoenixMarket: d?.phoenixMarket ?? d?.phoenix_market,
+            underlyingPythFeed: d?.underlyingPythFeed ?? d?.underlying_pyth_feed,
+            settlePrice: d?.settlePrice ?? d?.settle_price,
+            settleConfidence: d?.settleConfidence ?? d?.settle_confidence,
+            settleSlot: d?.settleSlot ?? d?.settle_slot,
+            settledAtUnix: d?.settledAtUnix ?? d?.settled_at_unix,
+            adminOverrideEligibleAt: d?.adminOverrideEligibleAt ?? d?.admin_override_eligible_at,
+            yesMintBump: d?.yesMintBump ?? d?.yes_mint_bump,
+            noMintBump: d?.noMintBump ?? d?.no_mint_bump,
+            vaultBump: d?.vaultBump ?? d?.vault_bump,
+            pairsOutstanding: d?.pairsOutstanding ?? d?.pairs_outstanding,
+            orderBook: d?.orderBook ?? d?.order_book,
+          };
+          decoded.push({ pda: pdaList[i]!, data: normalized });
         } catch (e) {
           decodeFailures++;
           if (decodeFailures <= 2) {
