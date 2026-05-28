@@ -769,8 +769,8 @@
     border-bottom: 1px solid var(--border);
   }
   .matrix-thead > div {
-    padding: 10px 12px;
-    font-family: 'IBM Plex Mono', monospace; font-size: 9px;
+    padding: 12px 12px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px;
     color: var(--text-muted); text-transform: uppercase;
     letter-spacing: 1px; font-weight: 700;
     text-align: center;
@@ -789,30 +789,30 @@
   .matrix-row:last-child { border-bottom: none; }
   .matrix-row:hover { background: var(--row-hover); }
   .matrix-row > div {
-    padding: 14px 12px;
-    font-family: 'IBM Plex Mono', monospace; font-size: 12px;
-    display: flex; flex-direction: column; gap: 1px;
+    padding: 16px 12px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 14px;
+    display: flex; flex-direction: column; gap: 2px;
     justify-content: center;
     position: relative;
   }
   .matrix-ticker {
     font-weight: 700; color: var(--text-strong);
-    font-size: 13px; letter-spacing: -0.2px;
+    font-size: 15px; letter-spacing: -0.2px;
     display: flex; align-items: center; gap: 8px;
   }
   .matrix-ticker-mark {
-    width: 22px; height: 22px;
+    width: 26px; height: 26px;
     background: var(--accent-bg); border: 1px solid var(--accent);
     border-radius: 3px;
     display: flex; align-items: center; justify-content: center;
-    font-size: 10px; color: var(--accent);
+    font-size: 12px; color: var(--accent);
   }
   .matrix-spot {
     text-align: right; color: var(--text);
     align-items: flex-end;
   }
-  .matrix-spot .px { font-weight: 600; font-size: 12px; }
-  .matrix-spot .chg { font-size: 10px; }
+  .matrix-spot .px { font-weight: 600; font-size: 14px; }
+  .matrix-spot .chg { font-size: 12px; }
   .matrix-spot .chg.up { color: var(--yes); }
   .matrix-spot .chg.down { color: var(--no); }
 
@@ -820,7 +820,7 @@
   .prob-cell {
     text-align: center;
     align-items: center;
-    font-weight: 700; font-size: 13px;
+    font-weight: 700; font-size: 17px;
     cursor: pointer; transition: all 150ms;
   }
   .prob-cell:hover {
@@ -828,7 +828,7 @@
     box-shadow: inset 0 0 0 1px var(--accent);
   }
   .prob-cell .strike {
-    font-size: 9px; color: var(--text-subtle); margin-bottom: 2px;
+    font-size: 11px; color: var(--text-subtle); margin-bottom: 3px;
     font-weight: 500;
   }
   .prob-cell .prob {
@@ -876,7 +876,7 @@
     text-align: right; color: var(--text); font-weight: 600;
     align-items: flex-end;
   }
-  .matrix-vol .delta { font-size: 9px; color: var(--text-subtle); }
+  .matrix-vol .delta { font-size: 11px; color: var(--text-subtle); }
   .matrix-action {
     text-align: right; align-items: flex-end;
   }
@@ -884,10 +884,10 @@
     background: var(--panel-3);
     border: 1px solid var(--border-strong);
     color: var(--text);
-    padding: 5px 10px;
+    padding: 7px 12px;
     border-radius: 3px;
     font-family: 'IBM Plex Mono', monospace; font-weight: 700;
-    font-size: 10px; letter-spacing: 0.5px;
+    font-size: 12px; letter-spacing: 0.5px;
     transition: all 150ms;
   }
   .matrix-row:hover .matrix-action button {
