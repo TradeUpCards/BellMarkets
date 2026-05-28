@@ -9,7 +9,7 @@ import type { Adapter } from "@solana/wallet-adapter-base";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SessionProvider } from "next-auth/react";
 
-import { SOLANA_RPC_ENDPOINT } from "@/lib/solana/config";
+import { SOLANA_RPC_ENDPOINT, SOLANA_WS_ENDPOINT } from "@/lib/solana/config";
 import { Toaster } from "@/components/ui/toaster";
 
 import "@solana/wallet-adapter-react-ui/styles.css";
@@ -47,7 +47,10 @@ export function Providers({ children }: { children: ReactNode }) {
       refetchOnWindowFocus={false}
     >
       <QueryClientProvider client={queryClient}>
-        <ConnectionProvider endpoint={SOLANA_RPC_ENDPOINT}>
+        <ConnectionProvider
+          endpoint={SOLANA_RPC_ENDPOINT}
+          config={SOLANA_WS_ENDPOINT ? { wsEndpoint: SOLANA_WS_ENDPOINT, commitment: "confirmed" } : { commitment: "confirmed" }}
+        >
           <WalletProvider wallets={wallets} autoConnect>
             <WalletModalProvider>
               {children}
