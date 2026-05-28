@@ -46,7 +46,24 @@ export function useUserConfig(
   );
 
   const decode = useCallback(
-    (data: Buffer): UserConfig => decodeUserConfig(data),
+    (data: Buffer): UserConfig => {
+      // Same snake_case → camelCase normalization as useFeeConfig /
+      // useMarketConfig / useAllMarkets. Anchor 0.30 BorshAccountsCoder +
+      // our IDL returns `mint_volume_30d` etc.; pre-fix the trade page
+      // crashed whenever a wallet with an initialized UserConfig PDA
+      // (e.g. the platform admin) connected because
+      // `query.data.mintVolume30d` was undefined and `.toString()` threw.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const raw = decodeUserConfig(data) as any;
+      return {
+        user: raw.user,
+        mintVolume30d: raw.mintVolume30d ?? raw.mint_volume_30d,
+        mintVolumeLifetime:
+          raw.mintVolumeLifetime ?? raw.mint_volume_lifetime,
+        lastDecayUnix: raw.lastDecayUnix ?? raw.last_decay_unix,
+        bump: raw.bump,
+      };
+    },
     [],
   );
 
@@ -56,9 +73,10 @@ export function useUserConfig(
     queryKeys.userConfig(userPubkey),
   );
 
-  const volumeMicros = query.data
-    ? BigInt(query.data.mintVolume30d.toString())
-    : 0n;
+  const volumeMicros =
+    query.data && query.data.mintVolume30d
+      ? BigInt(query.data.mintVolume30d.toString())
+      : 0n;
   const tier = tierForVolume(volumeMicros);
 
   return {
