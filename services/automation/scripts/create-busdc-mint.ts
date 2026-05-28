@@ -36,8 +36,12 @@ async function loadPlatformAdminKeypair() {
   return web3.Keypair.fromSecretKey(Uint8Array.from(bytes));
 }
 
+function rpcHost(): string {
+  try { return new URL(DEVNET_RPC).host; } catch { return "<invalid>"; }
+}
+
 async function main() {
-  console.error(JSON.stringify({ event: "operator.busdc-create.start", rpc: DEVNET_RPC }));
+  console.error(JSON.stringify({ event: "operator.busdc-create.start", rpcHost: rpcHost() }));
 
   const platformAdmin = await loadPlatformAdminKeypair();
   console.error(
@@ -98,7 +102,7 @@ async function main() {
       mintAuthority: platformAdmin.publicKey.toBase58(),
       freezeAuthority: platformAdmin.publicKey.toBase58(),
       cluster: "devnet",
-      rpc: DEVNET_RPC,
+      rpcHost: rpcHost(),
       createdAt: new Date().toISOString(),
     }),
   );

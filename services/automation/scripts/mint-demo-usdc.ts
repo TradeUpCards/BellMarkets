@@ -59,13 +59,17 @@ async function main() {
     );
   }
 
+  // Redact secrets in operator logs: log host only (api-key query strip).
+  const rpcHost = (() => {
+    try { return new URL(DEVNET_RPC).host; } catch { return "<invalid>"; }
+  })();
   console.error(
     JSON.stringify({
       event: "operator.mint-demo-usdc.start",
       recipient,
       amount,
       busdcMint,
-      rpc: DEVNET_RPC,
+      rpcHost,
     }),
   );
 
