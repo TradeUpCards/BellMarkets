@@ -55,7 +55,22 @@
     background-attachment: fixed;
     min-height: 100vh;
   }
-  .mono { font-family: 'IBM Plex Mono', monospace; font-variant-numeric: tabular-nums; }
+  .mono {
+    font-family: 'IBM Plex Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: visible;
+  }
+  /* Brute-force: every stock-price / strike-price display in the trade
+   * page cannot be clipped. See sibling comment in v8-landing.css. */
+  .market-id-title, .market-id-title > *,
+  .strike-pill, .strike-pill .px, .strike-pill .prob,
+  .strike-pills-inline, .strike-pills-inline .strike-pill,
+  .chart-headline, .chart-price, .chart-delta {
+    white-space: nowrap !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+  }
   a { color: inherit; text-decoration: none; }
   button { font-family: inherit; cursor: pointer; }
 

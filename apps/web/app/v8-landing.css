@@ -80,7 +80,27 @@
     background-attachment: fixed;
     min-height: 100vh;
   }
-  .mono { font-family: 'IBM Plex Mono', monospace; font-variant-numeric: tabular-nums; }
+  .mono {
+    font-family: 'IBM Plex Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: visible;
+  }
+  /* Brute-force: ensure every stock price / strike display in the matrix
+   * and rail cannot be clipped by an ancestor's overflow rule. If you find
+   * this comment while debugging another truncation: the root cause is
+   * almost certainly the IBM Plex Mono font being slightly wider than the
+   * fallback when the font is still loading, OR a parent flex container
+   * with insufficient min-width. */
+  .matrix-spot, .matrix-spot .px, .matrix-spot .chg,
+  .matrix-vol, .matrix-vol .delta,
+  .matrix-ticker,
+  .prob-cell, .prob-cell .strike, .prob-cell .prob {
+    white-space: nowrap !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+  }
+  .matrix-spot, .matrix-vol { min-width: 0; }
   a { color: inherit; text-decoration: none; }
   button { font-family: inherit; cursor: pointer; }
 
