@@ -507,11 +507,27 @@ export function LandingView() {
   // Live probability matrix — drives the matrix-card on desktop. Each cell
   // owns its own useOrderBook subscription so prices update live without
   // re-rendering the whole list.
-  const { data: allMarkets } = useAllMarkets();
+  const { data: allMarkets, isLoading: marketsLoading, error: marketsError } =
+    useAllMarkets();
   const liveGroups = useMemo(
     () => (allMarkets ? groupLiveMarkets(allMarkets) : []),
     [allMarkets],
   );
+  const matrixEmptyState: string | null = useMemo(() => {
+    if (marketsLoading || allMarkets === undefined) {
+      return "Loading live markets from program.account.strikeMarket.all()…";
+    }
+    if (marketsError) {
+      return `RPC error: ${marketsError instanceof Error ? marketsError.message : String(marketsError)}`;
+    }
+    if (allMarkets.length === 0) {
+      return "No StrikeMarket accounts returned by getProgramAccounts. Check RPC + program ID.";
+    }
+    if (liveGroups.length === 0) {
+      return `Decoded ${allMarkets.length} markets but none matched DEMO_STRIKE_MARKETS. Registry may be stale vs Bram's latest seed.`;
+    }
+    return null;
+  }, [allMarkets, marketsLoading, marketsError, liveGroups.length]);
 
   // Live AAPL briefing (P2-paired-sprint pattern).
   const [briefing, setBriefing] = useState<LiveBriefing | null>(null);
@@ -773,18 +789,21 @@ export function LandingView() {
               <div />
             </div>
 
-            {liveGroups.length === 0 && (
+            {matrixEmptyState && (
               <div
                 className="matrix-row"
-                style={{ padding: "20px", opacity: 0.6, fontSize: 13 }}
+                style={{ padding: "20px", opacity: 0.7, fontSize: 13 }}
+                data-matrix-state={
+                  marketsLoading
+                    ? "loading"
+                    : marketsError
+                      ? "error"
+                      : allMarkets?.length === 0
+                        ? "empty"
+                        : "registry-miss"
+                }
               >
-                <span>
-                  Loading live markets from{" "}
-                  <code style={{ fontFamily: "var(--font-mono)" }}>
-                    program.account.strikeMarket.all()
-                  </code>
-                  …
-                </span>
+                <span>{matrixEmptyState}</span>
               </div>
             )}
             {liveGroups.map((group) => (

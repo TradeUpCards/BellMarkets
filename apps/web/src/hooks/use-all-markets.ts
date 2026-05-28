@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useConnection } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
+import bs58 from "bs58";
 
 import {
   accountDiscriminator,
@@ -32,6 +33,10 @@ export function useAllMarkets() {
     queryKey: queryKeys.markets.list(),
     queryFn: async () => {
       const discriminator = accountDiscriminator("StrikeMarket");
+      // bs58 encoding is the cross-version-safe default for memcmp.bytes.
+      // The base64 `encoding:` field was added in a later web3.js — using
+      // it on older clients silently matches nothing, which manifests as
+      // a stuck "Loading live markets" matrix.
       const accounts = await connection.getProgramAccounts(
         BELL_MARKETS_PROGRAM_PUBKEY,
         {
@@ -40,8 +45,7 @@ export function useAllMarkets() {
             {
               memcmp: {
                 offset: 0,
-                bytes: discriminator.toString("base64"),
-                encoding: "base64",
+                bytes: bs58.encode(discriminator),
               },
             },
           ],
