@@ -41,27 +41,44 @@ export function useAllMarkets() {
       const pdaList = DEMO_STRIKE_MARKETS.map((m) => new PublicKey(m.marketPda));
       if (pdaList.length === 0) return [];
 
-      const infos = await connection.getMultipleAccountsInfo(pdaList, "confirmed");
+      // Diagnostic: visible in browser console — helps the next person
+      // debug "matrix empty" without reading the queryFn source.
+      // eslint-disable-next-line no-console
+      console.log(`[useAllMarkets] fetching ${pdaList.length} StrikeMarket PDAs from registry…`);
+      let infos;
+      try {
+        infos = await connection.getMultipleAccountsInfo(pdaList, "confirmed");
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.error(`[useAllMarkets] getMultipleAccountsInfo threw:`, e);
+        throw e;
+      }
+      // eslint-disable-next-line no-console
+      console.log(`[useAllMarkets] received ${infos.length} responses · null=${infos.filter((i) => !i).length} · present=${infos.filter((i) => i).length}`);
 
       const decoded: StrikeMarketWithPda[] = [];
+      let decodeFailures = 0;
+      let fieldGuards = 0;
       for (let i = 0; i < infos.length; i++) {
         const info = infos[i];
         if (!info) continue; // PDA in registry but no account on-chain — skip silently
         try {
           const data = decodeStrikeMarket(info.data as Buffer);
-          // Defensive: same legacy-schema guard as the prior `getProgramAccounts`
-          // path — drop entries where the load-bearing fields didn't decode
-          // (deploy_index ≤ 6 StrikeMarket was 333 B without `order_book`).
           if (!data?.strikePrice || !data.expiryUnix || !data.yesMint) {
+            fieldGuards++;
             continue;
           }
           decoded.push({ pda: pdaList[i]!, data });
-        } catch {
-          // Legacy-schema or malformed; skip silently. Re-emerges as
-          // `liveMarket=null` in trade-view → "No on-chain StrikeMarket"
-          // disable banner.
+        } catch (e) {
+          decodeFailures++;
+          if (decodeFailures <= 2) {
+            // eslint-disable-next-line no-console
+            console.warn(`[useAllMarkets] decode failed for ${pdaList[i]!.toBase58().slice(0, 8)}… (size=${info.data.length}):`, (e as Error).message);
+          }
         }
       }
+      // eslint-disable-next-line no-console
+      console.log(`[useAllMarkets] decoded ${decoded.length} markets · decodeFailures=${decodeFailures} · fieldGuards=${fieldGuards}`);
       return decoded;
     },
     // 60s staleTime + 30s background refresh: matrix data changes when
