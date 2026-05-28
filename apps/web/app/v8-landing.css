@@ -764,7 +764,7 @@
   }
   .matrix-thead {
     grid-column: 1 / -1;
-    display: grid; grid-template-columns: 110px 90px repeat(7, 1fr) 100px 90px;
+    display: grid; grid-template-columns: 110px 120px repeat(7, 1fr) 110px 100px;
     background: var(--panel-2);
     border-bottom: 1px solid var(--border);
   }
@@ -781,7 +781,7 @@
 
   .matrix-row {
     grid-column: 1 / -1;
-    display: grid; grid-template-columns: 110px 90px repeat(7, 1fr) 100px 90px;
+    display: grid; grid-template-columns: 110px 120px repeat(7, 1fr) 110px 100px;
     border-bottom: 1px solid var(--border);
     transition: background 150ms;
     cursor: pointer;
@@ -816,10 +816,19 @@
   .matrix-spot .chg.up { color: var(--yes); }
   .matrix-spot .chg.down { color: var(--no); }
 
-  /* Color-coded probability cells — heat map */
+  /* Color-coded probability cells — heat map.
+   * Note: must duplicate the flex column from `.matrix-row > div` because
+   * the clickable cells render as <a> via <Link>, not <div>, so the
+   * direct-child selector doesn't apply to them. Without this the strike
+   * label and probability appear on the same line. */
   .prob-cell {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
     text-align: center;
     align-items: center;
+    gap: 4px;
+    padding: 14px 8px;
     font-weight: 700; font-size: 17px;
     cursor: pointer; transition: all 150ms;
   }

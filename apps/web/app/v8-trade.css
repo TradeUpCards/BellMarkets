@@ -292,20 +292,23 @@
   }
   .strike-pill {
     flex-shrink: 0;
-    display: flex; flex-direction: column; gap: 1px; align-items: center;
-    padding: 7px 12px;
+    display: flex; flex-direction: column; gap: 2px; align-items: center;
+    padding: 8px 14px;
     background: var(--panel-2); border: 1px solid var(--border);
     border-radius: 4px;
     cursor: pointer; transition: all 150ms;
-    min-width: 70px;
+    min-width: 90px;
     font-family: 'IBM Plex Mono', monospace;
+    white-space: nowrap;
   }
   .strike-pill:hover { border-color: var(--border-strong); }
   .strike-pill .px {
-    font-size: 11px; color: var(--text-muted); font-weight: 500;
+    font-size: 13px; color: var(--text-muted); font-weight: 500;
+    white-space: nowrap;
   }
   .strike-pill .prob {
-    font-size: 13px; font-weight: 700; color: var(--text);
+    font-size: 15px; font-weight: 700; color: var(--text);
+    white-space: nowrap;
   }
   .strike-pill.active {
     background: var(--accent-bg); border-color: var(--accent);
@@ -1624,8 +1627,8 @@
     min-width: auto;
     min-height: 28px;
   }
-  .strike-pills-inline .strike-pill .px { font-size: 10px; }
-  .strike-pills-inline .strike-pill .prob { font-size: 11px; }
+  .strike-pills-inline .strike-pill .px { font-size: 12px; }
+  .strike-pills-inline .strike-pill .prob { font-size: 13px; }
   .strike-pills-inline::-webkit-scrollbar { height: 0; }
   .strike-pills-inline .strike-pill { flex-shrink: 0; }
   /* Strike dropdown — only shown on small screens (replaces inline pills) */
