@@ -38,29 +38,6 @@ function resolveRpcEndpoint(): string {
 export const SOLANA_RPC_ENDPOINT: string = resolveRpcEndpoint();
 
 /**
- * Direct Helius WebSocket endpoint for `onAccountChange` subscriptions.
- *
- * Why a separate WS endpoint: Vercel's serverless functions handle HTTP
- * but NOT WebSocket upgrades. The `/api/solana-rpc` proxy rejects WSS
- * with a 404 + HTML response, web3.js retries indefinitely, and every
- * subscription-driven hook (useMarketConfig, useOrderBook, usePosition,
- * useTokenBalance) silently stops receiving updates.
- *
- * Fix: HTTP stays through the proxy (key server-side, gets the matrix +
- * one-shot reads); WSS goes direct to Helius (key in the URL, client-side).
- * Same Helius account either way — exposure of the key for the WS half is
- * equivalent to exposure for the HTTP half. The split is purely about
- * Vercel's WS limitation, not security posture.
- *
- * Set `NEXT_PUBLIC_SOLANA_WS_URL` in Vercel env vars to the direct
- * Helius WSS URL (e.g., `wss://devnet.helius-rpc.com/?api-key=<key>`).
- * If unset, returns `undefined` — wallet-adapter falls back to deriving
- * the WSS endpoint from the HTTP one (which lands on the broken proxy).
- */
-export const SOLANA_WS_ENDPOINT: string | undefined =
-  process.env.NEXT_PUBLIC_SOLANA_WS_URL || undefined;
-
-/**
  * Canonical devnet deployment of the BellMarkets program (Aria, 2026-05-21).
  * Env var overrides for future redeploys without a rebuild.
  */
