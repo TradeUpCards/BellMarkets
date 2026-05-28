@@ -76,16 +76,24 @@ function outcomeLabel(o: Outcome): string {
 }
 
 function strikeToDollars(strikePrice: { toString(): string }): number {
-  // On-chain strike is in Pyth-feed-exponent units (typically expo=-8 →
-  // strike × 1e8). For display we divide by 1e8 unless the value looks
-  // smaller (USDC-scale fallback at 1e6).
+  // On-chain strike is encoded at the underlying Pyth feed's negative
+  // exponent. Mainnet equity feeds use e-8; USDC-shaped feeds use e-6;
+  // SOL/USD devnet (our current fallback while Pyth devnet has no MAG7
+  // equity feeds) uses e-5. Magnitude-detect the scale by band:
+  //   raw < 1e8     → e-5  (SOL/USD devnet fallback)
+  //   raw 1e8–1e11  → e-6  (USDC-shaped feeds)
+  //   raw >= 1e11   → e-8  (mainnet Pyth equity feeds)
+  // Pre-fix this divided e-5-encoded values by 1e6, so $639 rendered as $64
+  // ($639 × 1e5 / 1e6 = 63.9 → rounded to 64). See landing-view.tsx for
+  // the parallel fix + comment trail.
   const raw = BigInt(strikePrice.toString());
   if (raw === 0n) return 0;
-  // Heuristic: anything ≥ 1e8 is e-8 scaled; else e-6.
   const e6Scale = 1_000_000n;
   const e8Scale = 100_000_000n;
-  const div = raw >= e8Scale ? e8Scale : e6Scale;
-  return Number(raw) / Number(div);
+  const e5Scale = 100_000n;
+  if (raw >= 100_000_000_000n) return Number(raw) / Number(e8Scale);
+  if (raw >= 100_000_000n) return Number(raw) / Number(e6Scale);
+  return Number(raw) / Number(e5Scale);
 }
 
 function inferTicker(_pythFeed: PublicKey): string {

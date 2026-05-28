@@ -335,16 +335,28 @@ function probToCls(prob: number): string {
 }
 
 /**
- * On-chain strike is in Pyth-feed-exponent micros (we accept either e-6 or
- * e-8 scaling per the trade-view's `liveMarket` matcher). Returns dollars.
+ * On-chain strike is encoded at the Pyth feed's negative exponent. Our demo
+ * uses SOL/USD (expo=-5) as the underlying feed fallback because Pyth devnet
+ * doesn't have MAG7 equity feeds; mainnet would use the real MAG7 feeds at
+ * expo=-8. Auto-detect the scale by magnitude — strikes are in the
+ * $1–$10,000 range, so the raw integer falls into well-separated bands:
+ *
+ *   raw < 1e8     → e-5 scaling (SOL/USD devnet fallback, our current case)
+ *   raw 1e8–1e11  → e-6 scaling (USDC-shaped feeds)
+ *   raw >= 1e11   → e-8 scaling (mainnet Pyth equity feeds)
+ *
+ * Without the e-5 branch, $639 was rendering as $64 ($639 × 10^5 / 10^6).
+ * That's what looked like "ones-place truncation" in the matrix.
  */
 function strikeToDollars(rawBn: { toString(): string }): number {
   const raw = BigInt(rawBn.toString());
   if (raw === 0n) return 0;
   const e8 = 100_000_000n;
   const e6 = 1_000_000n;
-  const div = raw >= e8 ? e8 : e6;
-  return Number(raw) / Number(div);
+  const e5 = 100_000n;
+  if (raw >= 100_000_000_000n) return Number(raw) / Number(e8);
+  if (raw >= 100_000_000n) return Number(raw) / Number(e6);
+  return Number(raw) / Number(e5);
 }
 
 interface LiveMatrixCellProps {

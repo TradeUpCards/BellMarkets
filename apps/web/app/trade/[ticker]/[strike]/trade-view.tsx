@@ -116,6 +116,10 @@ export function TradeView({ ticker, strike }: TradeViewParams) {
   // matter what the deployed markets were created with.
   const liveMarket = useMemo(() => {
     if (!allMarkets) return null;
+    // Accept e-5 (SOL/USD devnet fallback, our current case), e-6 (USDC-shaped),
+    // and e-8 (mainnet Pyth equity) scaling. Pre-fix, only e-6 + e-8 were
+    // matched so all e-5 markets were silently invisible to the trade view.
+    const strikeE5 = BigInt(strikeNum) * 100_000n;
     const strikeE6 = BigInt(strikeNum) * 1_000_000n;
     const strikeE8 = BigInt(strikeNum) * 100_000_000n;
     return (
@@ -129,7 +133,7 @@ export function TradeView({ ticker, strike }: TradeViewParams) {
         } catch {
           return false;
         }
-        return sp === strikeE6 || sp === strikeE8;
+        return sp === strikeE5 || sp === strikeE6 || sp === strikeE8;
       }) ?? null
     );
   }, [allMarkets, strikeNum]);
@@ -144,9 +148,12 @@ export function TradeView({ ticker, strike }: TradeViewParams) {
       .filter((m) => marketToTicker(m.pda.toBase58()) === tickerUpper)
       .map((m) => {
         const raw = BigInt(m.data.strikePrice.toString());
-        const e8 = 100_000_000n;
-        const e6 = 1_000_000n;
-        const div = raw >= e8 ? e8 : e6;
+        // e-5 / e-6 / e-8 band detection (see landing-view.tsx strikeToDollars
+        // comment for the band thresholds + rationale).
+        let div: bigint;
+        if (raw >= 100_000_000_000n) div = 100_000_000n; // e-8
+        else if (raw >= 100_000_000n) div = 1_000_000n; // e-6
+        else div = 100_000n; // e-5 (current SOL/USD devnet fallback)
         return Math.round(Number(raw) / Number(div));
       })
       .sort((a, b) => a - b);
@@ -167,9 +174,11 @@ export function TradeView({ ticker, strike }: TradeViewParams) {
     for (const mkt of allMarkets) {
       if (marketToTicker(mkt.pda.toBase58()) !== tickerUpper) continue;
       const raw = BigInt(mkt.data.strikePrice.toString());
-      const e8 = 100_000_000n;
-      const e6 = 1_000_000n;
-      const div = raw >= e8 ? e8 : e6;
+      // e-5 / e-6 / e-8 band detection (see landing-view.tsx strikeToDollars).
+      let div: bigint;
+      if (raw >= 100_000_000_000n) div = 100_000_000n; // e-8
+      else if (raw >= 100_000_000n) div = 1_000_000n; // e-6
+      else div = 100_000n; // e-5 (current SOL/USD devnet fallback)
       const strike = Math.round(Number(raw) / Number(div));
       m.set(strike, { pda: mkt.pda });
     }
