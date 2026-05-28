@@ -6,8 +6,8 @@ import { BellMarketsAnchorClient } from "../src/clients/anchor.js";
 import { loadConfig } from "../src/config.js";
 
 const EXPECTED_BUSDC = "5vq2oahKFnnjStK1Ctqwdxdt44rtKuKHmPga9iZKtBZp";
-const RECIPIENT_WALLET = "8YBJdbnwSM5LDu7L9rfHfp1fSnY9JFjUxnX9qgBzBQG1";
-const EXPECTED_ATA = "CK1FEAf7niMrnC2MDa3csCVkfDBFeAnTMfGmLngwP137";
+const RECIPIENT_WALLET = "BYPeNkAVEHvfSBzWTnxgFx4DVzMEpNoowKpmmRr67YiW";
+const EXPECTED_ATA = "63BXnEtJRojKtrkdx1SHtSUgv7RLw6rXeiGJdP4QCSrk";
 
 async function main() {
   const cfg = loadConfig();

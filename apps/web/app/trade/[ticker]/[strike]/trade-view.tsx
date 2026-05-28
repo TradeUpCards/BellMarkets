@@ -294,6 +294,28 @@ export function TradeView({ ticker, strike }: TradeViewParams) {
   const usdcAvail = usdcBalance?.amount
     ? Number(usdcBalance.amount) / Number(10n ** USDC_DECIMALS)
     : USDC_AVAIL_FALLBACK;
+  // Diagnostic — visible in browser console so user can see exactly what
+  // wallet pubkey, mint, and balance the trade page is reading. Remove
+  // once the bUSDC balance reliably populates without needing this.
+  useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.log("[useTokenBalance/trade]", {
+      walletPubkey: wallet.publicKey?.toBase58() ?? null,
+      marketConfigLoaded: !!marketConfig,
+      usdcMintFromConfig: marketConfig?.usdcMint?.toBase58() ?? null,
+      derivedAta: usdcBalance?.ata?.toBase58() ?? null,
+      ataInitialized: usdcBalance?.uninitialized === false,
+      rawAmount: usdcBalance?.amount?.toString() ?? null,
+      computedUsdcAvail: usdcAvail,
+    });
+  }, [
+    wallet.publicKey,
+    marketConfig,
+    usdcBalance?.ata,
+    usdcBalance?.uninitialized,
+    usdcBalance?.amount,
+    usdcAvail,
+  ]);
 
   const sellEmpty = side === "sell" && pos.contracts === 0;
 
