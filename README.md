@@ -4,6 +4,7 @@ A non-custodial Solana dApp for trading binary outcome contracts on daily MAG7 s
 
 > Gauntlet project codename: **Meridian**. Cohort 5 submission. See `.project/bell-markets/docs/prd/` for the original PRD.
 
+🎥 **Demo video:** [youtu.be/keODMa5CSGI](https://youtu.be/keODMa5CSGI)
 🌐 **Live demo:** [bell-markets.vercel.app](https://bell-markets.vercel.app)
 📜 **Program:** [`599h7VznYR4CxyrG5nQbhR13qtRuwPcbnNr5QqbkS7uV`](https://solscan.io/account/599h7VznYR4CxyrG5nQbhR13qtRuwPcbnNr5QqbkS7uV?cluster=devnet) on Solana devnet (`deploy_index=9`)
 💵 **bUSDC:** Self-controlled demo mint [`5vq2oahKFnnjStK1Ctqwdxdt44rtKuKHmPga9iZKtBZp`](https://solscan.io/account/5vq2oahKFnnjStK1Ctqwdxdt44rtKuKHmPga9iZKtBZp?cluster=devnet)

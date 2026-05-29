@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>BellMarkets — Mock Interview Prep</title>
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --bg-2: #0f1626;
+    --fg: #e4ecf7;
+    --muted: #8a99b3;
+    --accent: #22d3ee;
+    --accent-glow: rgba(34, 211, 238, 0.25);
+    --border: #1c2640;
+    --warn: #fbbf24;
+    --good: #34d399;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 15px; line-height: 1.55;
+  }
+  .page { max-width: 980px; margin: 0 auto; padding: 40px 32px 80px; }
+  header {
+    border-bottom: 2px solid var(--border);
+    padding-bottom: 20px; margin-bottom: 36px;
+  }
+  h1 {
+    font-size: 28px; margin: 0 0 6px;
+    color: var(--accent);
+    text-shadow: 0 0 18px var(--accent-glow);
+  }
+  .sub { color: var(--muted); font-size: 14px; }
+  h2 {
+    font-size: 22px; margin: 48px 0 16px;
+    padding: 12px 16px;
+    background: linear-gradient(90deg, rgba(34,211,238,0.12), transparent);
+    border-left: 4px solid var(--accent);
+    color: var(--accent);
+  }
+  h3 {
+    font-size: 16px; margin: 24px 0 8px;
+    color: var(--fg);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+  }
+  .clock {
+    display: inline-block;
+    background: rgba(34,211,238,0.12);
+    color: var(--accent);
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    margin-left: 12px;
+    vertical-align: middle;
+  }
+  .step {
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px 20px;
+    margin: 12px 0;
+  }
+  .step .what { color: var(--accent); font-weight: 700; font-size: 14px; }
+  .step .say { color: var(--fg); margin-top: 6px; font-size: 15px; }
+  .step .say::before { content: '" '; color: var(--muted); }
+  .step .say::after  { content: ' "'; color: var(--muted); }
+  ul { padding-left: 22px; margin: 8px 0; }
+  ul li { margin: 6px 0; }
+  ul li strong { color: var(--accent); }
+  .qa {
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--warn);
+    border-radius: 6px;
+    padding: 16px 20px;
+    margin: 14px 0;
+  }
+  .qa .q { color: var(--warn); font-weight: 700; font-size: 15px; margin-bottom: 8px; }
+  .qa .q::before { content: 'Q · '; opacity: 0.6; }
+  .qa .a { font-size: 14px; }
+  .qa .a::before { content: 'A · '; color: var(--good); font-weight: 700; }
+  .qa .tag {
+    display: inline-block; font-size: 11px;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    padding: 1px 7px; border-radius: 3px;
+    margin-left: 8px; vertical-align: middle;
+  }
+  .pillrow { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 18px; }
+  .pill {
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+  }
+  .pill strong { color: var(--accent); }
+  hr {
+    border: 0; border-top: 1px dashed var(--border);
+    margin: 32px 0;
+  }
+  .lede {
+    color: var(--fg);
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 18px;
+    margin-bottom: 18px;
+    font-size: 14px;
+  }
+  .lede strong { color: var(--accent); }
+  footer {
+    margin-top: 60px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 12px;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header>
+  <h1>BellMarkets — Mock Interview Prep</h1>
+  <div class="sub">2.5 min demo · 2.5 min Q&amp;A · Gauntlet staff</div>
+</header>
+
+<!-- ──────────────────────────────────────────── -->
+<h2>1. The Demo<span class="clock">2.5 min</span></h2>
+
+<div class="lede">
+  <strong>Frame:</strong> Mobile first. If you don't win mobile on Solana you don't have a product — Phantom and Solflare are phone-native. Show the phone first, do a real trade, then flip to desktop for the architecture talk-through.
+</div>
+
+<div class="pillrow">
+  <span class="pill"><strong>Phone:</strong> ~75s</span>
+  <span class="pill"><strong>Desktop:</strong> ~45s</span>
+  <span class="pill"><strong>Architecture beat:</strong> ~30s</span>
+</div>
+
+<h3>00:00 — 00:15 · Open on phone</h3>
+<div class="step">
+  <div class="what">Show: phone landing → matrix loads with live Pyth spots</div>
+  <div class="say">BellMarkets — non-custodial Solana markets for one question: will this MAG7 stock close above this price today? Mobile is the demo because Solana wallets are phone-native — if you can't trade from a phone, you don't have a Solana product.</div>
+</div>
+
+<h3>00:15 — 00:45 · Buy on mobile</h3>
+<div class="step">
+  <div class="what">Show: tap META 639 strike → trade view → 17 YES at $0.55 → sign in Phantom → balance updates in &lt;5s</div>
+  <div class="say">One signature. That tx mints a YES/NO pair against bUSDC and crosses the resting ask in the same instruction. Vault, mint, and order book all updated atomically — no off-chain matcher between me and the chain.</div>
+</div>
+
+<h3>00:45 — 01:15 · Position + chart</h3>
+<div class="step">
+  <div class="what">Show: position card showing 17 YES · spot chart drawing from Pyth Hermes polls</div>
+  <div class="say">The chart you see is the underlying — live Pyth Hermes feed, polling every 5 seconds. Same Pyth feed that settles the market on-chain at 4 PM. One oracle for live and settle eliminates the read/settle price drift problem.</div>
+</div>
+
+<h3>01:15 — 02:00 · Flip to desktop</h3>
+<div class="step">
+  <div class="what">Show: desktop matrix → trade page with full order book → admin page</div>
+  <div class="say">Desktop is the same Next.js app, same wallet adapter, same on-chain reads. Order book is rendered directly from the on-chain account — not a backend cache. Admin page is for diagnostics and settlement nudging; it doesn't have any privileged write paths the program enforces.</div>
+</div>
+
+<h3>02:00 — 02:30 · Architecture beat</h3>
+<div class="step">
+  <div class="what">Three sentences, one each:</div>
+  <div class="say">Solana for cost and the mobile wallet ecosystem. Custom in-program CLOB because Phoenix's devnet deploy was permissioned and we pivoted to control our own upgrade path on day four. Pyth for both live and settle — non-custodial vault with no admin withdraw instruction means the only way money leaves is through a winning redeem or a force-redeem after the grace window.</div>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<h2>2. Defense Q&amp;A<span class="clock">2.5 min</span></h2>
+
+<div class="lede">
+  Most likely questions, in rough order of probability. <strong>Pick the strongest one-liner and stop talking</strong> — they will reroute if they want more.
+</div>
+
+<div class="qa">
+  <div class="q">Why Solana, not an L2? <span class="tag">expected</span></div>
+  <div class="a">
+    Three reasons in order: <strong>cost</strong> — $0.0001 per state-changing tx makes 0DTE economically possible at retail size; <strong>Pyth</strong> — Pyth was built for Solana and Pythnet, it's first-class here, not a bridged afterthought; <strong>mobile wallets</strong> — Phantom and Solflare own the mobile UX, and a same-day options product lives or dies on phone trading. An L2 would force me to bridge USDC and use a worse mobile wallet story for a feature I don't need: programmable settlement.
+  </div>
+</div>
+
+<div class="qa">
+  <div class="q">Why a custom CLOB instead of Phoenix or Drift? <span class="tag">expected</span></div>
+  <div class="a">
+    Original plan was Phoenix. Day four discovered Phoenix's devnet deploy is permissioned — couldn't reproduce the market-creation path without their team. Pivot was documented as DR-020. Binary outcome books are thin by nature, so an in-program CLOB matches the actual liquidity shape and gives me full control of the upgrade path. Phoenix is documented as a v1.1 swap — the value isn't auto-liquidity, it's distribution and discovery: MMs already wired into Phoenix can opt-in to our books without building a custom integration, and our markets surface to the existing Phoenix user base. And a Phoenix listing makes us aggregator-eligible — Jupiter and similar see depth they can route to, which is the actual liquidity-bootstrap mechanism on Solana.
+  </div>
+</div>
+
+<div class="qa">
+  <div class="q">What happens if Pyth lies or stalls? <span class="tag">expected</span></div>
+  <div class="a">
+    Two defenses in the program. <strong>Staleness:</strong> settle reverts if the Pyth publish_time is older than the configured staleness window. <strong>Confidence:</strong> settle reverts if Pyth's confidence band is wider than 50bps of price. If both gates fail, the admin override path opens with a 24-hour delay and an on-chain reason field — the user has time to redeem-pair out before any disputed settle is applied.
+  </div>
+</div>
+
+<div class="qa">
+  <div class="q">What's your trust model? Who can move user funds? <span class="tag">expected</span></div>
+  <div class="a">
+    No one. There is no <code>withdraw_to_admin</code> instruction in the program — that's the mechanical, not policy, guarantee. The vault PDA only releases USDC through <code>redeem</code> (winning token burn) or <code>redeem_pair</code> (both sides burn together pre-settle). After the grace window, anyone can call <code>force_redeem</code> for any holder, recovering vault rent.
+  </div>
+</div>
+
+<div class="qa">
+  <div class="q">What if your cron dies at 4 PM? <span class="tag">very likely</span></div>
+  <div class="a">
+    Settle is <strong>permissionless</strong>. The cron on Trigger.dev is a convenience nudger, not the authority — anyone can crank <code>settle_market</code> after expiry. The program checks Pyth and writes the outcome idempotently, so races between callers cost the loser a transaction fee but produce the same outcome. DR-002 codifies this — cron failure is not market failure.
+  </div>
+</div>
+
+<div class="qa">
+  <div class="q">How does this scale? Rent on Solana adds up. <span class="tag">expected</span></div>
+  <div class="a">
+    Per market: about 0.05 SOL of rent (StrikeMarket + YES mint + NO mint + USDC vault + OrderBook). At 7 tickers × 7 strikes/day that's ~2.5 SOL/day in rent at peak occupancy. <strong>Rent recovery is a documented pre-mainnet precondition</strong> in specs/deferred.md — v1.1 adds <code>force_cancel_order</code> + <code>close_order_book</code> instructions that telescope rent back to the originating wallet after settlement.
+  </div>
+</div>
+
+<div class="qa">
+  <div class="q">MEV and front-running? <span class="tag">if quant lens</span></div>
+  <div class="a">
+    No AMM curve to sandwich. Orders rest at fixed prices on a CLOB, takers consume them at the resting price, and the buy paths are IOC — leftover quantity rejects instead of resting against you. The close-of-day Pyth read is permissionless and idempotent; racing for it doesn't change the price.
+  </div>
+</div>
+
+<div class="qa">
+  <div class="q">How do you bootstrap liquidity? <span class="tag">likely</span></div>
+  <div class="a">
+    Demo uses an automation seeder posting both sides at fair-coin-flip prices. Production has two levers: <strong>creator rebates</strong> in DR-008 — the wallet that created the market gets a slice of mint fees from every trade against it — and a per-ticker market-maker integration as a v1.1 partnership. Binary outcome books have an obvious anchor (50¢/50¢) which makes algorithmic MM straightforward.
+  </div>
+</div>
+
+<div class="qa">
+  <div class="q">Why bUSDC, not USDC? <span class="tag">technical</span></div>
+  <div class="a">
+    Devnet only. Real USDC mint doesn't exist on devnet, so we ship a self-controlled mint with the same 6-decimal layout and call it bUSDC. <code>MarketConfig.usdc_mint</code> is parameterized — flipping to mainnet USDC is a one-instruction config update; no program redeploy.
+  </div>
+</div>
+
+<div class="qa">
+  <div class="q">Why daily expiry (0DTE) instead of weekly? <span class="tag">product</span></div>
+  <div class="a">
+    Three reasons. <strong>Oracle simplicity:</strong> one Pyth read per cycle, no overnight risk window to model. <strong>Retail mental model:</strong> "will it close above this today" is a question anyone watching the market already asks. <strong>Capital velocity:</strong> 0DTE flow in TradFi is the fastest-growing options segment — daily turn is the product-market fit, not weekly tail risk.
+  </div>
+</div>
+
+<div class="qa">
+  <div class="q">What did you defer and why? <span class="tag">very likely</span></div>
+  <div class="a">
+    Four big ones, all in <code>specs/deferred.md</code>: <strong>rent-recovery instructions</strong> (pre-mainnet hard gate), <strong>Phoenix swap</strong> (v1.1 if MM depth becomes the bottleneck), <strong>WebSocket subscription path</strong> (Vercel serverless can't proxy WS — needs a Cloudflare Worker proxy in production; demo polls at 5s), and <strong>Neon-backed market registry</strong> (replaces the hardcoded demo registry; currently I list known PDAs to dodge a Helius getProgramAccounts restriction).
+  </div>
+</div>
+
+<div class="qa">
+  <div class="q">What would you do differently with another week? <span class="tag">soft</span></div>
+  <div class="a">
+    Three things, in priority. <strong>One:</strong> ship the rent-recovery instructions — the only thing actually blocking mainnet. <strong>Two:</strong> replace the demo registry with the Neon-backed pattern + a backend GPA sync job. <strong>Three:</strong> Phoenix evaluation — if we can get a non-permissioned deploy path, Phoenix buys us distribution and discovery: existing MMs that already speak Phoenix's protocol can opt-in to our books, and our markets show up in the Phoenix-integrated frontends and aggregators that users already use. A Phoenix listing also makes us aggregator-eligible — Jupiter and similar see depth they can route to, which is the actual liquidity-bootstrap mechanism on Solana.
+  </div>
+</div>
+
+<hr/>
+
+<!-- ──────────────────────────────────────────── -->
+<h2>3. Numbers to know cold</h2>
+
+<ul>
+  <li><strong>28</strong> instructions in the program · <strong>7</strong> account types · <strong>57</strong> error variants</li>
+  <li><strong>0.05 SOL</strong> rent per market (verified on-chain, see <code>docs/cost-analysis.md</code>)</li>
+  <li><strong>$0.0001</strong> per state-changing tx (Solana base fee + small priority)</li>
+  <li><strong>50 bps</strong> Pyth confidence gate · <strong>staleness</strong> gate configurable</li>
+  <li><strong>24h</strong> admin override delay if both gates fail</li>
+  <li><strong>4:05 PM ET</strong> nominal settle nudger fires; permissionless caller after</li>
+  <li><strong>7 MAG7</strong> tickers × <strong>7</strong> strikes ≈ <strong>49</strong> markets/day at full grid</li>
+  <li><strong>1</strong> Anchor program, <strong>0</strong> off-chain matchers, <strong>0</strong> custody instructions</li>
+</ul>
+
+<h2>4. Lines to deliver verbatim</h2>
+
+<ul>
+  <li>"Same-day binary. Will this stock close above this price today. Settled by Pyth at 4 PM."</li>
+  <li>"There is no withdraw-to-admin instruction in the program. That's the mechanical guarantee, not a policy."</li>
+  <li>"Settle is permissionless. Cron is a nudger, not an authority. Cron failure is not market failure."</li>
+  <li>"One Pyth feed for live and settle — no oracle mismatch risk."</li>
+  <li>"Phoenix pivot was day four. Documented as DR-020. v1.1 swap path stays open."</li>
+  <li>"Rent recovery is the only thing blocking mainnet."</li>
+</ul>
+
+<footer>
+  BellMarkets · Cohort 5 (Meridian) · Mock interview prep · self-contained one-pager
+</footer>
+
+</div>
+</body>
+</html>

@@ -33,7 +33,8 @@
     "seed-demo-liquidity": "tsx --env-file=.env scripts/seed-demo-liquidity.ts",
     "gen-test-wallets": "tsx scripts/generate-test-wallets.ts",
     "fund-test-wallets": "tsx --env-file=.env scripts/fund-test-wallets.ts",
-    "export-phantom": "tsx scripts/export-wallets-for-phantom.ts"
+    "export-phantom": "tsx scripts/export-wallets-for-phantom.ts",
+    "export-keypair": "tsx scripts/export-keypair-base58.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
