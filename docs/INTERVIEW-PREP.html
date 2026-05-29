@@ -221,7 +221,14 @@
 <div class="qa">
   <div class="q">How does this scale? Rent on Solana adds up. <span class="tag">expected</span></div>
   <div class="a">
-    Per market: about 0.05 SOL of rent (StrikeMarket + YES mint + NO mint + USDC vault + OrderBook). At 7 tickers × 7 strikes/day that's ~2.5 SOL/day in rent at peak occupancy. <strong>Rent recovery is a documented pre-mainnet precondition</strong> in specs/deferred.md — v1.1 adds <code>force_cancel_order</code> + <code>close_order_book</code> instructions that telescope rent back to the originating wallet after settlement.
+    Per market: <strong>0.128 SOL</strong> verified on-chain — the OrderBook account alone is 16,448 bytes / 0.115 SOL (90.4% of the total). At 49 markets/day that's ~6.3 SOL/day at full grid. <strong>Rent recovery is a documented pre-mainnet precondition</strong> in specs/deferred.md — v1.1 adds <code>force_cancel_order</code> + <code>close_order_book</code> instructions that recover 95.2% of per-market rent, dropping net stranded to ~$1/market.
+  </div>
+</div>
+
+<div class="qa">
+  <div class="q">How much did your CLOB cost vs Phoenix? <span class="tag">expected</span></div>
+  <div class="a">
+    Ours is <strong>cheaper per market</strong>, not more expensive — that's actually a defense of the DR-020 pivot. Ours: <strong>16,448 bytes → 0.115 SOL ≈ $18 per market</strong>, verified on-chain. Phoenix at the standard <strong>500/500/100</strong> sizing (bids/asks/seats) is <strong>~80KB → ~0.5–0.6 SOL per market — 4–5× our cost.</strong> And no pre-existing Phoenix market exists for our YES/USDC or NO/USDC mints, so we'd have been the ones initializing one per strike per day — paying the full ~0.5 SOL each, not amortizing across other integrators. Source for the 500/500/100 number: <code>specs/clob-strategy.md</code> §"InitializeMarket CPI". The pivot cost us audit-pedigree on the matching engine; it bought us better unit economics and full control of the upgrade path.
   </div>
 </div>
 
@@ -274,7 +281,7 @@
 
 <ul>
   <li><strong>28</strong> instructions in the program · <strong>7</strong> account types · <strong>57</strong> error variants</li>
-  <li><strong>0.05 SOL</strong> rent per market (verified on-chain, see <code>docs/cost-analysis.md</code>)</li>
+  <li><strong>0.128 SOL</strong> rent per market verified on-chain (OrderBook = 0.115 of that, 90.4%); v1.1 recovers 95.2% to ~$1/market net (see <code>docs/cost-analysis.md</code>)</li>
   <li><strong>$0.0001</strong> per state-changing tx (Solana base fee + small priority)</li>
   <li><strong>50 bps</strong> Pyth confidence gate · <strong>staleness</strong> gate configurable</li>
   <li><strong>24h</strong> admin override delay if both gates fail</li>
