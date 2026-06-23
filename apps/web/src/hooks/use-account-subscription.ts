@@ -4,7 +4,6 @@ import { useEffect } from "react";
 import {
   type QueryKey,
   useQuery,
-  useQueryClient,
   type UseQueryResult,
 } from "@tanstack/react-query";
 import { useConnection } from "@solana/wallet-adapter-react";
@@ -74,23 +73,12 @@ export function useAccountSubscription<T>(
   opts: { enabled?: boolean; pollIntervalMs?: number } = {},
 ): UseQueryResult<T> {
   const { connection } = useConnection();
-  const queryClient = useQueryClient();
   const enabled = (opts.enabled ?? true) && pubkey !== null;
 
-  // ─── DEMO posture: HTTP polling at 5s. v1.1: switch to WS subscriptions ───
-  //
-  // Hard YES #9 originally said "subscriptions, never polling." For the demo
-  // we soften this: Vercel serverless functions don't support WS upgrades,
-  // and routing WS direct to Helius would put the API key in NEXT_PUBLIC_*
-  // (Hard NO #13). 5s HTTP polling through the existing proxy lands the
-  // same data with a 5-second lag. Documented in
-  // `docs/architecture/frontend-data-flow.md`.
-  //
-  // For v1.1 production: stand up a WS proxy outside Vercel (Cloudflare
-  // Workers, Fly.io, or a dedicated Node service) that holds the Helius
-  // key server-side and relays WS upgrades. Then drop this polling and
-  // restore subscription-driven updates.
-  const pollIntervalMs = opts.pollIntervalMs ?? 5_000;
+  // Polling disabled — was burning Helius free-plan quota at 5s/account.
+  // Page data updates on navigation and after transactions. Re-enable
+  // (opts.pollIntervalMs) if a paid Helius plan is added.
+  const pollIntervalMs = opts.pollIntervalMs ?? false;
 
   const result = useQuery<T>({
     queryKey,
@@ -103,22 +91,14 @@ export function useAccountSubscription<T>(
     staleTime: Number.POSITIVE_INFINITY,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
-    refetchInterval: enabled ? pollIntervalMs : false,
+    refetchInterval: enabled && pollIntervalMs ? pollIntervalMs : false,
   });
 
+  // WebSocket subscriptions disabled — sharing the Helius free-plan quota
+  // with HTTP polling was unsustainable. Re-enable when a paid plan is in
+  // place and a proper WS proxy (Cloudflare Workers / Fly.io) is wired up.
   useEffect(() => {
-    if (!enabled || !pubkey) return;
-
-    const id = connection.onAccountChange(pubkey, (info) => {
-      queryClient.setQueryData(queryKey, decoder(info ?? null));
-    });
-
-    return () => {
-      void connection.removeAccountChangeListener(id);
-    };
-    // queryKey identity is the caller's responsibility — including the full
-    // tuple here would re-subscribe on every render for inline arrays.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // no-op — subscription body removed intentionally
   }, [connection, pubkey?.toBase58() ?? null, enabled, decoder]);
 
   return result;
