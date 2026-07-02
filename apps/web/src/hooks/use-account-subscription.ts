@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import {
   type QueryKey,
   useQuery,
+  useQueryClient,
   type UseQueryResult,
 } from "@tanstack/react-query";
 import { useConnection } from "@solana/wallet-adapter-react";
